@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { 
   Users, 
   Calendar, 
@@ -95,7 +96,10 @@ export default function AdminDashboard({ profile }: { profile: any }) {
     <div className="admin-container fade-in">
       <aside className="admin-sidebar">
         <div className="brand-header">
-           <div className="logo">W <span>Admin</span></div>
+           <div className="logo">
+              <Image src="/logo.png" alt="MWG" width={32} height={32} style={{borderRadius:'4px'}} />
+              <span>Admin</span>
+           </div>
            <p>Workforce IQ</p>
         </div>
 

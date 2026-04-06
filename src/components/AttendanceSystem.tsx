@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { 
   MapPin, 
   Calendar, 
@@ -53,6 +54,58 @@ export default function AttendanceSystem({ profile }: { profile: { name: string;
   const [isCapturing, setIsCapturing] = useState(false);
   const [capturedSelfie, setCapturedSelfie] = useState<string | null>(null);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+  const [notificationStatus, setNotificationStatus] = useState<'granted' | 'denied' | 'default'>('default');
+
+  // PWA Notification Logic
+  useEffect(() => {
+    if ("Notification" in window) {
+      Notification.requestPermission().then(status => setNotificationStatus(status));
+    }
+  }, []);
+
+  useEffect(() => {
+    const checkNotification = () => {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes();
+      const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+
+      // Config (Workforce IQ Standard Shifts)
+      const shiftStartStr = "09:00";
+      const shiftEndStr = "18:00";
+
+      // 10 mins before start
+      const startSplit = shiftStartStr.split(':').map(Number);
+      const startTime = new Date();
+      startTime.setHours(startSplit[0], startSplit[1] - 10, 0);
+      const startNotifyStr = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`;
+
+      // 10 mins after end
+      const endSplit = shiftEndStr.split(':').map(Number);
+      const endTime = new Date();
+      endTime.setHours(endSplit[0], endSplit[1] + 10, 0);
+      const endNotifyStr = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
+
+      if (timeStr === startNotifyStr && !isCheckedIn) {
+        new Notification("White Gloves Workforce IQ", {
+          body: "Reminder: Your shift starts in 10 minutes. Please prepare to punch in.",
+          icon: "/logo.png"
+        });
+      }
+
+      if (timeStr === endNotifyStr && isCheckedIn) {
+        new Notification("White Gloves Workforce IQ", {
+          body: "Notice: Your shift ended 10 minutes ago. Please remember to punch out.",
+          icon: "/logo.png"
+        });
+      }
+    };
+
+    const interval = setInterval(checkNotification, 60000); 
+    return () => clearInterval(interval);
+  }, [isCheckedIn]);
 
   // Group logs by DATE and NORMALIZE keys to avoid duplicates
   const dailyLogs = React.useMemo(() => {
@@ -214,7 +267,9 @@ export default function AttendanceSystem({ profile }: { profile: { name: string;
       {/* Premium Sidebar - Desktop Only */}
       <aside className="sidebar desktop-only">
         <div className="brand-logo">
-          <div className="logo-sq">W</div>
+          <div className="logo-sq">
+             <Image src="/logo.png" alt="MWG" width={36} height={36} style={{borderRadius:'8px'}} />
+          </div>
           <div className="logo-text">
             <strong>White Gloves</strong>
             <span>TECHNOLOGIES</span>
@@ -235,6 +290,18 @@ export default function AttendanceSystem({ profile }: { profile: { name: string;
             <FileText size={18} /> Leave
           </div>
         </nav>
+
+        {/* PWA Alert Status Badge */}
+        <div className="alert-status-box">
+           <div className={`alert-indicator ${notificationStatus === 'granted' ? 'active' : ''}`}>
+              <div className="a-glow"></div>
+              <Clock size={14} />
+           </div>
+           <div className="a-text">
+              <strong>System Alerts</strong>
+              <span>{notificationStatus === 'granted' ? 'Active & Monitoring' : 'Requires Permission'}</span>
+           </div>
+        </div>
 
         <div className="sidebar-footer">
           <button className="btn-side-punch" onClick={startCamera}>
@@ -726,6 +793,15 @@ Reason: ${leaveReason}`)}`, '_blank')}>
         .thumb-v span { position: absolute; bottom: -4px; right: -4px; background: #000; font-size: 0.6rem; font-weight: 900; padding: 2px 5px; border-radius: 4px; border: 1px solid #222; }
         .more-count { width: 32px; height: 32px; border-radius: 50%; background: #111; border: 1px solid #222; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; color: #444; margin-left: -5px; }
         .l-loc { font-size: 0.85rem; color: #444; }
+
+        .alert-status-box { margin-top: 2rem; padding: 1.2rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; display: flex; align-items: center; gap: 1rem; }
+        .alert-indicator { position: relative; width: 32px; height: 32px; background: #111; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #444; border: 1px solid #222; }
+        .alert-indicator.active { color: #00ff0a; border-color: rgba(0,255,10,0.3); }
+        .alert-indicator.active .a-glow { position: absolute; inset: -4px; border: 2px solid #00ff0a; border-radius: 50%; opacity: 0; animation: a-pulse 2s infinite; }
+        @keyframes a-pulse { 0% { opacity: 0.6; transform: scale(0.8); } 100% { opacity: 0; transform: scale(1.4); } }
+        .a-text { display: flex; flex-direction: column; gap: 0.1rem; }
+        .a-text strong { font-size: 0.75rem; color: #eee; }
+        .a-text span { font-size: 0.6rem; color: #555; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
 
         .capture-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(15px); }
         .modal-content { background: #0d0d0d; padding: 3rem; border-radius: 40px; border: 1px solid #222; width: 550px; text-align: center; }

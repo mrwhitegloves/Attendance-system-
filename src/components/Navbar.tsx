@@ -79,8 +79,8 @@ export default function Navbar() {
         .logo-icon {
           width: 44px;
           height: 44px;
-          background: rgba(230, 30, 42, 0.1);
-          border: 1px solid var(--primary);
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           display: flex;
           align-items: center;
           justify-content: center;

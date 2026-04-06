@@ -18,72 +18,176 @@ interface Profile {
 export default function Home() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [liveCount, setLiveCount] = useState(1432);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setProfile(JSON.parse(savedUser));
-    }
+    if (savedUser) setProfile(JSON.parse(savedUser));
     setIsLoaded(true);
+
+    const interval = setInterval(() => {
+      setLiveCount(prev => prev + Math.floor(Math.random() * 3) - 1);
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
-  if (!isLoaded) return null; // Prevent hydration mismatch
+  if (!isLoaded) return null;
 
   return (
     <main className="main-wrapper">
-      {!profile && <Navbar />}
+      {!profile && (
+        <div className="mobile-only">
+           <nav className="m-navbar">
+              <div className="m-nav-container">
+                 <div className="m-brand">
+                    <div className="m-logo">
+                       <Image src="/logo.png" alt="MWG" width={36} height={36} style={{borderRadius: '8px'}} />
+                    </div>
+                    <div className="m-brand-text">
+                       <strong>White Gloves</strong>
+                       <span>Technologies</span>
+                    </div>
+                 </div>
+                 <button className="m-menu-toggle" onClick={() => setMenuOpen(!menuOpen)}>
+                    {menuOpen ? "✕" : "☰"}
+                 </button>
+              </div>
+              <div className={`m-nav-menu ${menuOpen ? 'open' : ''}`}>
+                 <Link href="/login" onClick={() => setMenuOpen(false)}>Login</Link>
+                 <Link href="/signup" onClick={() => setMenuOpen(false)}>Register</Link>
+                 <div className="m-nav-actions">
+                    <Link href="/signup" style={{width:'100%'}}><button className="m-btn-primary">Get Started</button></Link>
+                 </div>
+              </div>
+           </nav>
+        </div>
+      )}
+
+      {!profile && <div className="desktop-only"><Navbar /></div>}
       
       {!profile ? (
-        <section className="hero-section">
-          <div className="container">
-            <div className="hero-content fade-in">
-              <h1>Digital Attendance for the <span className="highlight">Modern Workforce.</span></h1>
-              <p className="description">
-                Join White Gloves Technologies. Track your presence, manage your profile, and stay connected with your team anywhere, anytime.
-              </p>
-              
-              <div className="stats fade-in" style={{ animationDelay: '0.2s' }}>
-                <div className="stat-item">
-                  <span className="stat-number">10k+</span>
-                  <span className="stat-label">Employees</span>
+        <>
+          {/* Mobile High-Fidelity Landing */}
+          <div className="mobile-only">
+             <section className="m-hero">
+                <div className="m-hero-bg">
+                   <div className="m-grid"></div>
+                   <div className="m-orb o1"></div>
+                   <div className="m-orb o2"></div>
                 </div>
-                <div className="stat-item">
-                  <span className="stat-number">99.9%</span>
-                  <span className="stat-label">Uptime</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-number">24/7</span>
-                  <span className="stat-label">Support</span>
-                </div>
-              </div>
 
-              <div className="cta-container">
-                <Link href="/signup">
-                  <button className="get-started-btn">
-                    Get Started Now <span>→</span>
-                  </button>
-                </Link>
-              </div>
-            </div>
+                <div className="m-hero-content">
+                   <div className="m-live-tag">
+                      <div className="m-pulse"></div>
+                      <span>LIVE: {liveCount.toLocaleString()} ONLINE</span>
+                   </div>
 
-            <div className="hero-image-container fade-in" style={{ animationDelay: '0.4s' }}>
-              <div className="image-card">
-                <Image 
-                  src="/hero.png" 
-                  alt="Attendance Illustration" 
-                  width={600} 
-                  height={600} 
-                  className="hero-img"
-                  priority
-                />
-                <div className="floating-badge">
-                  <span className="dot"></span>
-                  LIVE: 1,432 Online
+                   <h1 className="m-title">
+                      Digital<br />Attendance<br />for the<br />
+                      <span className="m-highlight">Modern<br />Workforce.</span>
+                   </h1>
+
+                   <p className="m-desc">
+                      Join White Gloves Technologies. Track your presence, manage your profile, and stay connected.
+                   </p>
+
+                   <div className="m-actions">
+                      <Link href="/signup" style={{width:'100%'}}><button className="m-btn-cta">Get Started <span>→</span></button></Link>
+                   </div>
+
+                   <div className="m-preview-box">
+                      <div className="m-interface">
+                         <div className="m-i-header">
+                            <div className="m-i-light"></div>
+                            <span>SYSTEM ACCESS ACTIVE</span>
+                         </div>
+                         <div className="m-i-profile">
+                            <div className="m-i-avatar"></div>
+                            <div className="m-i-lines">
+                               <div className="m-line"></div>
+                               <div className="m-line s"></div>
+                            </div>
+                         </div>
+                         <div className="m-i-scan">
+                            <div className="m-eye"></div>
+                            <div className="m-scan-line"></div>
+                         </div>
+                      </div>
+                   </div>
                 </div>
-              </div>
-            </div>
+             </section>
+
+             <section className="m-stats-bar">
+                <div className="m-stat">
+                   <strong>50K+</strong>
+                   <span>USERS</span>
+                </div>
+                <div className="m-stat">
+                   <strong>99.9%</strong>
+                   <span>UPTIME</span>
+                </div>
+                <div className="m-stat">
+                   <strong>24/7</strong>
+                   <span>SUPPORT</span>
+                </div>
+             </section>
           </div>
-        </section>
+
+          {/* Desktop High-Fidelity Landing */}
+          <div className="desktop-only" style={{width:'100%'}}>
+            <section className="hero-section">
+              <div className="container">
+                <div className="hero-content fade-in">
+                  <h1>Digital Attendance for the <span className="highlight">Modern Workforce.</span></h1>
+                  <p className="description">
+                    Join White Gloves Technologies. Track your presence, manage your profile, and stay connected with your team anywhere, anytime.
+                  </p>
+                  
+                  <div className="stats fade-in" style={{ animationDelay: '0.2s' }}>
+                    <div className="stat-item">
+                      <span className="stat-number">10k+</span>
+                      <span className="stat-label">Employees</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-number">99.9%</span>
+                      <span className="stat-label">Uptime</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-number">24/7</span>
+                      <span className="stat-label">Support</span>
+                    </div>
+                  </div>
+
+                  <div className="cta-container">
+                    <Link href="/signup">
+                      <button className="get-started-btn">
+                        Get Started Now <span>→</span>
+                      </button>
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="hero-image-container fade-in" style={{ animationDelay: '0.4s' }}>
+                  <div className="image-card">
+                    <Image 
+                      src="/hero.png" 
+                      alt="Attendance Illustration" 
+                      width={600} 
+                      height={600} 
+                      className="hero-img"
+                      priority
+                    />
+                    <div className="floating-badge">
+                      <span className="dot"></span>
+                      LIVE: {liveCount.toLocaleString()} Online
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </>
       ) : profile.isAdmin ? (
         <AdminDashboard profile={profile} />
       ) : (
@@ -340,30 +444,76 @@ export default function Home() {
           cursor: pointer;
         }
 
+        .mobile-only { display: none !important; }
+        .desktop-only { display: flex !important; }
+
         @media (max-width: 900px) {
-          .hero-section .container {
-            grid-template-columns: 1fr;
-            text-align: center;
-            gap: 4rem;
-          }
-          .description {
-            margin: 0 auto 3rem;
-          }
-          .stats {
-            justify-content: center;
-          }
-          .cta-container {
-            display: flex;
-            justify-content: center;
-          }
-          .image-card {
-            transform: none;
-          }
-          .footer-container {
-            flex-direction: column;
-            gap: 2rem;
-            text-align: center;
-          }
+          .mobile-only { display: block !important; }
+          .desktop-only { display: none !important; }
+          
+          .main-wrapper { background: #000; }
+          .footer-container { flex-direction: column; gap: 2rem; text-align: center; }
+
+          /* Mobile Navbar */
+          .m-navbar { position: fixed; top: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.1); padding: 16px 20px; z-index: 1000; }
+          .m-nav-container { display: flex; justify-content: space-between; align-items: center; }
+          .m-brand { display: flex; align-items: center; gap: 10px; }
+          .m-logo { width: 36px; height: 36px; background: #e61e2a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; }
+          .m-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+          .m-brand-text strong { font-size: 14px; }
+          .m-brand-text span { font-size: 9px; color: #e61e2a; text-transform: uppercase; letter-spacing: 1px; }
+          .m-menu-toggle { background: none; border: none; color: #fff; font-size: 24px; }
+          
+          .m-nav-menu { position: fixed; top: 68px; left: 0; right: 0; background: #000; padding: 20px; display: flex; flex-direction: column; gap: 1rem; transform: translateY(-100%); opacity: 0; transition: 0.3s ease; border-bottom: 1px solid #1a1a1a; }
+          .m-nav-menu.open { transform: translateY(0); opacity: 1; }
+          .m-nav-menu a { color: #888; font-weight: 600; text-decoration: none; padding: 10px 0; }
+          .m-btn-primary { width: 100%; padding: 14px; background: #e61e2a; border: none; border-radius: 12px; color: #fff; font-weight: 700; }
+
+          /* Mobile Hero */
+          .m-hero { position: relative; padding: 120px 20px 60px; min-height: 90vh; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+          .m-hero-bg { position: absolute; inset: 0; z-index: 0; }
+          .m-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(230,30,42,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(230,30,42,0.03) 1px, transparent 1px); background-size: 30px 30px; }
+          .m-orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.2; animation: m-float 8s infinite; }
+          .o1 { width: 250px; height: 250px; background: #e61e2a; top: -50px; right: -50px; }
+          .o2 { width: 200px; height: 200px; background: #a8121a; bottom: 50px; left: -50px; }
+          @keyframes m-float { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(15px,-15px); } }
+
+          .m-hero-content { position: relative; z-index: 10; }
+          .m-live-tag { display: inline-flex; align-items: center; gap: 8px; background: rgba(0,255,10,0.1); border: 1px solid rgba(0,255,10,0.2); padding: 8px 16px; border-radius: 20px; color: #00ff0a; font-size: 11px; font-weight: 800; margin-bottom: 24px; }
+          .m-pulse { width: 8px; height: 8px; background: #00ff0a; border-radius: 50%; animation: m-pulse 2s infinite; }
+          @keyframes m-pulse { 0% { box-shadow: 0 0 0 0 rgba(0,255,10,0.4); } 70% { box-shadow: 0 0 0 10px rgba(0,255,10,0); } 100% { box-shadow: 0 0 0 0 rgba(0,255,10,0); } }
+          
+          .m-title { font-size: 42px; font-weight: 950; line-height: 1; margin-bottom: 20px; letter-spacing: -1px; }
+          .m-highlight { color: #e61e2a; }
+          .m-desc { font-size: 15px; color: #666; line-height: 1.5; margin-bottom: 40px; }
+          .m-actions { display: flex; gap: 10px; margin-bottom: 40px; }
+          .m-btn-cta { width: 100%; padding: 18px; background: #e61e2a; border: none; border-radius: 14px; color: #fff; font-weight: 900; font-size: 16px; box-shadow: 0 10px 30px rgba(230,30,42,0.3); }
+          .m-btn-demo { padding: 18px 24px; background: rgba(255,255,255,0.05); border: 1px solid #222; border-radius: 14px; color: #fff; font-weight: 700; }
+
+          /* Mobile Preview Interface */
+          .m-preview-box { margin-top: 20px; perspective: 1000px; }
+          .m-interface { background: rgba(255,255,255,0.02); border: 1px solid rgba(230,30,42,0.2); border-radius: 24px; padding: 24px; position: relative; overflow: hidden; transform: rotateX(5deg); }
+          .m-i-header { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+          .m-i-light { width: 8px; height: 8px; background: #e61e2a; border-radius: 50%; box-shadow: 0 0 10px #e61e2a; animation: m-blink 2s infinite; }
+          @keyframes m-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+          .m-i-header span { font-size: 10px; color: #e61e2a; font-weight: 900; letter-spacing: 1px; }
+          .m-i-profile { display: flex; gap: 15px; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; margin-bottom: 20px; }
+          .m-i-avatar { width: 44px; height: 44px; background: #e61e2a; border-radius: 50%; opacity: 0.4; }
+          .m-i-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+          .m-line { height: 6px; background: #222; border-radius: 3px; }
+          .m-line.s { width: 60%; }
+          .m-i-scan { height: 100px; background: #000; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+          .m-eye { width: 40px; height: 40px; border: 2px solid #e61e2a; border-radius: 50%; }
+          .m-eye::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 12px; height: 12px; background: #e61e2a; border-radius: 50%; box-shadow: 0 0 15px #e61e2a; }
+          .m-scan-line { position: absolute; left: 0; right: 0; height: 1px; background: #e61e2a; box-shadow: 0 0 10px #e61e2a; animation: m-scan 3s infinite; }
+          @keyframes m-scan { 0%, 100% { top: 10%; opacity: 0; } 50% { top: 90%; opacity: 1; } }
+
+          /* Mobile Stats */
+          .m-stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); background: #0a0a0a; border: 1px solid #1a1a1a; margin: 20px 0; border-radius: 16px; overflow: hidden; }
+          .m-stat { padding: 20px; text-align: center; border-right: 1px solid #1a1a1a; }
+          .m-stat:last-child { border: none; }
+          .m-stat strong { display: block; font-size: 20px; color: #e61e2a; }
+          .m-stat span { font-size: 10px; color: #444; font-weight: 800; }
         }
       `}</style>
     </main>
