@@ -15,7 +15,11 @@ import {
   MapPin,
   Clock,
   ArrowRight,
-  UserCheck
+  UserCheck,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  Filter
 } from 'lucide-react';
 
 interface User {
@@ -46,16 +50,36 @@ interface AttendanceRecord {
 }
 
 export default function AdminDashboard({ profile }: { profile: any }) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'employees' | 'attendance' | 'leaves'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'employees' | 'attendance' | 'leaves' | 'insights'>('overview');
   const [employees, setEmployees] = useState<User[]>([]);
   const [logs, setLogs] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  
+  // Specific for Insights Tab
+  const [selectedUserForInsight, setSelectedUserForInsight] = useState<string | null>(null);
+  const [currentInsightMonth, setCurrentInsightMonth] = useState(new Date().getMonth());
+  const [currentInsightYear, setCurrentInsightYear] = useState(new Date().getFullYear());
+  const [userLogsForInsight, setUserLogsForInsight] = useState<AttendanceRecord[]>([]);
 
   useEffect(() => {
     fetchData();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'insights' && selectedUserForInsight) {
+       fetchUserSpecificLogs();
+    }
+  }, [activeTab, selectedUserForInsight, currentInsightMonth, currentInsightYear]);
+
+  const fetchUserSpecificLogs = async () => {
+     try {
+       const res = await fetch(`/api/admin/attendance?employeeId=${selectedUserForInsight}&date=${currentInsightYear}-${String(currentInsightMonth + 1).padStart(2, '0')}`);
+       const result = await res.json();
+       setUserLogsForInsight(result);
+     } catch (err) { console.error(err); }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -82,6 +106,33 @@ export default function AdminDashboard({ profile }: { profile: any }) {
     window.location.reload();
   };
 
+  const exportDailyAttendance = () => {
+    if (logs.length === 0) return alert("No logs available to export today.");
+    const headers = ['Employee Name', 'Employee ID', 'Department', 'Date', 'Time', 'Status', 'Location'];
+    const csvContent = [
+      headers.join(','),
+      ...logs.map(log => [
+        `"${log.userName}"`,
+        `"${log.employeeId}"`,
+        `"${log.department}"`,
+        `"${log.date}"`,
+        `"${log.time}"`,
+        `"${log.status}"`,
+        `"${log.location.replace(/"/g, '""')}"`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Daily_Attendance_${new Date().toLocaleDateString('en-CA')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const filteredEmployees = employees.filter(emp => 
     emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     emp.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
@@ -94,6 +145,11 @@ export default function AdminDashboard({ profile }: { profile: any }) {
 
   return (
     <div className="admin-container fade-in">
+      <div className="bg-vfx-container">
+        <div className="vfx-circle v1"></div>
+        <div className="vfx-circle v2"></div>
+        <div className="vfx-dots"></div>
+      </div>
       <aside className="admin-sidebar">
         <div className="brand-header">
            <div className="logo">
@@ -111,15 +167,21 @@ export default function AdminDashboard({ profile }: { profile: any }) {
             <Users size={20} /> All Employees
           </div>
           <div className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => setActiveTab('attendance')}>
-            <Calendar size={20} /> Shift Logs
+            <Clock size={20} /> Shift Logs
           </div>
           <div className={`nav-item ${activeTab === 'leaves' ? 'active' : ''}`} onClick={() => setActiveTab('leaves')}>
             <FileText size={20} /> Leave Requests
           </div>
+          <div className={`nav-item ${activeTab === 'insights' ? 'active' : ''}`} onClick={() => setActiveTab('insights')}>
+            <Calendar size={20} /> Presence Analysis
+          </div>
         </nav>
 
         <div className="sidebar-footer">
-           <button className="logout-btn" onClick={handleLogout}>Logout</button>
+           <button className="logout-btn" onClick={handleLogout}>
+             <LogOut size={20} />
+             <span>Logout</span>
+           </button>
         </div>
       </aside>
 
@@ -309,7 +371,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                
                <aside className="side-panel quick-links">
                   <h3>Management Tools</h3>
-                  <div className="q-link" onClick={() => alert("Report generation starting...")}>
+                  <div className="q-link" onClick={exportDailyAttendance}>
                      <Download size={18} /> Export Daily Attendance
                   </div>
                   <div className="q-link" onClick={() => setActiveTab('employees')}>
@@ -449,15 +511,139 @@ export default function AdminDashboard({ profile }: { profile: any }) {
               </div>
            </div>
         )}
+         {activeTab === 'insights' && (
+            <div className="tab-view panel">
+               <div className="table-header-row">
+                  <h2>Presence Analysis: {new Date(currentInsightYear, currentInsightMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
+                  <div className="insight-controls">
+                     <select 
+                       className="i-select"
+                       value={selectedUserForInsight || ''} 
+                       onChange={(e) => setSelectedUserForInsight(e.target.value)}
+                     >
+                        <option value="">Select Employee</option>
+                        {employees.map(e => <option key={e.employeeId} value={e.employeeId}>{e.name} ({e.employeeId})</option>)}
+                     </select>
+                     <div className="cal-nav-btns">
+                        <button onClick={() => {
+                           if (currentInsightMonth === 0) { setCurrentInsightMonth(11); setCurrentInsightYear(prev => prev - 1); }
+                           else setCurrentInsightMonth(prev => prev - 1);
+                        }}><ChevronLeft size={16} /></button>
+                        <button onClick={() => {
+                           if (currentInsightMonth === 11) { setCurrentInsightMonth(0); setCurrentInsightYear(prev=>prev+1); }
+                           else setCurrentInsightMonth(prev=>prev+1);
+                        }}><ChevronRight size={16} /></button>
+                     </div>
+                  </div>
+               </div>
+
+               {!selectedUserForInsight ? (
+                  <div className="hq-notice-card">
+                     <div className="hq-icon"><Filter size={32} /></div>
+                     <div className="hq-text">
+                        <h3>Employee Analysis Required</h3>
+                        <p>To view detailed presence reports, please select an employee from the dropdown above. The system will display their presence/absence calendar for the selected month.</p>
+                     </div>
+                  </div>
+               ) : (
+                  <div className="insight-grid">
+                     <div className="mini-stats-row">
+                        <div className="premium-min-card">
+                           <span>DAYS PRESENT (This Month)</span>
+                           <strong>{[...new Set(userLogsForInsight.map(l => l.date))].length}</strong>
+                        </div>
+                        <div className="premium-min-card highlight">
+                           <span>STATUS SUMMARY</span>
+                           <strong>ACTIVE</strong>
+                        </div>
+                     </div>
+
+                     <div className="card-vfx presence-calendar">
+                        <div className="p-cal-grid">
+                           {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d} className="p-cal-day-name">{d}</div>)}
+                           {(() => {
+                              const firstDay = new Date(currentInsightYear, currentInsightMonth, 1).getDay();
+                              const daysCount = new Date(currentInsightYear, currentInsightMonth + 1, 0).getDate();
+                              const presentDates = new Set(userLogsForInsight.map(l => l.date));
+                              const items = [];
+                              for (let i = 0; i < firstDay; i++) items.push(<div key={`empty-${i}`} className="p-cal-day empty"></div>);
+                              for (let d = 1; d <= daysCount; d++) {
+                                 const dStr = `${currentInsightYear}-${String(currentInsightMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                                 const isPresent = presentDates.has(dStr);
+                                 items.push(
+                                    <div key={d} className={`p-cal-day ${isPresent ? 'present' : ''}`}>
+                                       <span>{d}</span>
+                                       {isPresent && <div className="p-marker" title="Present"></div>}
+                                    </div>
+                                 );
+                              }
+                              return items;
+                           })()}
+                        </div>
+                     </div>
+                  </div>
+               )}
+            </div>
+         )}
       </main>
 
       <style jsx>{`
+        .bg-vfx-container {
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          overflow: hidden;
+          pointer-events: none;
+        }
+        .vfx-circle {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(100px);
+          opacity: 0.15;
+          background: radial-gradient(circle, #e61e2a 0%, transparent 70%);
+        }
+        .vfx-circle.v1 {
+          width: 600px;
+          height: 600px;
+          top: -200px;
+          left: -200px;
+          animation: moveV1 20s infinite alternate ease-in-out;
+        }
+        .vfx-circle.v2 {
+          width: 500px;
+          height: 500px;
+          bottom: -150px;
+          right: -150px;
+          animation: moveV2 25s infinite alternate ease-in-out;
+        }
+        @keyframes moveV1 {
+          0% { transform: translate(0, 0) scale(1); }
+          100% { transform: translate(100px, 150px) scale(1.2); }
+        }
+        @keyframes moveV2 {
+          0% { transform: translate(0, 0) scale(1.2); }
+          100% { transform: translate(-150px, -100px) scale(1); }
+        }
+        .vfx-dots {
+          position: absolute;
+          inset: 0;
+          background-image: radial-gradient(#e61e2a 1px, transparent 1px);
+          background-size: 40px 40px;
+          opacity: 0.05;
+        }
+
         .admin-container {
           display: flex;
           min-height: 100vh;
           background: #000;
           color: #fff;
           font-family: 'Inter', sans-serif;
+          position: relative;
+        }
+
+        .admin-sidebar, .admin-main {
+          position: relative;
+          z-index: 10;
         }
 
         .admin-sidebar {
@@ -532,6 +718,11 @@ export default function AdminDashboard({ profile }: { profile: any }) {
            padding: 0.8rem;
            border-radius: 10px;
            font-weight: 600;
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           gap: 0.8rem;
+           transition: all 0.3s;
         }
 
         .logout-btn:hover {
@@ -778,6 +969,48 @@ export default function AdminDashboard({ profile }: { profile: any }) {
           to { opacity: 1; transform: translateY(0); }
         }
 
+        .insight-controls { display: flex; gap: 1rem; align-items: center; }
+        .i-select { background: #111; border: 1px solid #222; color: #fff; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 600; outline: none; min-width: 200px; }
+        .cal-nav-btns { display: flex; gap: 5px; }
+        .cal-nav-btns button { width: 34px; height: 34px; background: #111; border: 1px solid #222; border-radius: 8px; color: #fff; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .cal-nav-btns button:hover { background: #e61e2a; border-color: #e61e2a; }
+
+        .insight-grid { display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+        .mini-stats-row { display: flex; flex-direction: column; gap: 1rem; }
+        .premium-min-card { background: #0a0a0a; border: 1px solid #1a1a1a; padding: 1.5rem; border-radius: 16px; display: flex; flex-direction: column; gap: 0.5rem; }
+        .premium-min-card span { font-size: 0.7rem; color: #555; text-transform: uppercase; font-weight: 800; letter-spacing: 1px; }
+        .premium-min-card strong { font-size: 1.8rem; color: #fff; }
+        .premium-min-card.highlight strong { color: #e61e2a; }
+
+        .presence-calendar { padding: 1.5rem; }
+        .p-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+        .p-cal-day-name { text-align: center; font-size: 0.7rem; color: #444; font-weight: 800; padding: 0.5rem 0; text-transform: uppercase; }
+        .p-cal-day { height: 60px; background: rgba(255,255,255,0.02); border: 1px solid #111; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; font-weight: 600; color: #555; }
+        .p-cal-day.empty { background: transparent; border: none; }
+        .p-cal-day.present { background: rgba(0,255,10,0.05); border-color: rgba(0,255,10,0.1); color: #00ff0a; }
+        .p-marker { width: 8px; height: 8px; background: #00ff0a; border-radius: 50%; box-shadow: 0 0 10px #00ff0a; position: absolute; bottom: 10px; }
+
+        .insight-controls { display: flex; gap: 1rem; align-items: center; }
+        .i-select { background: #111; border: 1px solid #222; color: #fff; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 600; outline: none; min-width: 200px; }
+        .cal-nav-btns { display: flex; gap: 5px; }
+        .cal-nav-btns button { width: 34px; height: 34px; background: #111; border: 1px solid #222; border-radius: 8px; color: #fff; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .cal-nav-btns button:hover { background: #e61e2a; border-color: #e61e2a; }
+
+        .insight-grid { display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+        .mini-stats-row { display: flex; flex-direction: column; gap: 1rem; }
+        .premium-min-card { background: #0a0a0a; border: 1px solid #1a1a1a; padding: 1.5rem; border-radius: 16px; display: flex; flex-direction: column; gap: 0.5rem; }
+        .premium-min-card span { font-size: 0.7rem; color: #555; text-transform: uppercase; font-weight: 800; letter-spacing: 1px; }
+        .premium-min-card strong { font-size: 1.8rem; color: #fff; }
+        .premium-min-card.highlight strong { color: #e61e2a; }
+
+        .presence-calendar { padding: 1.5rem; }
+        .p-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+        .p-cal-day-name { text-align: center; font-size: 0.7rem; color: #444; font-weight: 800; padding: 0.5rem 0; text-transform: uppercase; }
+        .p-cal-day { height: 60px; background: rgba(255,255,255,0.02); border: 1px solid #111; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; font-weight: 600; color: #555; }
+        .p-cal-day.empty { background: transparent; border: none; }
+        .p-cal-day.present { background: rgba(0,255,10,0.05); border-color: rgba(0,255,10,0.1); color: #00ff0a; }
+        .p-marker { width: 8px; height: 8px; background: #00ff0a; border-radius: 50%; box-shadow: 0 0 10px #00ff0a; position: absolute; bottom: 10px; }
+
         @media (max-width: 1024px) {
           .admin-sidebar { width: 80px; padding: 2rem 0.5rem; }
           .admin-sidebar .logo span, .admin-sidebar .nav-item span, .admin-sidebar .brand-header p, .admin-sidebar .nav-item { font-size: 0; justify-content: center; }
@@ -790,38 +1023,55 @@ export default function AdminDashboard({ profile }: { profile: any }) {
           .admin-container { flex-direction: column; }
           .admin-sidebar { width: 100%; height: auto; position: relative; padding: 1rem; border-right: none; border-bottom: 1px solid #1a1a1a; flex-direction: row; align-items: center; justify-content: space-between; gap: 0.5rem; }
           .brand-header { margin: 0; text-align: left; }
-          .nav-menu { flex-direction: row; gap: 5px; flex-grow: 0; }
-          .nav-item { padding: 0.8rem; border-radius: 8px; }
-          .sidebar-footer { display: none; }
+          .nav-menu { display: flex; flex-direction: row; gap: 10px; flex: 1; overflow-x: auto; padding: 0 10px 5px 10px; -webkit-overflow-scrolling: touch; }
+          .nav-menu::-webkit-scrollbar { display: none; }
+          .nav-item { padding: 0.8rem; border-radius: 12px; flex-shrink: 0; min-width: max-content; }
+          .sidebar-footer { flex-shrink: 0; margin-left: 10px; }
+          .logout-btn { padding: 0.8rem; width: auto; border: none; background: rgba(255,255,255,0.05); }
+          .logout-btn span { display: none; }
+          .logout-btn svg { color: #e61e2a; }
           
-          .admin-main { max-width: 100vw; padding: 1.5rem; }
-          .admin-header { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
-          .search-bar { min-width: 100%; }
+          .admin-main { max-width: 100vw; padding: 1rem; }
+          .admin-header { flex-direction: column; align-items: flex-start; gap: 1rem; margin-bottom: 2rem; }
+          .admin-header h1 { font-size: 1.5rem; }
+          .admin-header p { font-size: 0.75rem; }
+          .search-bar { min-width: 100%; padding: 0.6rem 1rem; }
           
-          .grid-3 { grid-template-columns: 1fr; }
-          .main-content-split { grid-template-columns: 1fr; }
+          .grid-3 { grid-template-columns: 1fr; gap: 1rem; }
+          .main-content-split { grid-template-columns: 1fr; gap: 1.5rem; }
           
-          .status-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
-          .status-tile { padding: 0.8rem; }
+          .status-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.8rem; }
+          .status-tile { padding: 0.6rem; }
+          .tile-info strong { font-size: 0.8rem; }
           
           .mini-ledger-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
           .mini-ledger-table { min-width: 600px; }
           
-          .detail-top { grid-template-columns: 1fr; gap: 1rem; }
-          .d-pane.map { height: 120px; }
+          .detail-top { grid-template-columns: 1fr; gap: 1.5rem; }
+          .d-pane.map { height: 150px; }
 
-          .ledger-wrapper { overflow-x: auto; }
+          .ledger-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
           .ledger-table { min-width: 800px; }
           
-          .selfie-view img { max-width: 120px; }
+          .selfie-view img { max-width: 100px; }
           .detail-split { grid-template-columns: 1fr; gap: 1.5rem; }
+
+          /* Insights Responsive */
+          .table-header-row { flex-direction: column; align-items: flex-start; gap: 1rem; }
+          .insight-controls { width: 100%; flex-wrap: wrap; }
+          .i-select { width: 100%; font-size: 0.85rem; }
+          .insight-grid { grid-template-columns: 1fr; }
+          .p-cal-grid { gap: 4px; }
+          .p-cal-day { height: 45px; font-size: 0.75rem; }
+          .p-marker { width: 6px; height: 6px; bottom: 5px; }
         }
 
         @media (max-width: 480px) {
-           .admin-header h1 { font-size: 1.5rem; }
            .nav-item { padding: 0.5rem; }
-           .logo { font-size: 1.2rem; }
-           .admin-main { padding: 1rem; }
+           .logo { font-size: 1.1rem; }
+           .admin-main { padding: 0.8rem; }
+           .premium-min-card strong { font-size: 1.4rem; }
+           .p-cal-day-name { font-size: 0.6rem; }
         }
       `}</style>
     </div>

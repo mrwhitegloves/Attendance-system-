@@ -12,7 +12,8 @@ import {
   Search, 
   X, 
   CheckCircle2, 
-  MoreHorizontal 
+  MoreHorizontal,
+  LogOut
 } from 'lucide-react';
 
 interface AttendanceRecord {
@@ -140,6 +141,10 @@ export default function AttendanceSystem({ profile }: { profile: { name: string;
   }, [attendanceLogs]);
 
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  const isShiftComplete = React.useMemo(() => {
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    return attendanceLogs.some(l => l.date === todayStr && l.status === 'Checked Out');
+  }, [attendanceLogs]);
 
   // Month Statistics for Reports
   const stats = React.useMemo(() => {
@@ -201,6 +206,7 @@ export default function AttendanceSystem({ profile }: { profile: { name: string;
 
   const startCamera = async () => {
     const now = new Date();
+    if (isShiftComplete) return alert("Your shift for today is already completed and verified. No further punches are permitted.");
     if (!isCheckedIn && (now.getHours() > 19 || (now.getHours() === 19 && now.getMinutes() >= 30))) {
       return alert("Shift over. Punch-in is not permitted after 07:30 PM.");
     }
@@ -263,6 +269,11 @@ export default function AttendanceSystem({ profile }: { profile: { name: string;
 
   return (
     <div className="app-container">
+      <div className="bg-vfx-container">
+        <div className="vfx-circle v1"></div>
+        <div className="vfx-circle v2"></div>
+        <div className="vfx-dots"></div>
+      </div>
       {/* Premium Sidebar */}
       {/* Premium Sidebar - Desktop Only */}
       <aside className="sidebar desktop-only">
@@ -304,8 +315,8 @@ export default function AttendanceSystem({ profile }: { profile: { name: string;
         </div>
 
         <div className="sidebar-footer">
-          <button className="btn-side-punch" onClick={startCamera}>
-            {isCheckedIn ? 'PUNCH OUT' : 'PUNCH IN'}
+          <button className={`btn-side-punch ${isShiftComplete ? 'disabled' : ''}`} onClick={startCamera} disabled={isShiftComplete}>
+            {isShiftComplete ? 'SHIFT ENDED' : (isCheckedIn ? 'PUNCH OUT' : 'PUNCH IN')}
           </button>
           
           <div className="logout-area" onClick={() => { localStorage.removeItem('user'); window.location.reload(); }}>
@@ -335,6 +346,17 @@ export default function AttendanceSystem({ profile }: { profile: { name: string;
       </nav>
 
       <div className="main-layout">
+        {/* Mobile Header - High Fidelity */}
+        <header className="mobile-header mobile-only">
+           <div className="m-h-brand">
+              <Image src="/logo.png" alt="MWG" width={28} height={28} style={{borderRadius:'6px'}} />
+              <span>{profile.name.split(' ')[0]}</span>
+           </div>
+           <button className="m-logout-btn" onClick={() => { localStorage.removeItem('user'); window.location.reload(); }}>
+              <LogOut size={20} />
+           </button>
+        </header>
+
         <header className="top-header desktop-only">
            <div className="search-bar">
               <Search size={18} color="#555" />
@@ -365,11 +387,11 @@ export default function AttendanceSystem({ profile }: { profile: { name: string;
                    <div className="m-loc-info">
                       📍 {address.length > 40 ? address.substring(0, 40) + '...' : address}
                    </div>
-                   <button className={`m-punch-btn ${isCheckedIn ? 'punched' : ''}`} onClick={startCamera}>
+                   <button className={`m-punch-btn ${isCheckedIn ? 'punched' : ''} ${isShiftComplete ? 'disabled' : ''}`} onClick={startCamera} disabled={isShiftComplete}>
                       <div className="m-p-ripple"></div>
                       <div className="m-p-content">
                          <Clock size={32} />
-                         <span>{isCheckedIn ? 'PUNCH OUT' : 'PUNCH'}</span>
+                         <span>{isShiftComplete ? 'SHIFT ENDED' : (isCheckedIn ? 'PUNCH OUT' : 'PUNCH IN')}</span>
                       </div>
                    </button>
                 </div>
@@ -391,7 +413,7 @@ export default function AttendanceSystem({ profile }: { profile: { name: string;
                         className={`punch-hero-btn ${isCheckedIn ? 'out' : 'in'}`}
                         onClick={startCamera}
                       >
-                         {isCheckedIn ? 'PUNCH OUT' : 'PUNCH'}
+                         {isShiftComplete ? 'SHIFT ENDED' : (isCheckedIn ? 'PUNCH OUT' : 'PUNCH IN')}
                       </button>
                    </div>
                  </div>
@@ -699,12 +721,62 @@ Reason: ${leaveReason}`)}`, '_blank')}>
       )}
 
       <style jsx>{`
+        .bg-vfx-container {
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          overflow: hidden;
+          pointer-events: none;
+        }
+        .vfx-circle {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(100px);
+          opacity: 0.1;
+          background: radial-gradient(circle, #e61e2a 0%, transparent 70%);
+        }
+        .vfx-circle.v1 {
+          width: 600px;
+          height: 600px;
+          top: -200px;
+          left: -200px;
+          animation: moveV1 20s infinite alternate ease-in-out;
+        }
+        .vfx-circle.v2 {
+          width: 500px;
+          height: 500px;
+          bottom: -150px;
+          right: -150px;
+          animation: moveV2 25s infinite alternate ease-in-out;
+        }
+        @keyframes moveV1 {
+          0% { transform: translate(0, 0) scale(1); }
+          100% { transform: translate(100px, 150px) scale(1.2); }
+        }
+        @keyframes moveV2 {
+          0% { transform: translate(0, 0) scale(1.2); }
+          100% { transform: translate(-150px, -100px) scale(1); }
+        }
+        .vfx-dots {
+          position: absolute;
+          inset: 0;
+          background-image: radial-gradient(#e61e2a 1px, transparent 1px);
+          background-size: 40px 40px;
+          opacity: 0.05;
+        }
+
         .app-container {
           display: flex;
           min-height: 100vh;
           background: #000000;
           color: #ffffff;
           font-family: 'Inter', sans-serif;
+          position: relative;
+        }
+
+        .sidebar, .main-layout {
+          position: relative;
+          z-index: 10;
         }
 
         .sidebar {
@@ -734,6 +806,7 @@ Reason: ${leaveReason}`)}`, '_blank')}>
         .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 1.5rem; }
         .btn-side-punch { width: 100%; padding: 1.2rem; background: #e61e2a; border: none; border-radius: 12px; color: white; font-weight: 800; font-size: 1.1rem; box-shadow: 0 8px 25px rgba(0,0,0,0.5); cursor: pointer; transition: 0.2s; }
         .btn-side-punch:hover { transform: translateY(-2px); }
+        .btn-side-punch.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; filter: grayscale(1); }
         .logout-area { display: flex; align-items: center; gap: 1rem; color: #555; font-size: 0.9rem; cursor: pointer; font-weight: 600; }
         .logout-area:hover { color: white; }
 
@@ -748,7 +821,7 @@ Reason: ${leaveReason}`)}`, '_blank')}>
         .u-info span { font-size: 0.8rem; color: #555; font-weight: 700; }
         .u-avatar { width: 44px; height: 44px; background: #1a1a1a; border: 1px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; color: #fff; }
 
-        .view-content { padding: 2.5rem 4rem; }
+        .view-content { padding: 1.5rem 2rem; }
         .system-card { background: #0a0a0a; border: 1px solid #161616; border-radius: 32px; padding: 3.5rem; margin-bottom: 3.5rem; }
         .card-row { display: flex; justify-content: space-between; align-items: flex-end; }
         .tag { font-size: 0.75rem; color: #444; font-weight: 800; letter-spacing: 2px; }
@@ -758,6 +831,7 @@ Reason: ${leaveReason}`)}`, '_blank')}>
 
         .punch-hero-btn { padding: 1.8rem 5rem; border-radius: 20px; border: none; background: #e61e2a; color: white; font-weight: 900; font-size: 1.5rem; cursor: pointer; box-shadow: 0 15px 45px rgba(230, 30, 42, 0.4); transition: 0.3s; }
         .punch-hero-btn:hover { transform: scale(1.05) translateY(-5px); }
+        .punch-hero-btn.disabled, .m-punch-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; filter: grayscale(1); }
 
         .ledger-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
         .ledger-header h3 { font-size: 1.5rem; color: #eee; }
@@ -812,7 +886,7 @@ Reason: ${leaveReason}`)}`, '_blank')}>
         .retake-btn { padding: 1.4rem; background: #1a1a1a; color: #888; border: none; border-radius: 15px; cursor: pointer; }
         .close-btn { color: #444; background: none; border: none; font-size: 1rem; margin-top: 1rem; }
 
-        .success-overlay { position: fixed; bottom: 40px; right: 40px; z-index: 2000; }
+        .success-overlay { position: fixed; bottom: 40px; right: 40px; z-index: 2000; }\n            @media (max-width: 768px) { .success-overlay { bottom: 100px; right: 20px; left: 20px; text-align: center; } }
         .success-toast { background: #00ff0a; color: black; padding: 1.2rem 2.5rem; border-radius: 12px; font-weight: 800; font-size: 1.1rem; }
 
         .attendance-view { padding: 1rem 0; }
@@ -855,7 +929,7 @@ Reason: ${leaveReason}`)}`, '_blank')}>
         .bar-pillar.filled { background: #00ff0a; box-shadow: 0 0 20px rgba(0,255,10,0.15); max-height: 200px; }
         .bar-label { font-size: 0.6rem; color: #333; font-weight: 800; }
 
-        .heatmap-box { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.6rem; margin: 2rem 0; }
+        .heatmap-box { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.6rem; margin: 2rem 0; }\n            @media (max-width: 480px) { .heatmap-box { gap: 0.3rem; } .heat-sq { border-radius: 2px; } }
         .heat-sq { width: 100%; aspect-ratio: 1; border-radius: 4px; transition: 0.3s; }
         .heat-sq:hover { transform: scale(1.1); filter: brightness(1.2); }
         .heat-legend { font-size: 0.7rem; color: #333; text-align: center; font-weight: 700; }
@@ -876,6 +950,12 @@ Reason: ${leaveReason}`)}`, '_blank')}>
         @media (max-width: 768px) {
            .desktop-only { display: none !important; }
            .mobile-only { display: block !important; }
+
+           .mobile-header { position: sticky; top: 0; z-index: 1001; display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; background: rgba(0,0,0,0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.05); width: 100%; top: 0; }
+           .m-h-brand { display: flex; align-items: center; gap: 0.8rem; }
+           .m-h-brand span { font-weight: 700; font-size: 0.95rem; color: #eee; letter-spacing: -0.5px; }
+           .m-logout-btn { background: rgba(230, 30, 42, 0.1); border: 1px solid rgba(230, 30, 42, 0.2); color: #e61e2a; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; cursor: pointer; }
+           .m-logout-btn:active { transform: scale(0.9); background: #e61e2a; color: #fff; }
            
            .app-container { flex-direction: column; height: auto; }
            .main-layout { width: 100%; min-height: 100vh; padding-bottom: 80px; }
@@ -916,19 +996,19 @@ Reason: ${leaveReason}`)}`, '_blank')}>
            @keyframes p-dot { 0%, 100% { opacity: 1; box-shadow: 0 0 10px #00ff0a; } 50% { opacity: 0.4; box-shadow: 0 0 2px #00ff0a; } }
 
            /* Reports Mobile */
-           .reports-top { flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
+           .reports-top { flex-direction: column; gap: 0.8rem; margin-bottom: 2rem; }\n            .stat-pill strong { font-size: 1.4rem; }
            .stat-pill { padding: 1rem 1.5rem; flex-direction: row; justify-content: space-between; align-items: center; }
            .reports-grid { grid-template-columns: 1fr; gap: 2rem; }
            .chart-card { padding: 1.5rem; border-radius: 20px; }
-           .bar-chart-v { height: 160px; }
+           .bar-chart-v { height: 160px; overflow-x: auto; padding-bottom: 20px; display: flex; gap: 8px; justify-content: flex-start; scrollbar-width: none; }\n            .bar-chart-v::-webkit-scrollbar { display: none; }\n            .bar-wrapper { min-width: 12px; }
 
            /* Calendar Mobile */
            .cal-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
            .calendar-card { padding: 1.5rem; border-radius: 20px; }
-           .cal-grid-base { gap: 0.5rem; }
-           .cal-day-box { height: 80px; padding: 0.5rem; }
-           .p-indicator { font-size: 0.45rem; bottom: 0.5rem; }
-           .d-num { font-size: 1rem; }
+           .cal-grid-base { gap: 4px; }
+           .cal-day-box { height: 60px; padding: 0.4rem; border-radius: 12px; }
+           .p-indicator { font-size: 0.35rem; bottom: 0.4rem; left: 0.1rem; right: 0.1rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; padding: 2px; }
+           .d-num { font-size: 0.9rem; }
 
            /* Leave View Mobile */
            .leave-view-mobile { animation: fadeIn 0.5s ease; }
