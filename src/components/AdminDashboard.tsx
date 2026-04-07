@@ -66,6 +66,8 @@ interface LeaveRequest {
   endDate: string;
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
+  adminNote?: string;
+  processedAt?: string | Date;
 }
 
 export default function AdminDashboard({ profile }: { profile: any }) {
