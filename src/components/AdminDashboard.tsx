@@ -34,6 +34,7 @@ import {
 
 interface AttendanceLog {
   _id: string;
+  userId?: any;
   employeeId: string;
   date: string;
   time: string;

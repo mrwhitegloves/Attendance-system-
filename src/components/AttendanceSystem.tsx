@@ -22,10 +22,11 @@ import {
 } from 'lucide-react';
 
 interface AttendanceRecord {
+  _id?: string;
   employeeId: string;
   date: string;
   time: string;
-  status: 'Checked In' | 'Checked Out';
+  status: 'Checked In' | 'Checked Out' | 'Late' | 'Leave';
   location: string;
   lat?: number;
   lon?: number;
