@@ -6,6 +6,7 @@ import AttendanceSystem from '@/components/AttendanceSystem';
 import AdminDashboard from '@/components/AdminDashboard';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Shield, Users, Activity, LogOut, Menu, X, ArrowRight, Zap, Globe, Lock } from 'lucide-react';
 
 interface Profile {
   name: string;
@@ -35,487 +36,198 @@ export default function Home() {
   if (!isLoaded) return null;
 
   return (
-    <main className="main-wrapper">
+    <main className="min-h-screen bg-black text-white flex flex-col font-sans overflow-x-hidden selection:bg-brand-red selection:text-white">
       {!profile && (
-        <div className="mobile-only">
-           <nav className="m-navbar">
-              <div className="m-nav-container">
-                 <div className="m-brand">
-                    <div className="m-logo">
-                       <Image src="/logo.png" alt="MWG" width={36} height={36} style={{borderRadius: '8px'}} />
-                    </div>
-                    <div className="m-brand-text">
-                       <strong>White Gloves</strong>
-                       <span>Technologies</span>
-                    </div>
-                 </div>
-                 <button className="m-menu-toggle" onClick={() => setMenuOpen(!menuOpen)}>
-                    {menuOpen ? "✕" : "☰"}
-                 </button>
-              </div>
-              <div className={`m-nav-menu ${menuOpen ? 'open' : ''}`}>
-                 <Link href="/login" onClick={() => setMenuOpen(false)}>Login</Link>
-                 <Link href="/signup" onClick={() => setMenuOpen(false)}>Register</Link>
-                 <div className="m-nav-actions">
-                    <Link href="/signup" style={{width:'100%'}}><button className="m-btn-primary">Get Started</button></Link>
-                 </div>
-              </div>
-           </nav>
-        </div>
-      )}
-
-      {!profile && <div className="desktop-only"><Navbar /></div>}
-      
-      {!profile ? (
         <>
-          {/* Mobile High-Fidelity Landing */}
-          <div className="mobile-only">
-             <section className="m-hero">
-                <div className="m-hero-bg">
-                   <div className="m-grid"></div>
-                   <div className="m-orb o1"></div>
-                   <div className="m-orb o2"></div>
-                </div>
-
-                <div className="m-hero-content">
-                   <div className="m-live-tag">
-                      <div className="m-pulse"></div>
-                      <span>LIVE: {liveCount.toLocaleString()} ONLINE</span>
-                   </div>
-
-                   <h1 className="m-title">
-                      Digital<br />Attendance<br />for the<br />
-                      <span className="m-highlight">Modern<br />Workforce.</span>
-                   </h1>
-
-                   <p className="m-desc">
-                      Join White Gloves Technologies. Track your presence, manage your profile, and stay connected.
-                   </p>
-
-                   <div className="m-actions">
-                      <Link href="/signup" style={{width:'100%'}}><button className="m-btn-cta">Get Started <span>→</span></button></Link>
-                   </div>
-
-                   <div className="m-preview-box">
-                      <div className="m-interface">
-                         <div className="m-i-header">
-                            <div className="m-i-light"></div>
-                            <span>SYSTEM ACCESS ACTIVE</span>
-                         </div>
-                         <div className="m-i-profile">
-                            <div className="m-i-avatar"></div>
-                            <div className="m-i-lines">
-                               <div className="m-line"></div>
-                               <div className="m-line s"></div>
-                            </div>
-                         </div>
-                         <div className="m-i-scan">
-                            <div className="m-eye"></div>
-                            <div className="m-scan-line"></div>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-             </section>
-
-             <section className="m-stats-bar">
-                <div className="m-stat">
-                   <strong>50K+</strong>
-                   <span>USERS</span>
-                </div>
-                <div className="m-stat">
-                   <strong>99.9%</strong>
-                   <span>UPTIME</span>
-                </div>
-                <div className="m-stat">
-                   <strong>24/7</strong>
-                   <span>SUPPORT</span>
-                </div>
-             </section>
-          </div>
-
-          {/* Desktop High-Fidelity Landing */}
-          <div className="desktop-only" style={{width:'100%'}}>
-            <section className="hero-section">
-              <div className="container">
-                <div className="hero-content fade-in">
-                  <h1>Digital Attendance for the <span className="highlight">Modern Workforce.</span></h1>
-                  <p className="description">
-                    Join White Gloves Technologies. Track your presence, manage your profile, and stay connected with your team anywhere, anytime.
-                  </p>
-                  
-                  <div className="stats fade-in" style={{ animationDelay: '0.2s' }}>
-                    <div className="stat-item">
-                      <span className="stat-number">10k+</span>
-                      <span className="stat-label">Employees</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-number">99.9%</span>
-                      <span className="stat-label">Uptime</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-number">24/7</span>
-                      <span className="stat-label">Support</span>
-                    </div>
-                  </div>
-
-                  <div className="cta-container">
-                    <Link href="/signup">
-                      <button className="get-started-btn">
-                        Get Started Now <span>→</span>
-                      </button>
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="hero-image-container fade-in" style={{ animationDelay: '0.4s' }}>
-                  <div className="image-card">
-                    <Image 
-                      src="/hero.png" 
-                      alt="Attendance Illustration" 
-                      width={600} 
-                      height={600} 
-                      className="hero-img"
-                      priority
-                    />
-                    <div className="floating-badge">
-                      <span className="dot"></span>
-                      LIVE: {liveCount.toLocaleString()} Online
-                    </div>
-                  </div>
-                </div>
+          {/* Mobile Navigation */}
+          <nav className="lg:hidden fixed top-0 inset-x-0 h-20 bg-black/95 backdrop-blur-3xl border-b border-white/10 px-6 flex items-center justify-between z-[1000]">
+            <Link href="/" className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-brand-red rounded-xl flex items-center justify-center p-1.5 shadow-xl shadow-red-900/40">
+                <Image src="/logo.png" alt="MWG" width={32} height={32} className="rounded" />
               </div>
+              <div className="leading-none">
+                <div className="text-sm font-bold tracking-tight">White Gloves</div>
+                <div className="text-[9px] font-bold uppercase text-brand-red tracking-widest">Technologies</div>
+              </div>
+            </Link>
+            <div className="flex items-center gap-2">
+              <Link href="/login" className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold">Login</Link>
+              <button className="w-10 h-10 bg-brand-red rounded-lg flex items-center justify-center text-white active:scale-95 transition-all shadow-lg shadow-red-900/20" onClick={() => setMenuOpen(!menuOpen)}>
+                {menuOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            </div>
+            
+            {menuOpen && (
+              <div className="absolute top-full right-6 left-6 mt-4 p-6 bg-brand-card/95 backdrop-blur-3xl border border-white/10 rounded-3xl flex flex-col gap-4 shadow-[0_40px_100px_rgba(0,0,0,0.8)] animate-fade-in origin-top">
+                <Link href="/login" onClick={() => setMenuOpen(false)} className="text-lg font-bold text-zinc-300 hover:text-white transition-colors flex justify-between items-center px-4 py-2">Account Login <ArrowRight size={18} /></Link>
+                <Link href="/signup" onClick={() => setMenuOpen(false)} className="text-lg font-bold text-zinc-300 hover:text-white transition-colors flex justify-between items-center px-4 py-2">Create Account <ArrowRight size={18} /></Link>
+                <div className="h-px bg-white/5 my-2"></div>
+                <Link href="/login" onClick={() => setMenuOpen(false)} className="text-lg font-bold text-brand-red hover:text-white transition-colors flex justify-between items-center px-4 py-2 italic font-black">Admin Access <Lock size={18} /></Link>
+              </div>
+            )}
+          </nav>
+
+          {/* Desktop Navbar */}
+          <div className="hidden lg:block"><Navbar /></div>
+
+          {/* Hero Section Container */}
+          <div className="relative pt-20 lg:pt-0">
+            {/* Ambient Background Elements */}
+            <div className="absolute inset-x-0 top-0 h-[800px] pointer-events-none z-0">
+              <div className="absolute top-0 left-[-10%] w-[60%] h-[100%] bg-brand-red/10 blur-[180px] rounded-full"></div>
+              <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#e61e2a 1px, transparent 1px)', backgroundSize: '50px 50px' }}></div>
+            </div>
+
+            {/* Landing Content */}
+            <section className="relative z-10 container mx-auto px-6 lg:px-12 py-16 lg:py-40 flex flex-col lg:flex-row items-center gap-16 lg:gap-32">
+               <div className="flex-1 space-y-8 lg:space-y-12 animate-fade-in max-w-2xl text-center lg:text-left">
+                  <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/20 px-4 py-2 rounded-full text-green-500 text-[10px] lg:text-xs font-bold uppercase tracking-wider">
+                     <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                     </span>
+                     {liveCount.toLocaleString()} EMPLOYEES ONLINE
+                  </div>
+
+                  <h1 className="text-5xl lg:text-8xl font-black tracking-tight leading-none uppercase">
+                     Digital<br />
+                     <span className="text-brand-red">Attendance</span>
+                     <br />System.
+                  </h1>
+
+                  <p className="text-zinc-500 text-lg lg:text-2xl font-medium tracking-tight leading-relaxed max-w-xl mx-auto lg:mx-0">
+                     Smart attendance tracking for White Gloves Technologies workforce. Simple, fast, and secure.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
+                     <Link href="/signup" className="w-full sm:w-auto">
+                        <button className="group w-full sm:w-max bg-brand-red text-white py-5 px-10 rounded-2xl font-bold text-xl flex items-center justify-center gap-4 hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/40">
+                           Join Workforce
+                           <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                        </button>
+                     </Link>
+                     <p className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest sm:max-w-[150px] text-center sm:text-left">
+                        Authorized Access Only v4.0
+                     </p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-6 lg:gap-10 pt-10 border-t border-white/5 group">
+                    {[
+                      { l: 'Employees', v: '10K+', i: Users },
+                      { l: 'Security', v: '99.9%', i: Shield },
+                      { l: 'Support', v: '24/7', i: Globe }
+                    ].map((s, i) => (
+                      <div key={i} className="flex flex-col items-center lg:items-start transition-opacity">
+                         <div className="flex items-center gap-2 text-zinc-300 font-bold text-lg lg:text-2xl tracking-tight mb-1">
+                            <s.i size={16} className="text-brand-red" /> {s.v}
+                         </div>
+                         <span className="text-[9px] lg:text-[10px] font-bold uppercase text-zinc-700 tracking-widest">{s.l}</span>
+                      </div>
+                    ))}
+                  </div>
+               </div>
+
+               <div className="flex-1 w-full lg:w-auto relative group animate-fade-in" style={{ animationDelay: '0.4s' }}>
+                  <div className="relative bg-brand-card/30 backdrop-blur-md border border-white/10 p-2 lg:p-3 rounded-[40px] shadow-2xl overflow-hidden lg:-rotate-3 group-hover:rotate-0 transition-transform duration-700">
+                     <div className="relative aspect-[4/5] lg:h-[650px] w-full rounded-[32px] overflow-hidden border border-white/5 bg-[#050505]">
+                        <Image src="/hero.png" alt="Employee Panel" fill className="object-cover grayscale group-hover:grayscale-0 transition-all duration-1000" priority />
+                        
+                        <div className="absolute inset-0 p-6 flex flex-col justify-between pointer-events-none">
+                           <div className="bg-black/60 backdrop-blur-xl border border-white/10 p-4 rounded-xl flex items-center gap-3 w-max">
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                              <span className="text-[10px] font-bold uppercase text-zinc-100 tracking-widest">Mark Presence</span>
+                           </div>
+
+                           <div className="bg-black/80 backdrop-blur-2xl border border-white/5 p-6 rounded-3xl space-y-4">
+                              <div className="flex items-center gap-3">
+                                 <div className="w-10 h-10 bg-brand-red rounded-full flex items-center justify-center font-bold text-white shadow-lg shadow-red-900/40">G</div>
+                                 <div className="flex-grow">
+                                    <div className="h-2 w-20 bg-white/20 rounded-full mb-2"></div>
+                                    <div className="h-1.5 w-12 bg-white/10 rounded-full"></div>
+                                 </div>
+                              </div>
+                              <div className="h-10 bg-green-500/20 rounded-xl border border-green-500/30 flex items-center justify-center text-[9px] font-black text-green-500 tracking-widest uppercase">Verified Check-in</div>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+               </div>
             </section>
           </div>
         </>
-      ) : profile.isAdmin ? (
+      )}
+
+      {profile && (profile.isAdmin ? (
         <AdminDashboard profile={profile} />
       ) : (
         <AttendanceSystem profile={profile} />
+      ))}
+
+      {/* Global Signup CTA for Mobile */}
+      {!profile && (
+        <div className="sticky bottom-8 inset-x-0 z-[500] px-6 lg:hidden">
+           <Link href="/login">
+              <button className="w-full py-4 bg-white text-black font-extrabold uppercase text-xs tracking-widest rounded-xl shadow-2xl shadow-black border border-white/20 active:scale-95 transition-all">
+                Login to Portal
+              </button>
+           </Link>
+        </div>
       )}
 
       {(!profile || !profile.isAdmin) && (
-        <footer className="footer fade-in">
-          <div className="footer-container">
-            <div className="footer-logo">W <span>Technologies</span></div>
-            <div className="copyright">© 2026 White Gloves Technologies. All rights reserved.</div>
-            <div className="socials">
-              <Link href="/login" className="admin-link"><span>🛡️</span> Admin Portal</Link>
-              <span className="social-link">Twitter</span>
-              <span className="social-link">LinkedIn</span>
-            </div>
-          </div>
+        <footer className="relative z-10 bg-black pt-16 pb-10 lg:py-24 border-t border-white/5">
+           <div className="container mx-auto px-6 lg:px-12">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-12 lg:gap-32">
+                 <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                       <div className="w-10 h-10 bg-white/5 border border-white/10 flex items-center justify-center rounded-xl">
+                          <Image src="/logo.png" alt="MWG" width={28} height={28} />
+                       </div>
+                       <div className="font-bold text-xl uppercase tracking-tight leading-none">
+                          White Gloves<br /><span className="text-brand-red text-[10px] tracking-[3px] font-black">TECHNOLOGIES</span>
+                       </div>
+                    </div>
+                    <p className="text-zinc-600 font-medium text-xs max-w-[280px]">Official attendance and workforce management system for White Gloves Technologies.</p>
+                 </div>
+
+                 <div className="grid grid-cols-2 md:grid-cols-3 gap-12 lg:gap-24">
+                    <div className="space-y-4">
+                       <h5 className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">General</h5>
+                       <ul className="space-y-3 text-xs font-medium text-zinc-600">
+                          <li className="hover:text-brand-red transition-colors cursor-pointer">About Us</li>
+                          <li className="hover:text-brand-red transition-colors cursor-pointer">Support</li>
+                          <li className="hover:text-brand-red transition-colors cursor-pointer">Careers</li>
+                       </ul>
+                    </div>
+                    <div className="space-y-4">
+                       <h5 className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Connect</h5>
+                       <ul className="space-y-3 text-xs font-medium text-zinc-600">
+                          <li className="hover:text-brand-red transition-colors cursor-pointer">LinkedIn</li>
+                          <li className="hover:text-brand-red transition-colors cursor-pointer">Twitter</li>
+                       </ul>
+                    </div>
+                    <div className="space-y-4">
+                       <h5 className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Administration</h5>
+                       <Link href="/login" className="flex items-center gap-3 text-zinc-300 font-bold text-xs group hover:text-brand-red transition-all">
+                          <div className="w-8 h-8 bg-brand-red/10 border border-brand-red/20 flex items-center justify-center rounded-lg group-hover:bg-brand-red group-hover:border-brand-red transition-all">
+                             <Lock size={14} className="text-brand-red group-hover:text-white transition-colors" />
+                          </div>
+                          Admin Login
+                       </Link>
+                    </div>
+                 </div>
+              </div>
+              
+              <div className="mt-16 pt-8 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
+                 <div className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest">© 2026 WHITE GLOVES TECHNOLOGIES. ALL RIGHTS RESERVED.</div>
+                 <div className="flex gap-8 text-[9px] font-bold uppercase tracking-widest text-zinc-700">
+                    <span className="hover:text-white cursor-pointer transition-colors">Privacy</span>
+                    <span className="hover:text-white cursor-pointer transition-colors">Terms</span>
+                 </div>
+              </div>
+           </div>
         </footer>
       )}
-
-      <style jsx>{`
-        .main-wrapper {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 5%;
-        }
-
-        .hero-section {
-          padding: 80px 0;
-          display: flex;
-          flex-direction: column;
-          gap: 120px;
-        }
-
-        .hero-section .container {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          align-items: center;
-          gap: 4rem;
-        }
-
-        h1 {
-          font-size: clamp(2.5rem, 6vw, 4.5rem);
-          line-height: 1.1;
-          font-weight: 800;
-          margin-bottom: 2rem;
-          font-family: 'Outfit', sans-serif;
-          letter-spacing: -2px;
-        }
-
-        .highlight {
-          color: var(--primary);
-        }
-
-        .description {
-          font-size: 1.25rem;
-          line-height: 1.6;
-          color: var(--text-gray);
-          max-width: 500px;
-          margin-bottom: 3rem;
-        }
-
-        .stats {
-          display: flex;
-          gap: 3rem;
-          margin-bottom: 3rem;
-        }
-
-        .stat-item {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .stat-number {
-          font-size: 1.8rem;
-          font-weight: 800;
-          color: white;
-        }
-
-        .stat-label {
-          font-size: 0.85rem;
-          color: var(--text-gray);
-          text-transform: uppercase;
-          letter-spacing: 1px;
-        }
-
-        .get-started-btn {
-          background: var(--primary);
-          color: white;
-          padding: 1.2rem 2.5rem;
-          border-radius: 50px;
-          font-size: 1.1rem;
-          font-weight: 700;
-          transition: all 0.4s ease;
-          display: flex;
-          align-items: center;
-          gap: 0.8rem;
-          box-shadow: 0 0 30px rgba(230, 30, 42, 0.4);
-        }
-
-        .get-started-btn:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 0 50px rgba(230, 30, 42, 0.6);
-        }
-
-        .hero-image-container {
-          position: relative;
-        }
-
-        .image-card {
-          position: relative;
-          border-radius: 40px;
-          overflow: hidden;
-          box-shadow: 0 30px 60px rgba(0,0,0,0.5);
-          transform: perspective(1000px) rotateY(-5deg);
-          border: 1px solid var(--glass-border);
-          transition: transform 0.6s ease;
-        }
-
-        .image-card:hover {
-          transform: perspective(1000px) rotateY(0deg) translateY(-10px);
-        }
-
-        .hero-img {
-          display: block;
-          width: 100%;
-          height: auto;
-          filter: grayscale(0.2) contrast(1.1);
-        }
-
-        .floating-badge {
-          position: absolute;
-          top: 2rem;
-          right: 2rem;
-          background: rgba(0, 0, 0, 0.7);
-          backdrop-filter: blur(10px);
-          padding: 0.8rem 1.5rem;
-          border-radius: 50px;
-          font-size: 0.9rem;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          gap: 0.6rem;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: white;
-        }
-
-        .dot {
-          width: 10px;
-          height: 10px;
-          background: #00ff00;
-          border-radius: 50%;
-          display: inline-block;
-          box-shadow: 0 0 10px #00ff00;
-        }
-
-        .form-section {
-          padding: 100px 5%;
-          display: flex;
-          justify-content: center;
-          background: linear-gradient(180deg, transparent, rgba(230, 30, 42, 0.05));
-        }
-
-        .form-wrapper {
-          width: 100%;
-          display: flex;
-          justify-content: center;
-        }
-
-        .dashboard-section {
-          padding: 60px 0;
-          flex-grow: 1;
-        }
-
-        .dashboard-header {
-          text-align: center;
-          margin-bottom: 4rem;
-        }
-
-        .dashboard-header h1 {
-          font-size: 3.5rem;
-          margin-bottom: 0.5rem;
-        }
-
-        .dashboard-header p {
-          color: var(--text-gray);
-          font-size: 1.1rem;
-        }
-
-        .footer {
-          padding: 60px 5%;
-          border-top: 1px solid var(--border);
-          background: #050505;
-          margin-top: auto;
-        }
-
-        .footer-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .footer-logo {
-          font-weight: 800;
-          font-family: 'Outfit', sans-serif;
-        }
-
-        .footer-logo span {
-          color: var(--primary);
-        }
-
-        .copyright {
-          color: #555;
-          font-size: 0.9rem;
-        }
-
-        .socials {
-          display: flex;
-          gap: 2rem;
-          color: #555;
-          font-size: 0.9rem;
-          font-weight: 500;
-        }
-
-        .admin-link {
-          background: rgba(230, 30, 42, 0.1);
-          color: white;
-          padding: 0.5rem 1rem;
-          border-radius: 50px;
-          border: 1px solid rgba(230, 30, 42, 0.2);
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          font-weight: 700;
-          transition: 0.3s;
-        }
-
-        .admin-link:hover {
-          background: #e61e2a;
-          transform: translateY(-2px);
-          box-shadow: 0 5px 15px rgba(230, 30, 42, 0.3);
-        }
-
-        .social-link:hover {
-          color: var(--primary);
-          cursor: pointer;
-        }
-
-        .mobile-only { display: none !important; }
-        .desktop-only { display: flex !important; }
-
-        @media (max-width: 900px) {
-          .mobile-only { display: block !important; }
-          .desktop-only { display: none !important; }
-          
-          .main-wrapper { background: #000; }
-          .footer-container { flex-direction: column; gap: 2rem; text-align: center; }
-
-          /* Mobile Navbar */
-          .m-navbar { position: fixed; top: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.1); padding: 16px 20px; z-index: 1000; }
-          .m-nav-container { display: flex; justify-content: space-between; align-items: center; }
-          .m-brand { display: flex; align-items: center; gap: 10px; }
-          .m-logo { width: 36px; height: 36px; background: #e61e2a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; }
-          .m-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
-          .m-brand-text strong { font-size: 14px; }
-          .m-brand-text span { font-size: 9px; color: #e61e2a; text-transform: uppercase; letter-spacing: 1px; }
-          .m-menu-toggle { background: none; border: none; color: #fff; font-size: 24px; }
-          
-          .m-nav-menu { position: fixed; top: 68px; left: 0; right: 0; background: #000; padding: 20px; display: flex; flex-direction: column; gap: 1rem; transform: translateY(-100%); opacity: 0; transition: 0.3s ease; border-bottom: 1px solid #1a1a1a; }
-          .m-nav-menu.open { transform: translateY(0); opacity: 1; }
-          .m-nav-menu a { color: #888; font-weight: 600; text-decoration: none; padding: 10px 0; }
-          .m-btn-primary { width: 100%; padding: 14px; background: #e61e2a; border: none; border-radius: 12px; color: #fff; font-weight: 700; }
-
-          /* Mobile Hero */
-          .m-hero { position: relative; padding: 120px 20px 60px; min-height: 90vh; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
-          .m-hero-bg { position: absolute; inset: 0; z-index: 0; }
-          .m-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(230,30,42,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(230,30,42,0.03) 1px, transparent 1px); background-size: 30px 30px; }
-          .m-orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.2; animation: m-float 8s infinite; }
-          .o1 { width: 250px; height: 250px; background: #e61e2a; top: -50px; right: -50px; }
-          .o2 { width: 200px; height: 200px; background: #a8121a; bottom: 50px; left: -50px; }
-          @keyframes m-float { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(15px,-15px); } }
-
-          .m-hero-content { position: relative; z-index: 10; }
-          .m-live-tag { display: inline-flex; align-items: center; gap: 8px; background: rgba(0,255,10,0.1); border: 1px solid rgba(0,255,10,0.2); padding: 8px 16px; border-radius: 20px; color: #00ff0a; font-size: 11px; font-weight: 800; margin-bottom: 24px; }
-          .m-pulse { width: 8px; height: 8px; background: #00ff0a; border-radius: 50%; animation: m-pulse 2s infinite; }
-          @keyframes m-pulse { 0% { box-shadow: 0 0 0 0 rgba(0,255,10,0.4); } 70% { box-shadow: 0 0 0 10px rgba(0,255,10,0); } 100% { box-shadow: 0 0 0 0 rgba(0,255,10,0); } }
-          
-          .m-title { font-size: 42px; font-weight: 950; line-height: 1; margin-bottom: 20px; letter-spacing: -1px; }
-          .m-highlight { color: #e61e2a; }
-          .m-desc { font-size: 15px; color: #666; line-height: 1.5; margin-bottom: 40px; }
-          .m-actions { display: flex; gap: 10px; margin-bottom: 40px; }
-          .m-btn-cta { width: 100%; padding: 18px; background: #e61e2a; border: none; border-radius: 14px; color: #fff; font-weight: 900; font-size: 16px; box-shadow: 0 10px 30px rgba(230,30,42,0.3); }
-          .m-btn-demo { padding: 18px 24px; background: rgba(255,255,255,0.05); border: 1px solid #222; border-radius: 14px; color: #fff; font-weight: 700; }
-
-          /* Mobile Preview Interface */
-          .m-preview-box { margin-top: 20px; perspective: 1000px; }
-          .m-interface { background: rgba(255,255,255,0.02); border: 1px solid rgba(230,30,42,0.2); border-radius: 24px; padding: 24px; position: relative; overflow: hidden; transform: rotateX(5deg); }
-          .m-i-header { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
-          .m-i-light { width: 8px; height: 8px; background: #e61e2a; border-radius: 50%; box-shadow: 0 0 10px #e61e2a; animation: m-blink 2s infinite; }
-          @keyframes m-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
-          .m-i-header span { font-size: 10px; color: #e61e2a; font-weight: 900; letter-spacing: 1px; }
-          .m-i-profile { display: flex; gap: 15px; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; margin-bottom: 20px; }
-          .m-i-avatar { width: 44px; height: 44px; background: #e61e2a; border-radius: 50%; opacity: 0.4; }
-          .m-i-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
-          .m-line { height: 6px; background: #222; border-radius: 3px; }
-          .m-line.s { width: 60%; }
-          .m-i-scan { height: 100px; background: #000; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-          .m-eye { width: 40px; height: 40px; border: 2px solid #e61e2a; border-radius: 50%; }
-          .m-eye::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 12px; height: 12px; background: #e61e2a; border-radius: 50%; box-shadow: 0 0 15px #e61e2a; }
-          .m-scan-line { position: absolute; left: 0; right: 0; height: 1px; background: #e61e2a; box-shadow: 0 0 10px #e61e2a; animation: m-scan 3s infinite; }
-          @keyframes m-scan { 0%, 100% { top: 10%; opacity: 0; } 50% { top: 90%; opacity: 1; } }
-
-          /* Mobile Stats */
-          .m-stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); background: #0a0a0a; border: 1px solid #1a1a1a; margin: 20px 0; border-radius: 16px; overflow: hidden; }
-          .m-stat { padding: 20px; text-align: center; border-right: 1px solid #1a1a1a; }
-          .m-stat:last-child { border: none; }
-          .m-stat strong { display: block; font-size: 20px; color: #e61e2a; }
-          .m-stat span { font-size: 10px; color: #444; font-weight: 800; }
-        }
-      `}</style>
     </main>
   );
 }

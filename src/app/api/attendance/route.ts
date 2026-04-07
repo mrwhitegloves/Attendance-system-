@@ -5,14 +5,18 @@ import Attendance from '@/models/Attendance';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    const date = searchParams.get('date');
+
     const employeeId = searchParams.get('employeeId');
 
-    if (!employeeId) {
-      return NextResponse.json({ error: 'Employee ID is required' }, { status: 400 });
-    }
-
     await dbConnect();
-    const records = await Attendance.find({ employeeId }).sort({ createdAt: -1 });
+    let query: any = {};
+    if (employeeId) query.employeeId = employeeId;
+    if (date) query.date = date;
+
+    const records = await Attendance.find(query)
+      .populate('userId', 'name mwgId department')
+      .sort({ createdAt: -1 });
 
     return NextResponse.json(records);
   } catch (error: any) {

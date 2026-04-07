@@ -2,9 +2,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-
-
 import React, { useState, useEffect } from 'react';
+import { Shield, LayoutDashboard, Database, Activity, LogOut, FileText, Users } from 'lucide-react';
 
 export default function Navbar() {
   const [user, setUser] = useState<any>(null);
@@ -15,7 +14,6 @@ export default function Navbar() {
       setUser(savedUser ? JSON.parse(savedUser) : null);
     };
     checkUser();
-    // Watch for login/logout in other tabs or same tab redirects
     window.addEventListener('storage', checkUser);
     return () => window.removeEventListener('storage', checkUser);
   }, []);
@@ -26,160 +24,53 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="navbar fade-in">
-      <Link href="/" className="logo-container">
-        <div className="logo-icon active-glow">
-          <Image src="/logo.png" alt="MWG Logo" width={32} height={32} style={{ borderRadius: '4px' }} />
+    <nav className="h-20 flex items-center justify-between px-6 lg:px-12 bg-black/80 backdrop-blur-2xl border-b border-brand-border sticky top-0 z-[100] animate-fade-in font-sans">
+      <Link href="/" className="flex items-center gap-4 group">
+        <div className="w-11 h-11 bg-white/[0.03] border border-white/10 flex items-center justify-center rounded-xl transition-all duration-500 group-hover:bg-brand-red group-hover:shadow-[0_0_20px_rgba(230,30,42,0.6)] group-hover:rotate-6">
+          <Image src="/logo.png" alt="MWG" width={32} height={32} className="rounded" />
         </div>
-        <div className="logo-text slide-right">
-          White Gloves <span>Technologies</span>
+        <div className="flex flex-col leading-none">
+          <span className="text-lg font-black tracking-tighter text-white">White Gloves</span>
+          <span className="text-[9px] font-black tracking-[3px] uppercase text-brand-red">Technologies</span>
         </div>
       </Link>
 
-      
-      <div className="nav-links">
-        <Link href="/" className="nav-link active">Home</Link>
-        <Link href="#" className="nav-link">Workforce</Link>
-        <Link href="#" className="nav-link">Reports</Link>
-        <Link href="#" className="nav-link">Settings</Link>
+      <div className="hidden lg:flex items-center gap-10">
+        {[
+          { label: 'Workforce', icon: Users },
+          { label: 'Reports', icon: FileText },
+          { label: 'Activity', icon: Activity }
+        ].map(item => (
+          <Link 
+            key={item.label}
+            href="#" 
+            className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-white transition-all group"
+          >
+            <item.icon size={14} className="group-hover:text-brand-red transition-colors" />
+            {item.label}
+          </Link>
+        ))}
       </div>
 
-      <div className="nav-actions">
+      <div className="flex items-center gap-4">
         {!user ? (
           <>
-            <Link href="/login" className="btn-secondary">Login</Link>
-            <Link href="/signup" className="btn-primary">Get Started</Link>
+            <Link href="/login" className="hidden sm:block text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-white px-6 py-3 transition-colors">
+              Login
+            </Link>
+            <Link href="/signup" className="flex items-center gap-2 bg-brand-red text-white text-xs font-bold uppercase tracking-widest px-8 py-3.5 rounded-xl hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/20">
+              <Shield size={14} /> Create Account
+            </Link>
           </>
         ) : (
-          <button onClick={handleLogout} className="btn-primary logout-btn">Logout</button>
+          <button 
+            onClick={handleLogout} 
+            className="flex items-center gap-3 bg-white/5 border border-white/10 text-white text-[10px] font-bold uppercase tracking-widest px-6 py-3 rounded-lg hover:bg-brand-red hover:border-brand-red transition-all"
+          >
+            <LogOut size={14} /> Logout
+          </button>
         )}
       </div>
-
-      <style jsx>{`
-        .navbar {
-          height: 80px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0 5%;
-          background: rgba(10, 10, 10, 0.8);
-          backdrop-filter: blur(20px);
-          border-bottom: 1px solid var(--border);
-          position: sticky;
-          top: 0;
-          z-index: 100;
-        }
-
-        .logo-container {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .logo-icon {
-          width: 44px;
-          height: 44px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 12px;
-          transition: all 0.4s ease;
-          overflow: hidden;
-        }
-
-        .logo-icon:hover {
-          background: var(--primary);
-          transform: rotate(5deg) scale(1.1);
-          box-shadow: 0 0 20px rgba(230, 30, 42, 0.6);
-        }
-
-        .active-glow {
-          box-shadow: 0 0 10px rgba(230, 30, 42, 0.3);
-        }
-
-
-        .logo-text {
-          font-weight: 800;
-          font-size: 1.2rem;
-          font-family: 'Outfit', sans-serif;
-          letter-spacing: -0.5px;
-        }
-
-        .logo-text span {
-          color: var(--primary);
-          font-weight: 300;
-        }
-
-        .nav-links {
-          display: flex;
-          gap: 2.5rem;
-        }
-
-        .nav-link {
-          font-size: 0.9rem;
-          font-weight: 500;
-          color: var(--text-gray);
-          transition: all 0.3s ease;
-          position: relative;
-        }
-
-        .nav-link:hover, .nav-link.active {
-          color: white;
-        }
-
-        .nav-link.active::after {
-          content: '';
-          position: absolute;
-          bottom: -5px;
-          left: 0;
-          width: 20px;
-          height: 2px;
-          background: var(--primary);
-          border-radius: 2px;
-        }
-
-        .nav-actions {
-          display: flex;
-          gap: 1rem;
-        }
-
-        .btn-secondary {
-          color: white;
-          font-weight: 600;
-          font-size: 0.9rem;
-          padding: 0.7rem 1.5rem;
-          border-radius: 10px;
-          transition: background 0.3s ease;
-        }
-
-        .btn-secondary:hover {
-          background: rgba(255, 255, 255, 0.05);
-        }
-
-        .btn-primary {
-          background: var(--primary);
-          color: white;
-          font-weight: 600;
-          font-size: 0.9rem;
-          padding: 0.7rem 1.5rem;
-          border-radius: 10px;
-          transition: all 0.3s ease;
-        }
-
-        .btn-primary:hover {
-          background: var(--primary-hover);
-          box-shadow: 0 5px 15px rgba(230, 30, 42, 0.3);
-          transform: translateY(-1px);
-        }
-
-        @media (max-width: 900px) {
-          .nav-links {
-            display: none;
-          }
-        }
-      `}</style>
     </nav>
   );
 }

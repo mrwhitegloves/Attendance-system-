@@ -6,10 +6,19 @@ const UserSchema = new mongoose.Schema({
     required: [true, 'Name is required'],
     trim: true,
   },
+  phone: {
+    type: String,
+    default: '',
+  },
   employeeId: {
     type: String,
     required: [true, 'Employee ID is required'],
     unique: true,
+  },
+  mwgId: { // Standard identifier for MWG system
+    type: String,
+    unique: true,
+    sparse: true
   },
   email: {
     type: String,
@@ -28,8 +37,19 @@ const UserSchema = new mongoose.Schema({
   },
   staffType: {
     type: String,
-    enum: ['Office Staff', 'Field Staff'],
     default: 'Office Staff',
+  },
+  expectedInTime: {
+    type: String,
+    default: '09:30', // Default format HH:MM
+  },
+  expectedOutTime: {
+    type: String,
+    default: '18:30',
+  },
+  isAdmin: {
+    type: Boolean,
+    default: false,
   },
 }, { timestamps: true });
 

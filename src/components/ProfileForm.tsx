@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { Shield, User, BadgeCheck, Briefcase, LayoutGrid, ArrowRight } from 'lucide-react';
 
 interface Profile {
   name: string;
@@ -25,169 +26,93 @@ export default function ProfileForm({ onComplete }: { onComplete: (profile: Prof
   };
 
   return (
-    <div className="form-container fade-in hover-lift">
-
-      <h2>Create Your Profile</h2>
-      <p className="subtitle">Enter your details to join White Gloves Technologies workforce</p>
+    <div className="w-full max-w-[480px] bg-brand-card/80 backdrop-blur-2xl border border-brand-border rounded-[40px] p-8 lg:p-12 shadow-2xl relative z-10 animate-fade-in font-sans">
+      <div className="text-center space-y-3 mb-10">
+        <div className="flex justify-center mb-6">
+          <div className="w-16 h-16 bg-brand-red rounded-2xl flex items-center justify-center shadow-2xl shadow-red-900/30 rotate-6 transition-transform hover:rotate-0 duration-500">
+             <Shield size={32} className="text-white" />
+          </div>
+        </div>
+        <h2 className="text-3xl font-black tracking-tighter text-white uppercase italic">Profile Genesis</h2>
+        <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest leading-none">Initialize your corporate identity node</p>
+      </div>
       
-      <form onSubmit={handleSubmit} className="profile-form">
-        <div className="input-group">
-          <label htmlFor="name">Full Name</label>
-          <input
-            type="text"
-            id="name"
-            placeholder="John Doe"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            required
-          />
-        </div>
-
-        <div className="input-group">
-          <label htmlFor="employeeId">Employee ID</label>
-          <input
-            type="text"
-            id="employeeId"
-            placeholder="WG-12345"
-            value={formData.employeeId}
-            onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-            required
-          />
-        </div>
-
-        <div className="input-row">
-          <div className="input-group">
-            <label htmlFor="department">Department</label>
-            <select
-              id="department"
-              value={formData.department}
-              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 block pl-2" htmlFor="name">Legal Identifier</label>
+          <div className="relative group">
+            <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-brand-red transition-colors" />
+            <input
+              type="text"
+              id="name"
+              placeholder="Full Name"
+              className="w-full bg-black/50 border border-brand-border rounded-2xl py-4 pl-12 pr-6 outline-none focus:border-brand-red/50 transition-all font-medium text-white text-sm"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
-            >
-              <option value="">Select Dept</option>
-              <option value="Engineering">Engineering</option>
-              <option value="Marketing">Marketing</option>
-              <option value="Operations">Operations</option>
-              <option value="Design">Design</option>
-              <option value="HR">HR</option>
-            </select>
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="staffType">Staff Type</label>
-            <select
-              id="staffType"
-              value={formData.staffType}
-              onChange={(e) => setFormData({ ...formData, staffType: e.target.value as any })}
-              required
-            >
-              <option value="Office Staff">Office Staff</option>
-              <option value="Field Staff">Field Staff</option>
-            </select>
+            />
           </div>
         </div>
 
-        <button type="submit" className="btn-primary">
-          Complete Profile <span>→</span>
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 block pl-2" htmlFor="employeeId">Badge Sequence</label>
+          <div className="relative group">
+            <BadgeCheck size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-brand-red transition-colors" />
+            <input
+              type="text"
+              id="employeeId"
+              placeholder="e.g. WG-12345"
+              className="w-full bg-black/50 border border-brand-border rounded-2xl py-4 pl-12 pr-6 outline-none focus:border-brand-red/50 transition-all font-medium text-white text-sm"
+              value={formData.employeeId}
+              onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+              required
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 block pl-2" htmlFor="department">Affiliation</label>
+            <div className="relative group">
+              <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none group-focus-within:text-brand-red transition-colors" />
+              <select
+                id="department"
+                className="w-full bg-black/50 border border-brand-border rounded-2xl py-4 pl-12 pr-6 outline-none focus:border-brand-red/50 transition-all font-bold text-white text-xs appearance-none"
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                required
+              >
+                <option value="" disabled className="bg-zinc-900 text-zinc-500 text-sm">Select Dept</option>
+                {['Engineering', 'Marketing', 'Operations', 'Design', 'HR'].map(dept => (
+                   <option key={dept} value={dept} className="bg-zinc-900 text-white text-sm">{dept}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 block pl-2" htmlFor="staffType">Strategy</label>
+            <div className="relative group">
+              <LayoutGrid size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none group-focus-within:text-brand-red transition-colors" />
+              <select
+                id="staffType"
+                className="w-full bg-black/50 border border-brand-border rounded-2xl py-4 pl-12 pr-6 outline-none focus:border-brand-red/50 transition-all font-bold text-white text-xs appearance-none"
+                value={formData.staffType}
+                onChange={(e) => setFormData({ ...formData, staffType: e.target.value as any })}
+                required
+              >
+                <option value="Office Staff" className="bg-zinc-900 text-white text-sm">Office Node</option>
+                <option value="Field Staff" className="bg-zinc-900 text-white text-sm">Field Node</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" className="w-full group bg-brand-red text-white py-5 rounded-2xl flex items-center justify-center gap-4 font-black text-lg transition-all hover:bg-red-700 active:scale-95 shadow-2xl shadow-red-900/30">
+          Sync Identity 
+          <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
         </button>
       </form>
-
-      <style jsx>{`
-        .form-container {
-          background: var(--bg-card);
-          padding: 2.5rem;
-          border-radius: 24px;
-          border: 1px solid var(--glass-border);
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(10px);
-          max-width: 450px;
-          width: 100%;
-        }
-
-        h2 {
-          font-size: 1.8rem;
-          margin-bottom: 0.5rem;
-          font-weight: 700;
-          letter-spacing: -0.5px;
-        }
-
-        .subtitle {
-          color: var(--text-gray);
-          font-size: 0.9rem;
-          margin-bottom: 2rem;
-        }
-
-        .profile-form {
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-        }
-
-        .input-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1rem;
-        }
-
-        .input-group {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        label {
-          font-size: 0.85rem;
-          font-weight: 600;
-          color: var(--text-gray);
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        input, select {
-          background: #1a1a1a;
-          border: 1px solid #333;
-          padding: 0.8rem 1rem;
-          border-radius: 12px;
-          color: white;
-          font-size: 1rem;
-          transition: all 0.3s ease;
-        }
-
-        input:focus, select:focus {
-          border-color: var(--primary);
-          outline: none;
-          box-shadow: 0 0 10px rgba(230, 30, 42, 0.2);
-        }
-
-        .btn-primary {
-          background: var(--primary);
-          color: white;
-          padding: 1rem;
-          border-radius: 12px;
-          font-size: 1rem;
-          font-weight: 600;
-          margin-top: 1rem;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-        }
-
-        .btn-primary:hover {
-          background: var(--primary-hover);
-          transform: translateY(-2px);
-          box-shadow: 0 5px 15px rgba(230, 30, 42, 0.4);
-        }
-
-        .btn-primary span {
-          transition: transform 0.3s ease;
-        }
-
-        .btn-primary:hover span {
-          transform: translateX(4px);
-        }
-      `}</style>
     </div>
   );
 }

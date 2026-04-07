@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { LogIn, Mail, Lock, ArrowRight, UserCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -18,7 +19,7 @@ export default function LoginPage() {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier: email, password }),
       });
 
       if (res.ok) {
@@ -38,204 +39,76 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="login-wrapper">
-      <div className="login-card slide-up">
-        <div className="login-header">
-          <Link href="/">
-            <div className="logo">W <span>Technologies</span></div>
-          </Link>
-          <h1>Welcome Back</h1>
-          <p>Login to your workforce account</p>
+    <div className="min-h-screen bg-black flex items-center justify-center p-6 relative overflow-hidden selection:bg-brand-red selection:text-white font-sans">
+      {/* Visual Background */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-brand-red/10 blur-[150px] rounded-full"></div>
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#e61e2a 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+      </div>
+
+      <div className="w-full max-w-[440px] bg-brand-card/80 backdrop-blur-2xl border border-brand-border rounded-[32px] p-8 lg:p-10 shadow-2xl relative z-10 animate-fade-in">
+        <div className="text-center space-y-2 mb-8">
+          <div className="flex justify-center mb-4">
+            <div className="w-14 h-14 bg-brand-red rounded-2xl flex items-center justify-center shadow-xl shadow-red-900/20">
+               <UserCircle size={32} className="text-white" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Login</h1>
+          <p className="text-zinc-500 font-medium text-sm">Sign in to your workforce portal</p>
         </div>
 
-        <form className="login-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email">Email or Username</label>
-            <input 
-              type="text" 
-              id="email" 
-              placeholder="e.g. whitegloves" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required 
-            />
-          </div>
-
-          <div className="form-group">
-            <div className="label-row">
-              <label htmlFor="password">Password</label>
-              <a href="#" className="forgot-password">Forgot?</a>
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-zinc-400 block ml-1" htmlFor="email">MWG-ID or Email</label>
+            <div className="relative group">
+              <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-brand-red transition-colors" />
+              <input 
+                type="text" 
+                id="email" 
+                placeholder="MWG-001 or name@email.com" 
+                className="w-full bg-black/50 border border-brand-border rounded-xl py-3.5 pl-12 pr-6 outline-none focus:border-brand-red/50 transition-all text-white placeholder:text-zinc-700"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required 
+              />
             </div>
-            <input 
-              type="password" 
-              id="password" 
-              placeholder="••••••••" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required 
-            />
           </div>
 
-          <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? 'Signing In...' : 'Sign In'}
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-xs font-bold text-zinc-400" htmlFor="password">Password</label>
+              <a href="#" className="text-xs font-bold text-brand-red hover:underline">Forgot?</a>
+            </div>
+            <div className="relative group">
+              <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-brand-red transition-colors" />
+              <input 
+                type="password" 
+                id="password" 
+                placeholder="Enter your password" 
+                className="w-full bg-black/50 border border-brand-border rounded-xl py-3.5 pl-12 pr-6 outline-none focus:border-brand-red/50 transition-all text-white placeholder:text-zinc-700"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required 
+              />
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full group bg-brand-red py-4 rounded-xl flex items-center justify-center gap-3 font-bold text-lg transition-all hover:bg-red-700 active:scale-95 shadow-xl shadow-red-900/20 disabled:grayscale disabled:opacity-50"
+          >
+            {loading ? 'Logging in...' : 'Login'}
+            {!loading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
           </button>
         </form>
 
-        <div className="login-footer">
-          <p>Don&apos;t have an account? <Link href="/signup" className="signup-link">Create one</Link></p>
+        <div className="mt-8 pt-6 border-t border-white/5 text-center">
+          <p className="text-zinc-500 font-medium text-sm">
+            Don't have an account? <Link href="/signup" className="text-brand-red hover:underline font-bold">Sign Up</Link>
+          </p>
         </div>
       </div>
-
-      <style jsx>{`
-        .login-wrapper {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 2rem;
-          background: var(--bg-dark);
-          position: relative;
-          overflow: hidden;
-        }
-
-        .login-wrapper::before {
-          content: '';
-          position: absolute;
-          top: -20%;
-          left: -10%;
-          width: 50%;
-          height: 50%;
-          background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
-          opacity: 0.15;
-          filter: blur(80px);
-        }
-
-        .login-card {
-          width: 100%;
-          max-width: 450px;
-          background: var(--bg-card);
-          padding: 3rem;
-          border-radius: 24px;
-          border: 1px solid var(--border);
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-          position: relative;
-          z-index: 1;
-        }
-
-        .login-header {
-          text-align: center;
-          margin-bottom: 2.5rem;
-        }
-
-        .logo {
-          font-weight: 800;
-          font-family: 'Outfit', sans-serif;
-          font-size: 1.5rem;
-          margin-bottom: 1.5rem;
-          cursor: pointer;
-        }
-
-        .logo span {
-          color: var(--primary);
-        }
-
-        h1 {
-          font-size: 2rem;
-          font-weight: 700;
-          margin-bottom: 0.5rem;
-          letter-spacing: -0.5px;
-        }
-
-        p {
-          color: var(--text-gray);
-          font-size: 1rem;
-        }
-
-        .login-form {
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-        }
-
-        .form-group {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .label-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        label {
-          font-size: 0.9rem;
-          font-weight: 500;
-          color: var(--text-white);
-        }
-
-        .forgot-password {
-          font-size: 0.85rem;
-          color: var(--primary);
-          font-weight: 500;
-        }
-
-        input {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid var(--border);
-          padding: 1rem 1.2rem;
-          border-radius: 12px;
-          color: white;
-          font-size: 1rem;
-          transition: all 0.3s ease;
-        }
-
-        input:focus {
-          outline: none;
-          border-color: var(--primary);
-          background: rgba(255, 255, 255, 0.05);
-          box-shadow: 0 0 0 4px rgba(230, 30, 42, 0.1);
-        }
-
-        .login-btn {
-          margin-top: 1rem;
-          background: var(--primary);
-          color: white;
-          padding: 1rem;
-          border-radius: 12px;
-          font-size: 1rem;
-          font-weight: 700;
-          transition: all 0.3s ease;
-        }
-
-        .login-btn:hover {
-          background: var(--primary-hover);
-          transform: translateY(-2px);
-          box-shadow: 0 10px 20px rgba(230, 30, 42, 0.3);
-        }
-
-        .login-footer {
-          margin-top: 2rem;
-          text-align: center;
-          font-size: 0.95rem;
-        }
-
-        .signup-link {
-          color: var(--primary);
-          font-weight: 600;
-        }
-
-        .signup-link:hover {
-          text-decoration: underline;
-        }
-
-        @media (max-width: 480px) {
-          .login-card {
-            padding: 2rem;
-          }
-        }
-      `}</style>
     </div>
   );
 }

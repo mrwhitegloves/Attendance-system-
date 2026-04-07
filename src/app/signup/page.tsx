@@ -1,227 +1,42 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { ShieldAlert, ArrowRight } from 'lucide-react';
 
 export default function SignupPage() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
-  const [department, setDepartment] = useState('');
-  const [staffType, setStaffType] = useState('Office Staff');
-  const [loading, setLoading] = useState(false);
-  
-  const router = useRouter();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const res = await fetch('/api/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-          employeeId,
-          department,
-          staffType,
-        }),
-      });
-
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        const userData = await res.json();
-        if (res.ok) {
-          localStorage.setItem('user', JSON.stringify(userData));
-          window.location.href = '/'; // Hard redirect to ensure storage sync
-        } else {
-          alert(userData.error || 'Signup failed');
-        }
-      } else {
-         const errorText = await res.text();
-         console.error("Server returned non-JSON response:", errorText);
-         alert("Server configuration error. Please check your database connection.");
-      }
-    } catch (err) {
-      console.error('Signup error:', err);
-      alert('An error occurred during signup');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="signup-wrapper">
-      <div className="signup-card slide-up">
-        <div className="signup-header">
-          <Link href="/">
-            <div className="logo">W <span>Technologies</span></div>
-          </Link>
-          <h1>Join Workforce</h1>
-          <p>Create your workforce account</p>
-        </div>
-
-        <form className="signup-form" onSubmit={handleSubmit}>
-          <div className="input-row">
-            <div className="form-group">
-              <label htmlFor="name">Full Name</label>
-              <input 
-                type="text" 
-                id="name" 
-                placeholder="John Doe" 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required 
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="employeeId">Employee ID</label>
-              <input 
-                type="text" 
-                id="employeeId" 
-                placeholder="WG-12345" 
-                value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
-                required 
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email">Email Address</label>
-            <input 
-              type="email" 
-              id="email" 
-              placeholder="name@company.com" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required 
-            />
-          </div>
-
-          <div className="input-row">
-            <div className="form-group">
-              <label htmlFor="department">Department</label>
-              <select
-                id="department"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                required
-              >
-                <option value="">Select Dept</option>
-                <option value="Engineering" style={{color: '#000'}}>Engineering</option>
-                <option value="Marketing" style={{color: '#000'}}>Marketing</option>
-                <option value="Operations" style={{color: '#000'}}>Operations</option>
-                <option value="Design" style={{color: '#000'}}>Design</option>
-                <option value="HR" style={{color: '#000'}}>HR</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label htmlFor="staffType">Staff Type</label>
-              <select
-                id="staffType"
-                value={staffType}
-                onChange={(e) => setStaffType(e.target.value)}
-                required
-              >
-                <option value="Office Staff" style={{color: '#000'}}>Office Staff</option>
-                <option value="Field Staff" style={{color: '#000'}}>Field Staff</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input 
-              type="password" 
-              id="password" 
-              placeholder="••••••••" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required 
-            />
-          </div>
-
-          <button type="submit" className="signup-btn" disabled={loading}>
-            {loading ? 'Creating Account...' : 'Create Account'}
-          </button>
-        </form>
-
-        <div className="signup-footer">
-          <p>Already have an account? <Link href="/login" className="login-link">Sign In</Link></p>
-        </div>
+    <div className="min-h-screen bg-black flex items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-brand-red selection:text-white">
+      {/* Visual Background */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] bg-brand-red/10 blur-[150px] rounded-full"></div>
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#e61e2a 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
       </div>
 
-      <style jsx>{`
-        .signup-wrapper {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 2rem;
-          background: #050505;
-          position: relative;
-        }
+      <div className="w-full max-w-[440px] bg-brand-card/80 backdrop-blur-2xl border border-brand-border rounded-[32px] p-12 text-center space-y-6 relative z-10 animate-fade-in shadow-2xl">
+        <div className="flex justify-center">
+            <div className="w-20 h-20 bg-brand-red/10 border border-brand-red/20 rounded-3xl flex items-center justify-center shadow-red-900/10">
+               <ShieldAlert size={40} className="text-brand-red" />
+            </div>
+        </div>
+        
+        <div className="space-y-2">
+          <h1 className="text-3xl font-black italic uppercase tracking-tight text-white underline decoration-brand-red decoration-4">Access Restricted</h1>
+          <p className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest">Enterprise Security Policy</p>
+        </div>
 
-        .signup-card {
-          width: 100%;
-          max-width: 500px;
-          background: #111;
-          padding: 2.5rem;
-          border-radius: 24px;
-          border: 1px solid #222;
-          box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-        }
+        <p className="text-zinc-400 font-bold text-sm leading-relaxed px-2">
+          Self-registration is currently disabled. All employee nodes are now provisioned directly through the Management Command Center. <br/><br/>
+          Please contact your administrator to obtain your unique <span className="text-brand-red font-black">MWG-ID</span> and verified credentials.
+        </p>
 
-        .signup-header { text-align: center; margin-bottom: 2rem; }
-        .logo { font-weight: 800; font-size: 1.5rem; margin-bottom: 1rem; color: #fff; }
-        .logo span { color: var(--primary); }
-        h1 { font-size: 1.8rem; color: #fff; margin-bottom: 0.5rem; }
-        p { color: #888; font-size: 0.9rem; }
-
-        .signup-form { display: flex; flex-direction: column; gap: 1.2rem; }
-        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
-        label { font-size: 0.8rem; font-weight: 600; color: #aaa; text-transform: uppercase; }
-
-        input, select {
-          background: #1a1a1a;
-          border: 1px solid #333;
-          padding: 0.8rem 1rem;
-          border-radius: 10px;
-          color: #fff;
-          font-size: 1rem;
-          width: 100%;
-        }
-
-        input::placeholder { color: #555; }
-
-        select option { background: #fff; color: #000; }
-
-        .signup-btn {
-          background: var(--primary);
-          color: white;
-          padding: 1rem;
-          border-radius: 12px;
-          font-size: 1rem;
-          font-weight: 700;
-          margin-top: 1rem;
-        }
-
-        .signup-footer { margin-top: 1.5rem; text-align: center; color: #666; font-size: 0.9rem; }
-        .login-link { color: var(--primary); font-weight: 600; }
-
-        @media (max-width: 480px) {
-          .signup-card {
-            padding: 2rem;
-          }
-        }
-      `}</style>
+        <div className="pt-4">
+           <Link href="/login" className="flex items-center justify-center gap-3 bg-brand-red hover:bg-red-700 text-white font-black py-4 px-8 rounded-2xl transition-all uppercase text-[10px] tracking-widest shadow-xl shadow-red-900/20 active:scale-95 group">
+              Return to Control Center
+              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+           </Link>
+        </div>
+      </div>
     </div>
   );
 }

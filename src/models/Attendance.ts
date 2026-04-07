@@ -5,9 +5,19 @@ const AttendanceSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Employee ID is required'],
   },
+  userName: {
+    type: String,
+    default: 'Unknown User'
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    index: true
+  },
   date: {
     type: String,
     required: true,
+    index: true
   },
   time: {
     type: String,
@@ -15,9 +25,11 @@ const AttendanceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Checked In', 'Checked Out'],
+    enum: ['Checked In', 'Checked Out', 'Leave', 'Late'],
     required: true,
   },
+  lat: Number,
+  lon: Number,
   location: {
     type: String,
     default: 'Unknown',
