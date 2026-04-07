@@ -55,6 +55,7 @@ interface UserProfile {
   phone?: string;
   staffType?: string;
   isAdmin?: boolean;
+  password?: string;
 }
 
 interface LeaveRequest {
