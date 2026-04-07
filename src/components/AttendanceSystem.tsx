@@ -462,7 +462,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                           <td className="px-8 py-6 text-green-500 font-black text-lg">{day.firstIn?.time || '--'}</td>
                           <td className="px-8 py-6">{day.lastOut ? <span className="text-red-500 font-black text-lg">{day.lastOut.time}</span> : (day.firstIn ? <span className="px-3 py-1 bg-green-500/10 text-green-500 text-[10px] font-bold rounded">ACTIVE</span> : <span className="text-zinc-900 font-black">--</span>)}</td>
                           <td className="px-8 py-6">
-                            {day.selfie && <div className="w-12 h-12 rounded-lg border border-white/10 overflow-hidden shadow-lg"><img src={day.selfie} alt="Verified" className="w-full h-full object-cover" /></div>}
+                            {day.selfie && <div className="w-12 h-12 rounded-lg border border-white/10 overflow-hidden shadow-lg"><Image src={day.selfie} alt="Verified" className="w-full h-full object-cover" width={48} height={48} /></div>}
                           </td>
                           <td className="px-8 py-6 text-zinc-600 text-xs font-bold truncate max-w-[200px]">{day.location}</td>
                         </tr>
@@ -622,7 +622,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                   <button onClick={() => { setIsCapturing(false); videoStream?.getTracks().forEach(t=>t.stop()); }} className="text-zinc-600 hover:text-white"><X size={24} /></button>
                </div>
                <div className="aspect-[4/3] w-full bg-black rounded-2xl overflow-hidden border border-white/10 relative group">
-                  {!capturedSelfie ? <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover grayscale brightness-110" /> : <img src={capturedSelfie} alt="Verified" className="w-full h-full object-cover" />}
+                  {!capturedSelfie ? <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover grayscale brightness-110" /> : <Image src={capturedSelfie} alt="Verified" className="w-full h-full object-cover" width={640} height={480} />}
                   <div className="absolute inset-0 pointer-events-none border-[12px] border-black/20 ring-1 ring-white/10 rounded-2xl"></div>
                </div>
                <div className="grid gap-4">
