@@ -59,6 +59,7 @@ interface UserProfile {
 
 interface LeaveRequest {
   _id: string;
+  userId?: any;
   employeeId: string;
   employeeName: string;
   startDate: string;
