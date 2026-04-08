@@ -5,12 +5,26 @@ export const metadata: Metadata = {
   title: "White Gloves Technologies | Global Intelligence Portal",
   description: "Unified workforce tracking and analytical command center for White Gloves Technologies.",
   keywords: "attendance, White Gloves, profile management, workplace tools",
+  themeColor: "#000000",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: "cover",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "MWG Attendance",
+  },
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',
     apple: '/logo.png',
   }
 };
+
 
 export default function RootLayout({
   children,

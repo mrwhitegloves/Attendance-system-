@@ -5,6 +5,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      screens: {
+        'xs': '400px',
+      },
       colors: {
         brand: {
           red: '#e61e2a',
@@ -13,6 +16,7 @@ module.exports = {
           border: '#161616',
         }
       },
+
       animation: {
         'fade-in': 'fadeIn 0.6s ease-out',
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

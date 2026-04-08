@@ -361,9 +361,9 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
           { id: 'reports', icon: TrendingUp, label: 'Stats' },
           { id: 'leave', icon: FileText, label: 'Leave' }
         ].map(item => (
-          <button key={item.id} onClick={() => setView(item.id as any)} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300 ${view === item.id ? 'text-brand-red scale-110' : 'text-zinc-600'}`}>
-            <item.icon size={22} />
-            <span className="text-[10px] font-bold uppercase">{item.label}</span>
+          <button key={item.id} onClick={() => setView(item.id as any)} className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-300 ${view === item.id ? 'text-brand-red scale-110' : 'text-zinc-600'}`}>
+            <item.icon size={24} />
+            <span className="text-[9px] font-black uppercase tracking-tighter">{item.label}</span>
           </button>
         ))}
       </nav>
@@ -397,17 +397,17 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
           {view === 'dashboard' && (
             <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
               {/* Hero Status Card */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-zinc-900 to-black border border-white/5 rounded-[32px] p-8 lg:p-14 shadow-2xl">
-                <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center lg:items-end gap-10">
+              <div className="relative overflow-hidden bg-gradient-to-br from-zinc-900 to-black border border-white/5 rounded-[32px] p-6 lg:p-14 shadow-2xl">
+                <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center lg:items-end gap-6 lg:gap-10">
                   <div className="text-center lg:text-left space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Current Time</span>
-                    <h1 className="text-6xl lg:text-8xl font-black tracking-tight">{currentTime}</h1>
+                    <h1 className="text-4xl xs:text-5xl md:text-6xl lg:text-8xl font-black tracking-tight">{currentTime}</h1>
                     <p className="text-lg lg:text-xl text-zinc-500 font-bold">{currentDate}</p>
                     <div className="flex items-center justify-center lg:justify-start gap-2 pt-4 text-zinc-600 font-bold text-xs">
                       <MapPin size={16} /> {address.length > 50 ? address.substring(0, 50) + '...' : address}
                     </div>
                   </div>
-                  <button disabled={isShiftComplete} onClick={startCamera} className={`w-full lg:w-max px-12 py-6 rounded-2xl font-black text-2xl transition-all duration-300 transform active:scale-95 shadow-3xl ${isShiftComplete ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50' : (isCheckedIn ? 'bg-white text-black hover:bg-zinc-200' : 'bg-brand-red text-white hover:bg-red-700 shadow-red-900/40')}`}>
+                  <button disabled={isShiftComplete} onClick={startCamera} className={`w-full lg:w-max px-8 py-4 lg:px-12 lg:py-6 rounded-2xl font-black text-xl lg:text-2xl transition-all duration-300 transform active:scale-95 shadow-3xl ${isShiftComplete ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50' : (isCheckedIn ? 'bg-white text-black hover:bg-zinc-200' : 'bg-brand-red text-white hover:bg-red-700 shadow-red-900/40')}`}>
                     {isShiftComplete ? 'SHIFT ENDED' : (isCheckedIn ? 'PUNCH OUT' : 'PUNCH IN')}
                   </button>
                 </div>
@@ -615,14 +615,18 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
 
       {/* Camera Verification Modal */}
       {isCapturing && (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[1000] flex items-center justify-center p-6">
-            <div className="bg-brand-card/50 border border-brand-border w-full max-w-xl p-8 lg:p-10 rounded-[32px] space-y-8 animate-fade-in">
-               <div className="flex items-center justify-between border-b border-white/5 pb-6">
-                  <h3 className="text-xl font-bold uppercase italic flex items-center gap-3"><Camera size={20} className="text-brand-red" /> Verification</h3>
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[1000] flex items-center justify-center p-4 lg:p-6">
+            <div className="bg-brand-card/50 border border-brand-border w-full max-w-xl p-6 lg:p-10 rounded-[32px] space-y-6 lg:space-y-8 animate-fade-in">
+               <div className="flex items-center justify-between border-b border-white/5 pb-4 lg:pb-6">
+                  <h3 className="text-lg lg:text-xl font-bold uppercase italic flex items-center gap-3"><Camera size={20} className="text-brand-red" /> Verification</h3>
                   <button onClick={() => { setIsCapturing(false); videoStream?.getTracks().forEach(t=>t.stop()); }} className="text-zinc-600 hover:text-white"><X size={24} /></button>
                </div>
                <div className="aspect-[4/3] w-full bg-black rounded-2xl overflow-hidden border border-white/10 relative group">
-                  {!capturedSelfie ? <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover grayscale brightness-110" /> : <Image src={capturedSelfie} alt="Verified" className="w-full h-full object-cover" width={640} height={480} />}
+                  {!capturedSelfie ? (
+                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover grayscale brightness-75 group-hover:grayscale-0 transition-all duration-700" />
+                  ) : (
+                    <Image src={capturedSelfie} alt="Verified" className="w-full h-full object-cover" width={640} height={480} unoptimized />
+                  )}
                   <div className="absolute inset-0 pointer-events-none border-[12px] border-black/20 ring-1 ring-white/10 rounded-2xl"></div>
                </div>
                <div className="grid gap-4">

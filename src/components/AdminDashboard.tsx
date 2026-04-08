@@ -490,8 +490,10 @@ export default function AdminDashboard({ profile }: { profile: any }) {
             <main className="flex-grow p-6 lg:p-10 overflow-y-auto bg-black scrollbar-hide">
                {activeTab === 'dashboard' && (
                   <div className="space-y-10 animate-fade-in">
-                     <h2 className="text-3xl font-black italic uppercase italic underline decoration-brand-red decoration-4">Real-time Logs</h2>
-                     <div className="vfx-card !bg-brand-card/20 rounded-[40px] border-white/5 overflow-hidden">
+                     <h2 className="text-2xl lg:text-3xl font-black italic uppercase underline decoration-brand-red decoration-4">Real-time Logs</h2>
+                     
+                     {/* Desktop Table View */}
+                     <div className="hidden lg:block vfx-card !bg-brand-card/20 rounded-[40px] border-white/5 overflow-hidden">
                         <table className="w-full text-left">
                            <thead>
                               <tr className="bg-white/5 border-b border-white/5 text-[10px] font-black text-zinc-700 uppercase">
@@ -515,7 +517,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                                     <td className="px-8 py-6">
                                        <div className="w-12 h-12 bg-zinc-900 rounded-xl overflow-hidden border border-white/5 shadow-2xl transition-transform group-hover:scale-110">
                                           {log.latestSelfie ? (
-                                             <Image src={log.latestSelfie} alt="Proof" className="w-full h-full object-cover" width={48} height={48} />
+                                             <Image src={log.latestSelfie} alt="Proof" className="w-full h-full object-cover" width={48} height={48} unoptimized />
                                           ) : (
                                              <div className="w-full h-full flex items-center justify-center text-zinc-800"><Activity size={18} /></div>
                                           )}
@@ -543,6 +545,52 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                            </tbody>
                         </table>
                      </div>
+
+                     {/* Mobile Card View */}
+                     <div className="lg:hidden grid grid-cols-1 gap-4">
+                        {isLoading ? (
+                           <div className="px-8 py-20 text-center text-zinc-700 font-black uppercase text-xs animate-pulse tracking-widest">Tracking Active Nodes...</div>
+                        ) : groupedTodayLogs.length === 0 ? (
+                           <div className="px-8 py-20 text-center text-zinc-800 font-black uppercase text-xs italic tracking-widest">No Signals Detected for {todayStr}</div>
+                        ) : groupedTodayLogs.slice((logPage - 1) * logsPerPage, logPage * logsPerPage).map((log, i) => (
+                           <div key={i} onClick={() => setSelectedGroupLog(log)} className="bg-brand-card/40 border border-brand-border p-5 rounded-[24px] space-y-4 active:scale-[0.98] transition-all">
+                              <div className="flex items-center justify-between">
+                                 <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 bg-zinc-900 rounded-xl overflow-hidden border border-white/5">
+                                       {log.latestSelfie ? (
+                                          <Image src={log.latestSelfie} alt="Proof" className="w-full h-full object-cover" width={48} height={48} />
+                                       ) : (
+                                          <div className="w-full h-full flex items-center justify-center text-zinc-800"><Activity size={18} /></div>
+                                       )}
+                                    </div>
+                                    <div>
+                                       <div className="font-bold text-white text-sm">{log.userName}</div>
+                                       <div className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider">{log.employeeId}</div>
+                                    </div>
+                                 </div>
+                                 <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${log.punchOut ? 'bg-green-500/10 text-green-500' : 'bg-brand-red/10 text-brand-red'}`}>
+                                    {log.punchOut ? 'Complete' : 'Active'}
+                                 </div>
+                              </div>
+                              <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl">
+                                 <div className="flex flex-col">
+                                    <span className="text-[8px] font-black text-zinc-700 uppercase">Punch In</span>
+                                    <span className={`text-sm font-black ${log.punchInStatus === 'Late' ? 'text-brand-red' : 'text-green-500'}`}>{log.punchIn || '--:--'}</span>
+                                 </div>
+                                 <div className="w-px h-6 bg-white/10"></div>
+                                 <div className="flex flex-col text-right">
+                                    <span className="text-[8px] font-black text-zinc-700 uppercase">Punch Out</span>
+                                    <span className={`text-sm font-black ${log.punchOut ? 'text-white' : 'text-zinc-800'}`}>{log.punchOut || '--:--'}</span>
+                                 </div>
+                              </div>
+                              <div className="text-zinc-500 font-bold text-[10px] flex items-center gap-2 px-1">
+                                 <MapPin size={12} className="text-brand-red shrink-0" /> 
+                                 <span className="truncate">{log.latestLocation}</span>
+                              </div>
+                           </div>
+                        ))}
+                     </div>
+
 
                      {/* Dashboard Pagination */}
                      {groupedTodayLogs.length > logsPerPage && (
@@ -575,7 +623,8 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                   <div className="space-y-12 animate-fade-in">
                      <div className="space-y-8">
                         <h2 className="text-3xl font-black italic uppercase underline decoration-brand-red decoration-4">Pending Approvals</h2>
-                        <div className="vfx-card !bg-brand-card/20 rounded-[40px] border-white/5 overflow-hidden shadow-2xl">
+                        {/* Desktop View */}
+                        <div className="hidden lg:block vfx-card !bg-brand-card/20 rounded-[40px] border-white/5 overflow-hidden shadow-2xl">
                            <table className="w-full text-left">
                               <thead>
                                  <tr className="bg-yellow-500/10 text-[10px] font-black uppercase text-yellow-500 tracking-widest"><th className="px-8 py-5">Node Identity</th><th className="px-8 py-5">Operational Range</th><th className="px-8 py-5">Rational Statement</th><th className="px-8 py-5">Command</th></tr>
@@ -602,6 +651,38 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                               </tbody>
                            </table>
                         </div>
+
+                        {/* Mobile View */}
+                        <div className="lg:hidden space-y-4">
+                           {leaves.filter(l => l.status === 'pending').length === 0 ? (
+                              <div className="vfx-card !p-10 text-center text-zinc-800 font-black uppercase text-xs">No Pending Signals Tracked</div>
+                           ) : (
+                              leaves.filter(l => l.status === 'pending').map((request, i) => (
+                                 <div key={i} className="bg-brand-card/40 border border-brand-border p-6 rounded-[28px] space-y-6">
+                                    <div className="flex justify-between items-start">
+                                       <div>
+                                          <div className="font-bold text-white text-lg">{request.employeeName}</div>
+                                          <div className="text-[10px] text-zinc-600 font-black">{request.employeeId}</div>
+                                       </div>
+                                       <div className="bg-yellow-500/10 text-yellow-500 px-3 py-1 rounded-lg text-[10px] font-black uppercase">Pending</div>
+                                    </div>
+                                    <div className="bg-white/5 p-4 rounded-2xl flex flex-col gap-1">
+                                       <span className="text-[8px] font-black text-zinc-600 uppercase">Requested Period</span>
+                                       <div className="text-sm font-bold text-zinc-300">{request.startDate} <span className="text-brand-red">to</span> {request.endDate}</div>
+                                    </div>
+                                    <div className="space-y-2">
+                                       <span className="text-[8px] font-black text-zinc-600 uppercase">Reason</span>
+                                       <p className="text-xs text-zinc-500 italic leading-relaxed">"{request.reason}"</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 pt-2">
+                                       <button onClick={() => handleLeaveAction(request._id, 'approved')} className="py-4 bg-green-500/10 text-green-500 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 border border-green-500/20 active:bg-green-600 active:text-white"><Check size={16}/> Approve</button>
+                                       <button onClick={() => handleLeaveAction(request._id, 'rejected')} className="py-4 bg-red-500/10 text-red-500 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 border border-red-500/20 active:bg-red-600 active:text-white"><X size={16}/> Reject</button>
+                                    </div>
+                                 </div>
+                              ))
+                           )}
+                        </div>
+
                      </div>
 
                      <div className="space-y-8 pb-20">
@@ -640,48 +721,81 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                         </button>
                      </div>
 
-                     <div className="vfx-card !bg-brand-card/20 rounded-[40px] border-white/5 overflow-hidden">
-                        <table className="w-full text-left">
-                           <thead>
-                              <tr className="bg-zinc-900/50 text-[10px] font-black uppercase text-zinc-700">
-                                 <th className="px-8 py-5">Employee Info</th>
-                                 <th className="px-8 py-5">Contact</th>
-                                 <th className="px-8 py-5">Department</th>
-                                 <th className="px-8 py-5">Actions</th>
-                              </tr>
-                           </thead>
-                           <tbody className="text-sm">
-                              {workforce.filter(w => w.name.toLowerCase().includes(search.toLowerCase()) || w.employeeId.includes(search)).map((user, i) => (
-                                 <tr key={i} className="border-t border-white/5 hover:bg-white/5">
-                                    <td className="px-8 py-6">
-                                       <div className="flex items-center gap-4">
-                                          <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center font-bold text-zinc-600">{user.name.charAt(0)}</div>
-                                          <div>
-                                             <div className="font-bold text-white">{user.name}</div>
-                                             <div className="text-[10px] font-black text-brand-red uppercase">{user.employeeId}</div>
-                                          </div>
-                                       </div>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                       <div className="flex flex-col gap-1">
-                                          <div className="text-xs text-zinc-400 font-bold">{user.email}</div>
-                                          <div className="text-[10px] text-zinc-600 font-bold uppercase">{user.phone || 'No Phone'}</div>
-                                       </div>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                       <span className="px-3 py-1 bg-white/5 rounded-lg text-[10px] font-black text-zinc-400 uppercase tracking-widest">{user.department}</span>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                       <div className="flex gap-2">
-                                          <button onClick={() => setIsEditingUser({ ...user, password: '' })} className="p-3 bg-white/5 rounded-xl hover:text-brand-red transition-all"><Pencil size={16} /></button>
-                                          <button onClick={() => handleDeleteUser(user._id)} className="p-3 bg-white/5 rounded-xl hover:text-red-600 transition-all"><Trash2 size={16} /></button>
-                                       </div>
-                                    </td>
+                        {/* Desktop View */}
+                        <div className="hidden lg:block vfx-card !bg-brand-card/20 rounded-[40px] border-white/5 overflow-hidden">
+                           <table className="w-full text-left">
+                              <thead>
+                                 <tr className="bg-zinc-900/50 text-[10px] font-black uppercase text-zinc-700">
+                                    <th className="px-8 py-5">Employee Info</th>
+                                    <th className="px-8 py-5">Contact</th>
+                                    <th className="px-8 py-5">Department</th>
+                                    <th className="px-8 py-5">Actions</th>
                                  </tr>
-                              ))}
-                           </tbody>
-                        </table>
-                     </div>
+                              </thead>
+                              <tbody className="text-sm">
+                                 {workforce.filter(w => w.name.toLowerCase().includes(search.toLowerCase()) || w.employeeId.includes(search)).map((user, i) => (
+                                    <tr key={i} className="border-t border-white/5 hover:bg-white/5">
+                                       <td className="px-8 py-6">
+                                          <div className="flex items-center gap-4">
+                                             <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center font-bold text-zinc-600">{user.name.charAt(0)}</div>
+                                             <div>
+                                                <div className="font-bold text-white">{user.name}</div>
+                                                <div className="text-[10px] font-black text-brand-red uppercase">{user.employeeId}</div>
+                                             </div>
+                                          </div>
+                                       </td>
+                                       <td className="px-8 py-6">
+                                          <div className="flex flex-col gap-1">
+                                             <div className="text-xs text-zinc-400 font-bold">{user.email}</div>
+                                             <div className="text-[10px] text-zinc-600 font-bold uppercase">{user.phone || 'No Phone'}</div>
+                                          </div>
+                                       </td>
+                                       <td className="px-8 py-6">
+                                          <span className="px-3 py-1 bg-white/5 rounded-lg text-[10px] font-black text-zinc-400 uppercase tracking-widest">{user.department}</span>
+                                       </td>
+                                       <td className="px-8 py-6">
+                                          <div className="flex gap-2">
+                                             <button onClick={() => setIsEditingUser({ ...user, password: '' })} className="p-3 bg-white/5 rounded-xl hover:text-brand-red transition-all"><Pencil size={16} /></button>
+                                             <button onClick={() => handleDeleteUser(user._id)} className="p-3 bg-white/5 rounded-xl hover:text-red-600 transition-all"><Trash2 size={16} /></button>
+                                          </div>
+                                       </td>
+                                    </tr>
+                                 ))}
+                              </tbody>
+                           </table>
+                        </div>
+
+                        {/* Mobile View */}
+                        <div className="lg:hidden space-y-4">
+                           {workforce.filter(w => w.name.toLowerCase().includes(search.toLowerCase()) || w.employeeId.includes(search)).map((user, i) => (
+                              <div key={i} className="bg-brand-card/30 border border-brand-border p-6 rounded-[28px] space-y-4">
+                                 <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-4">
+                                       <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center font-black text-zinc-700">{user.name.charAt(0)}</div>
+                                       <div>
+                                          <div className="font-bold text-white text-sm">{user.name}</div>
+                                          <div className="text-[9px] font-black text-brand-red uppercase">{user.employeeId}</div>
+                                       </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                       <button onClick={() => setIsEditingUser({ ...user, password: '' })} className="p-3 bg-white/5 rounded-xl text-zinc-500"><Pencil size={14} /></button>
+                                       <button onClick={() => handleDeleteUser(user._id)} className="p-3 bg-white/5 rounded-xl text-zinc-500"><Trash2 size={14} /></button>
+                                    </div>
+                                 </div>
+                                 <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-white/5 p-3 rounded-xl">
+                                       <span className="text-[8px] font-black text-zinc-700 uppercase">Contact</span>
+                                       <div className="text-[10px] font-bold text-zinc-400 truncate">{user.phone || 'No Phone'}</div>
+                                    </div>
+                                    <div className="bg-white/5 p-3 rounded-xl text-right">
+                                       <span className="text-[8px] font-black text-zinc-700 uppercase">Department</span>
+                                       <div className="text-[10px] font-black text-white uppercase">{user.department}</div>
+                                    </div>
+                                 </div>
+                              </div>
+                           ))}
+                        </div>
+
                   </div>
                )}
             </main>
@@ -797,9 +911,9 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                   </button>
 
                   <div className="w-full lg:w-1/2 aspect-square lg:aspect-auto bg-zinc-900 flex items-center justify-center group relative border-r border-white/5">
-                     {selectedGroupLog.latestSelfie ? (
+                    {selectedGroupLog.latestSelfie ? (
                         <>
-                           <Image src={selectedGroupLog.latestSelfie} alt="Selfie" className="w-full h-full object-cover" width={500} height={500} />
+                           <Image src={selectedGroupLog.latestSelfie} alt="Selfie" className="w-full h-full object-cover" width={800} height={800} unoptimized />
                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
                            <div className="absolute bottom-8 left-8 right-8">
                               <p className="text-[10px] font-black text-brand-red uppercase tracking-widest mb-1">Active Proof of Work</p>
