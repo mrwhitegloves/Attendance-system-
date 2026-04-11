@@ -11,6 +11,11 @@ export async function GET(request: Request) {
     const employeeId = searchParams.get('employeeId');
 
     await dbConnect();
+    
+    // Explicitly reference models to avoid MissingSchemaError in Vercel population
+    const _u = User; 
+    const _a = Attendance;
+
     let query: any = {};
     if (employeeId) query.employeeId = employeeId;
     if (date) query.date = date;

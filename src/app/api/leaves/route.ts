@@ -11,6 +11,11 @@ export async function GET(request: Request) {
     const userId = searchParams.get('userId');
 
     await dbConnect();
+    
+    // Ensure models are registered for population
+    const _u = User;
+    const _l = LeaveRequest;
+
     let query: any = {};
     if (employeeId) query.employeeId = employeeId;
     if (userId) query.userId = userId;

@@ -144,7 +144,11 @@ export default function AdminDashboard({ profile }: { profile: any }) {
 
    useEffect(() => {
       fetchData();
-      const interval = setInterval(fetchData, 10000); // 10s heartbeat
+      const interval = setInterval(() => {
+         if (document.visibilityState === 'visible') {
+            fetchData();
+         }
+      }, 15000); // 15s heartbeat
       return () => clearInterval(interval);
    }, []);
 
