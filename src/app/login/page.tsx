@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LogIn, Mail, Lock, ArrowRight, UserCircle } from 'lucide-react';
+import Loader from '@/components/Loader';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -98,7 +99,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full group bg-brand-red py-4 rounded-xl flex items-center justify-center gap-3 font-bold text-lg transition-all hover:bg-red-700 active:scale-95 shadow-xl shadow-red-900/20 disabled:grayscale disabled:opacity-50"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? <span className="flex items-center justify-center gap-2"><Loader className="w-6 h-6" /> SECURING...</span> : 'Login'}
             {!loading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
           </button>
         </form>

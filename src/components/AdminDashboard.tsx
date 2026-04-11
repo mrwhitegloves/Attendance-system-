@@ -31,6 +31,7 @@ import {
    RefreshCcw,
    Bell
 } from 'lucide-react';
+import Loader from './Loader';
 
 interface AttendanceLog {
    _id: string;
@@ -92,6 +93,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
    const [logPage, setLogPage] = useState(1);
    const logsPerPage = 10;
    const [isLoading, setIsLoading] = useState(true);
+   const [isActionLoading, setIsActionLoading] = useState(false);
 
    // Notification State
    const [notificationPermission, setNotificationPermission] = useState('default');
@@ -148,6 +150,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
 
    const handleLeaveAction = async (id: string, action: 'approved' | 'rejected') => {
       const adminNote = prompt(`Enter administrative reason for ${action.toUpperCase()}:`) || '';
+      setIsActionLoading(true);
       try {
          const res = await fetch('/api/leaves', {
             method: 'PUT',
@@ -156,10 +159,12 @@ export default function AdminDashboard({ profile }: { profile: any }) {
          });
          if (res.ok) fetchData();
       } catch (err) { console.error('Error updating leave:', err); }
+      finally { setIsActionLoading(false); }
    };
 
    const handleCreateUser = async () => {
       if (!newUser.name || !newUser.password) return alert("Fill required fields");
+      setIsActionLoading(true);
       try {
          const res = await fetch('/api/users', {
             method: 'POST',
@@ -176,10 +181,12 @@ export default function AdminDashboard({ profile }: { profile: any }) {
             alert(err.error || "Creation failed");
          }
       } catch (err) { console.error(err); }
+      finally { setIsActionLoading(false); }
    };
 
    const handleUpdateUser = async () => {
       if (!isEditingUser) return;
+      setIsActionLoading(true);
       try {
          const res = await fetch('/api/users', {
             method: 'PUT',
@@ -192,14 +199,17 @@ export default function AdminDashboard({ profile }: { profile: any }) {
             fetchData();
          }
       } catch (err) { console.error(err); }
+      finally { setIsActionLoading(false); }
    };
 
    const handleDeleteUser = async (id: string) => {
       if (!confirm("Are you sure you want to delete this user?")) return;
+      setIsActionLoading(true);
       try {
          const res = await fetch(`/api/users?id=${id}`, { method: 'DELETE' });
          if (res.ok) fetchData();
       } catch (err) { console.error(err); }
+      finally { setIsActionLoading(false); }
    };
 
    // Group Today's Logs by User with Search filtering
@@ -505,7 +515,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                            </thead>
                            <tbody className="text-sm">
                               {isLoading ? (
-                                 <tr><td colSpan={4} className="px-8 py-20 text-center text-zinc-700 font-black uppercase text-xs animate-pulse tracking-widest">Tracking Active Nodes...</td></tr>
+                                 <tr><td colSpan={4} className="px-8 py-20 text-center"><Loader className="mx-auto" /><p className="text-zinc-700 font-black uppercase text-[10px] tracking-[4px] mt-6">Decoding Node signals...</p></td></tr>
                               ) : groupedTodayLogs.length === 0 ? (
                                  <tr><td colSpan={4} className="px-8 py-20 text-center text-zinc-800 font-black uppercase text-xs italic tracking-widest">No Signals Detected for {todayStr}</td></tr>
                               ) : groupedTodayLogs.slice((logPage - 1) * logsPerPage, logPage * logsPerPage).map((log, i) => (
@@ -549,7 +559,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                      {/* Mobile Card View */}
                      <div className="lg:hidden grid grid-cols-1 gap-4">
                         {isLoading ? (
-                           <div className="px-8 py-20 text-center text-zinc-700 font-black uppercase text-xs animate-pulse tracking-widest">Tracking Active Nodes...</div>
+                           <div className="px-8 py-20 text-center"><Loader className="mx-auto" /><p className="text-zinc-700 font-black uppercase text-[10px] tracking-widest mt-4">Syncing Ops Panel...</p></div>
                         ) : groupedTodayLogs.length === 0 ? (
                            <div className="px-8 py-20 text-center text-zinc-800 font-black uppercase text-xs italic tracking-widest">No Signals Detected for {todayStr}</div>
                         ) : groupedTodayLogs.slice((logPage - 1) * logsPerPage, logPage * logsPerPage).map((log, i) => (
@@ -642,8 +652,12 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                                           <td className="px-8 py-6 text-zinc-300 font-black text-xs">{request.startDate} <span className="text-zinc-800">→</span> {request.endDate}</td>
                                           <td className="px-8 py-6 text-zinc-500 text-xs italic leading-relaxed max-w-sm">"{request.reason}"</td>
                                           <td className="px-8 py-6 flex gap-3">
-                                             <button onClick={() => handleLeaveAction(request._id, 'approved')} className="p-4 bg-green-500/10 text-green-500 rounded-[20px] hover:bg-green-600 hover:text-white transition-all shadow-lg shadow-green-900/10"><Check size={18} /></button>
-                                             <button onClick={() => handleLeaveAction(request._id, 'rejected')} className="p-4 bg-red-500/10 text-red-500 rounded-[20px] hover:bg-red-600 hover:text-white transition-all shadow-lg shadow-red-900/10"><X size={18} /></button>
+                                             <button disabled={isActionLoading} onClick={() => handleLeaveAction(request._id, 'approved')} className="p-4 bg-green-500/10 text-green-500 rounded-[20px] hover:bg-green-600 hover:text-white transition-all shadow-lg shadow-green-900/10 disabled:opacity-50">
+                                                {isActionLoading ? <Loader className="w-5 h-5" /> : <Check size={18} />}
+                                             </button>
+                                             <button disabled={isActionLoading} onClick={() => handleLeaveAction(request._id, 'rejected')} className="p-4 bg-red-500/10 text-red-500 rounded-[20px] hover:bg-red-600 hover:text-white transition-all shadow-lg shadow-red-900/10 disabled:opacity-50">
+                                                {isActionLoading ? <Loader className="w-5 h-5" /> : <X size={18} />}
+                                             </button>
                                           </td>
                                        </tr>
                                     ))
@@ -675,8 +689,12 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                                        <p className="text-xs text-zinc-500 italic leading-relaxed">"{request.reason}"</p>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 pt-2">
-                                       <button onClick={() => handleLeaveAction(request._id, 'approved')} className="py-4 bg-green-500/10 text-green-500 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 border border-green-500/20 active:bg-green-600 active:text-white"><Check size={16}/> Approve</button>
-                                       <button onClick={() => handleLeaveAction(request._id, 'rejected')} className="py-4 bg-red-500/10 text-red-500 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 border border-red-500/20 active:bg-red-600 active:text-white"><X size={16}/> Reject</button>
+                                       <button disabled={isActionLoading} onClick={() => handleLeaveAction(request._id, 'approved')} className="py-4 bg-green-500/10 text-green-500 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 border border-green-500/20 active:bg-green-600 active:text-white disabled:opacity-50">
+                                          {isActionLoading ? <Loader className="w-4 h-4" /> : <Check size={16}/>} Approve
+                                       </button>
+                                       <button disabled={isActionLoading} onClick={() => handleLeaveAction(request._id, 'rejected')} className="py-4 bg-red-500/10 text-red-500 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 border border-red-500/20 active:bg-red-600 active:text-white disabled:opacity-50">
+                                          {isActionLoading ? <Loader className="w-4 h-4" /> : <X size={16}/>} Reject
+                                       </button>
                                     </div>
                                  </div>
                               ))
@@ -850,7 +868,9 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                         <label htmlFor="isadmin" className="text-sm font-bold text-zinc-500 cursor-pointer">Grant Admin Access</label>
                      </div>
                   </div>
-                  <button onClick={handleCreateUser} className="w-full py-5 bg-brand-red text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-700 shadow-xl shadow-red-900/30">Provision User & Sync ID</button>
+                  <button disabled={isActionLoading} onClick={handleCreateUser} className="w-full py-5 bg-brand-red text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-700 shadow-xl shadow-red-900/30 flex items-center justify-center gap-3 active:scale-95 disabled:grayscale disabled:opacity-50">
+                     {isActionLoading ? <Loader className="w-6 h-6" /> : 'Provision User & Sync ID'}
+                  </button>
                </div>
             </div>
          )}
@@ -893,8 +913,9 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                         </select>
                      </div>
                   </div>
-                  <button onClick={handleUpdateUser} className="w-full py-5 bg-brand-red text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3">
-                     <Save size={18} /> Update Workforce Node
+                  <button disabled={isActionLoading} onClick={handleUpdateUser} className="w-full py-5 bg-brand-red text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 disabled:grayscale disabled:opacity-50">
+                     {isActionLoading ? <Loader className="w-6 h-6" /> : <Save size={18} />} 
+                     {isActionLoading ? 'Updating Node...' : 'Update Workforce Node'}
                   </button>
                </div>
             </div>

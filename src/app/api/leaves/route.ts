@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import LeaveRequest from '@/models/LeaveRequest';
 import Attendance from '@/models/Attendance';
+import User from '@/models/User';
 
 export async function GET(request: Request) {
   try {
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
       .sort({ createdAt: -1 });
     return NextResponse.json(leaves);
   } catch (error: any) {
+    console.error("Leaves GET Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -30,6 +32,7 @@ export async function POST(request: Request) {
     const newLeave = await LeaveRequest.create(body);
     return NextResponse.json(newLeave, { status: 201 });
   } catch (error: any) {
+    console.error("Leaves POST Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -84,6 +87,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json(leave);
   } catch (error: any) {
+    console.error("Leaves PUT Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

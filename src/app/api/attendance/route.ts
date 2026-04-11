@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Attendance from '@/models/Attendance';
+import User from '@/models/User';
 
 export async function GET(request: Request) {
   try {
@@ -20,6 +21,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(records);
   } catch (error: any) {
+    console.error("Attendance GET Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -124,6 +126,7 @@ export async function POST(request: Request) {
     
     return NextResponse.json(record, { status: 201 });
   } catch (error: any) {
+    console.error("Attendance POST Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

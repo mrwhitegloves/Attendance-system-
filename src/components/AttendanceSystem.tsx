@@ -18,8 +18,10 @@ import {
   Mail,
   Smartphone,
   Check,
-  MessageSquare
+  MessageSquare,
+  Loader2
 } from 'lucide-react';
+import Loader from './Loader';
 
 interface AttendanceRecord {
   _id?: string;
@@ -58,6 +60,9 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
   const [userLeaves, setUserLeaves] = useState<any[]>([]);
   const [leaveReason, setLeaveReason] = useState('');
   const [leaveDates, setLeaveDates] = useState({ start: '', end: '' });
+  const [isFetchingLogs, setIsFetchingLogs] = useState(true);
+  const [isFetchingLeaves, setIsFetchingLeaves] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const today = new Date();
   const currentMonthIdx = today.getMonth();
@@ -170,7 +175,11 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
           setIsCheckedIn(false);
         }
       }
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err); 
+    } finally {
+      setIsFetchingLogs(false);
+    }
   };
 
   const fetchLeaves = async () => {
@@ -178,7 +187,11 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
     try {
       const res = await fetch(`/api/leaves?employeeId=${profile.employeeId}`);
       if (res.ok) setUserLeaves(await res.json());
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err); 
+    } finally {
+      setIsFetchingLeaves(false);
+    }
   };
 
   useEffect(() => {
@@ -273,6 +286,8 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
       remark: 'Selfie Verified',
       selfie: capturedSelfie,
     };
+    
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/attendance', { 
         method: 'POST', 
@@ -288,11 +303,17 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
         setCapturedSelfie(null);
         setTimeout(() => setShowSuccess(false), 3000);
       }
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err); 
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleLeaveSubmit = async () => {
     if (!leaveDates.start || !leaveDates.end || !leaveReason) return alert("Please fill all details");
+    
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/leaves', {
         method: 'POST',
@@ -314,7 +335,11 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
         setLeaveDates({ start: '', end: '' });
         fetchLeaves(); // Refresh timeline
       }
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err); 
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -344,8 +369,8 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
           ))}
         </nav>
         <div className="mt-auto flex flex-col gap-6">
-          <button disabled={isShiftComplete} onClick={startCamera} className={`w-full py-4 rounded-xl font-bold text-lg transition-all active:scale-95 shadow-2xl ${isShiftComplete ? 'bg-zinc-900 text-zinc-600 grayscale cursor-not-allowed' : 'bg-brand-red text-white hover:bg-red-700 shadow-red-900/40'}`}>
-            {isShiftComplete ? 'SHIFT ENDED' : (isCheckedIn ? 'PUNCH OUT' : 'PUNCH IN')}
+          <button disabled={isShiftComplete || isSubmitting} onClick={startCamera} className={`w-full py-4 rounded-xl font-bold text-lg transition-all active:scale-95 shadow-2xl ${isShiftComplete || isSubmitting ? 'bg-zinc-900 text-zinc-600 grayscale cursor-not-allowed' : 'bg-brand-red text-white hover:bg-red-700 shadow-red-900/40'}`}>
+            {isSubmitting ? <span className="flex items-center justify-center gap-2"><Loader className="w-6 h-6" /> PUNCHING...</span> : (isShiftComplete ? 'SHIFT ENDED' : (isCheckedIn ? 'PUNCH OUT' : 'PUNCH IN'))}
           </button>
           <div onClick={() => { localStorage.removeItem('user'); window.location.reload(); }} className="flex items-center gap-4 text-zinc-600 hover:text-white font-bold cursor-pointer transition-colors px-2">
             <LogOut size={18} /> Logout
@@ -407,8 +432,8 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                       <MapPin size={16} /> {address.length > 50 ? address.substring(0, 50) + '...' : address}
                     </div>
                   </div>
-                  <button disabled={isShiftComplete} onClick={startCamera} className={`w-full lg:w-max px-8 py-4 lg:px-12 lg:py-6 rounded-2xl font-black text-xl lg:text-2xl transition-all duration-300 transform active:scale-95 shadow-3xl ${isShiftComplete ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50' : (isCheckedIn ? 'bg-white text-black hover:bg-zinc-200' : 'bg-brand-red text-white hover:bg-red-700 shadow-red-900/40')}`}>
-                    {isShiftComplete ? 'SHIFT ENDED' : (isCheckedIn ? 'PUNCH OUT' : 'PUNCH IN')}
+                  <button disabled={isShiftComplete || isSubmitting} onClick={startCamera} className={`w-full lg:w-max px-8 py-4 lg:px-12 lg:py-6 rounded-2xl font-black text-xl lg:text-2xl transition-all duration-300 transform active:scale-95 shadow-3xl ${isShiftComplete || isSubmitting ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50' : (isCheckedIn ? 'bg-white text-black hover:bg-zinc-200' : 'bg-brand-red text-white hover:bg-red-700 shadow-red-900/40')}`}>
+                    {isSubmitting ? <span className="flex items-center justify-center gap-4"><Loader className="w-8 h-8 lg:w-10 lg:h-10" /> PROCESSING...</span> : (isShiftComplete ? 'SHIFT ENDED' : (isCheckedIn ? 'PUNCH OUT' : 'PUNCH IN'))}
                   </button>
                 </div>
               </div>
@@ -456,7 +481,11 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                       </tr>
                     </thead>
                     <tbody>
-                      {dailyLogs.slice(0, 5).map((day: any, i) => (
+                      {isFetchingLogs ? (
+                        <tr><td colSpan={5} className="px-8 py-20 text-center"><Loader className="mx-auto" /><p className="text-[10px] font-black uppercase text-zinc-700 tracking-widest mt-4">Syncing History Node...</p></td></tr>
+                      ) : dailyLogs.length === 0 ? (
+                        <tr><td colSpan={5} className="px-8 py-10 text-center text-zinc-800 font-black uppercase text-xs">No Records Found</td></tr>
+                      ) : dailyLogs.slice(0, 5).map((day: any, i) => (
                         <tr key={i} onClick={() => setExpandedDay(expandedDay === day.date ? null : day.date)} className="group cursor-pointer border-b border-white/5 transition-colors hover:bg-white/5">
                           <td className="px-8 py-6 font-bold text-zinc-300">{new Date(day.date).toLocaleDateString()}</td>
                           <td className="px-8 py-6 text-green-500 font-black text-lg">{day.firstIn?.time || '--'}</td>
@@ -563,7 +592,12 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
               <div className="space-y-6">
                  <h3 className="text-sm font-black uppercase text-zinc-700 border-l-2 border-brand-red pl-4">Creative Timeline</h3>
                  <div className="space-y-4">
-                    {userLeaves.length === 0 ? (
+                    {isFetchingLeaves ? (
+                      <div className="bg-brand-card/20 border border-brand-border p-12 rounded-[32px] text-center">
+                        <Loader className="mx-auto" />
+                        <p className="text-zinc-600 font-bold uppercase text-[10px] tracking-[3px] mt-4">Syncing Timeline Data</p>
+                      </div>
+                    ) : userLeaves.length === 0 ? (
                       <div className="bg-brand-card/20 border border-brand-border p-12 rounded-[32px] text-center">
                         <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 text-zinc-800"><FileText size={32}/></div>
                         <p className="text-zinc-600 font-bold uppercase text-xs tracking-widest">No Leave History Data Sync</p>
@@ -633,10 +667,12 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                   {!capturedSelfie ? (
                     <button onClick={takeSnapshot} className="py-5 bg-brand-red text-white text-lg font-black uppercase tracking-widest rounded-xl hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/30">Take Photo</button>
                   ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                       <button onClick={handleAttendance} className="py-5 bg-green-600 text-white font-black text-lg rounded-xl hover:bg-green-700 transition-all">Submit</button>
-                       <button onClick={() => { setCapturedSelfie(null); startCamera(); }} className="py-5 bg-zinc-800 text-zinc-400 font-bold rounded-xl hover:text-white">Retake</button>
-                    </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <button disabled={isSubmitting} onClick={handleAttendance} className="py-5 bg-green-600 text-white font-black text-lg rounded-xl hover:bg-green-700 transition-all disabled:opacity-50 disabled:grayscale">
+                           {isSubmitting ? <Loader className="w-8 h-8 mx-auto" /> : 'Submit'}
+                        </button>
+                        <button disabled={isSubmitting} onClick={() => { setCapturedSelfie(null); startCamera(); }} className="py-5 bg-zinc-800 text-zinc-400 font-bold rounded-xl hover:text-white disabled:opacity-50">Retake</button>
+                     </div>
                   )}
                </div>
             </div>
@@ -663,7 +699,9 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                    </div>
                 </div>
                 <div className="grid gap-3">
-                   <button onClick={handleLeaveSubmit} className="py-4 bg-brand-red text-white rounded-xl font-bold active:scale-95 transition-all shadow-xl shadow-red-900/10">SUBMIT FOR APPROVAL</button>
+                   <button disabled={isSubmitting} onClick={handleLeaveSubmit} className="py-4 bg-brand-red text-white rounded-xl font-bold active:scale-95 transition-all shadow-xl shadow-red-900/10 disabled:opacity-50 disabled:grayscale">
+                      {isSubmitting ? <Loader className="w-6 h-6 mx-auto" /> : 'SUBMIT FOR APPROVAL'}
+                   </button>
                    <div className="h-px bg-white/5 my-2"></div>
                    <button onClick={() => window.open(`https://wa.me/919798324189?text=${encodeURIComponent(`*Leave Application*\nEmployee: ${profile.name}\nDates: ${leaveDates.start} to ${leaveDates.end}\nReason: ${leaveReason}`)}`, '_blank')} className="py-4 bg-[#25D366] text-white rounded-xl font-bold flex items-center justify-center gap-3 active:scale-95 transition-all"><MessageSquare size={18} /> Notify via WhatsApp</button>
                    <button onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=franchise@mrwhitegloves.com&su=Leave Request - ${profile.name}&body=${leaveReason}`, '_blank')} className="py-4 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-3 active:scale-95 transition-all"><Mail size={18} /> Notify via Gmail</button>
