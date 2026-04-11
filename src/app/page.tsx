@@ -33,7 +33,35 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  if (!isLoaded) return null;
+  if (!isLoaded) return (
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="absolute inset-0 z-0">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-brand-red/20 blur-[100px] rounded-full animate-pulse"></div>
+      </div>
+      <div className="relative z-10 flex flex-col items-center gap-6">
+        <div className="w-16 h-16 bg-brand-red rounded-2xl flex items-center justify-center shadow-2xl shadow-red-900/40 animate-bounce">
+           <Image src="/logo.png" alt="MWG" width={40} height={40} className="rounded" />
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <div className="text-xl font-black uppercase tracking-[0.3em] text-white">MWG SYSTEM</div>
+          <div className="flex items-center gap-2 text-zinc-700 font-bold text-[10px] tracking-[0.2em] uppercase">
+            <span className="w-1 h-1 bg-brand-red rounded-full animate-ping"></span>
+            Syncing Neural Node...
+          </div>
+        </div>
+        <div className="w-48 h-1 bg-white/5 rounded-full mt-4 overflow-hidden">
+           <div className="h-full bg-brand-red w-1/2 animate-[loading_1.5s_ease-in-out_infinite] origin-left shadow-[0_0_10px_#e61e2a]"></div>
+        </div>
+      </div>
+      <style jsx>{`
+        @keyframes loading {
+          0% { transform: scaleX(0) translateX(0); }
+          50% { transform: scaleX(1) translateX(0); }
+          100% { transform: scaleX(0) translateX(100%); }
+        }
+      `}</style>
+    </div>
+  );
 
   return (
     <main className="min-h-screen bg-black text-white flex flex-col font-sans overflow-x-hidden selection:bg-brand-red selection:text-white">

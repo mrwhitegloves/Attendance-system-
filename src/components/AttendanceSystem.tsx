@@ -52,16 +52,39 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
   const [view, setView] = useState<'dashboard' | 'attendance' | 'reports' | 'leave'>('dashboard');
-  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>([]);
-  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem(`logs_${profile.employeeId}`);
+      return cached ? JSON.parse(cached) : [];
+    }
+    return [];
+  });
+
+  const [isCheckedIn, setIsCheckedIn] = useState(() => {
+    if (attendanceLogs.length > 0) {
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      const todayLogs = attendanceLogs.filter(l => l.date === todayStr);
+      if (todayLogs.length > 0) {
+        const latest = [...todayLogs].sort((a, b) => parseTime(a.time) - parseTime(b.time))[todayLogs.length - 1];
+        return latest.status === 'Checked In' || latest.status === 'Late';
+      }
+    }
+    return false;
+  });
   const [showSuccess, setShowSuccess] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [userLeaves, setUserLeaves] = useState<any[]>([]);
+  const [userLeaves, setUserLeaves] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem(`leaves_${profile.employeeId}`);
+      return cached ? JSON.parse(cached) : [];
+    }
+    return [];
+  });
   const [leaveReason, setLeaveReason] = useState('');
   const [leaveDates, setLeaveDates] = useState({ start: '', end: '' });
-  const [isFetchingLogs, setIsFetchingLogs] = useState(true);
-  const [isFetchingLeaves, setIsFetchingLeaves] = useState(true);
+  const [isFetchingLogs, setIsFetchingLogs] = useState(attendanceLogs.length === 0);
+  const [isFetchingLeaves, setIsFetchingLeaves] = useState(userLeaves.length === 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const today = new Date();
@@ -165,6 +188,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
       if (res.ok) {
         const data = await res.json();
         setAttendanceLogs(data);
+        localStorage.setItem(`logs_${profile.employeeId}`, JSON.stringify(data));
         
         // Determine status specifically for today
         const todayLogs = data.filter((l: any) => l.date === todayStr);
@@ -186,7 +210,11 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
     if (!profile?.employeeId) return;
     try {
       const res = await fetch(`/api/leaves?employeeId=${profile.employeeId}`);
-      if (res.ok) setUserLeaves(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setUserLeaves(data);
+        localStorage.setItem(`leaves_${profile.employeeId}`, JSON.stringify(data));
+      }
     } catch (err) { 
       console.error(err); 
     } finally {
