@@ -2,19 +2,31 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Attendance from '@/models/Attendance';
 import User from '@/models/User';
+import { isAdminRequest, unauthorizedResponse } from '@/lib/adminAuth';
+
+// Max selfie size: 2 MB of raw bytes = ~2.7 MB base64 string
+const MAX_SELFIE_BASE64_LENGTH = 2 * 1024 * 1024 * (4 / 3);
+
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
-
     const employeeId = searchParams.get('employeeId');
+
+    // Fetching ALL records (no employeeId filter) is an admin-only operation
+    if (!employeeId && !isAdminRequest(request)) {
+      return unauthorizedResponse();
+    }
 
     await dbConnect();
     
     // Explicitly reference models to avoid MissingSchemaError in Vercel population
     const _u = User; 
     const _a = Attendance;
+
+    // 1. Run Auto-Checkout for forgotten logouts (from previous days) before fetching currently active logs
+    await autoCheckoutMissedLogs(employeeId);
 
     let query: any = {};
     if (employeeId) query.employeeId = employeeId;
@@ -26,8 +38,59 @@ export async function GET(request: Request) {
 
     return NextResponse.json(records);
   } catch (error: any) {
-    console.error("Attendance GET Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// Automatically check out employees who forgot to log out on past dates
+async function autoCheckoutMissedLogs(employeeId: string | null) {
+  try {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // Query for past "Open" records. If employeeId is passed, limit to that employee.
+    let searchParams: any = { date: { $lt: todayStr }, status: { $in: ['Checked In', 'Late'] } };
+    if (employeeId) searchParams.employeeId = employeeId;
+
+    const pastOpenLogs = await Attendance.find(searchParams);
+    if (pastOpenLogs.length === 0) return;
+
+    // Group to avoid duplicates if someone checked in twice in one day without checking out
+    const distinctMissed = new Map();
+    for (const log of pastOpenLogs) {
+      const key = `${log.employeeId}_${log.date}`;
+      if (!distinctMissed.has(key)) distinctMissed.set(key, log);
+    }
+
+    const checkoutsToCreate = [];
+
+    for (const [key, log] of distinctMissed.entries()) {
+      const hasCheckout = await Attendance.findOne({
+        employeeId: log.employeeId,
+        date: log.date,
+        status: 'Checked Out'
+      });
+
+      if (!hasCheckout) {
+        checkoutsToCreate.push({
+          employeeId: log.employeeId,
+          userId: log.userId,
+          userName: log.userName,
+          date: log.date,
+          time: '11:59 PM', // Auto logout at end of the day
+          status: 'Checked Out',
+          location: 'System Auto Checkout',
+          remark: 'System Note: You forgot to log out. System automatically checked you out at midnight.'
+        });
+      }
+    }
+
+    if (checkoutsToCreate.length > 0) {
+      await Attendance.insertMany(checkoutsToCreate);
+      console.log(`Auto-checked out ${checkoutsToCreate.length} missed logs.`);
+    }
+  } catch (err) {
+    console.error("Auto-checkout error:", err);
   }
 }
 
@@ -82,7 +145,17 @@ export async function POST(request: Request) {
     // Trigger non-blocking cleanup of old images
     cleanupOldImages();
 
-    // 1. ImageKit Upload Integration
+    // 1. File size check — reject selfies larger than 2 MB
+    if (body.selfie && body.selfie.startsWith('data:image')) {
+      if (body.selfie.length > MAX_SELFIE_BASE64_LENGTH) {
+        return NextResponse.json(
+          { error: 'Photo is too large. Please retake a smaller photo (max 2 MB).' },
+          { status: 413 }
+        );
+      }
+    }
+
+    // 2. ImageKit Upload Integration
     let selfieUrl = body.selfie;
     let ikFileId = null;
 

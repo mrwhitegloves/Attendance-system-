@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "White Gloves Technologies | Global Intelligence Portal",
-  description: "Unified workforce tracking and analytical command center for White Gloves Technologies.",
+  title: "White Gloves Technologies | Attendance System",
+  description: "Attendance and workforce tracking system for White Gloves Technologies employees.",
   keywords: "attendance, White Gloves, profile management, workplace tools",
   themeColor: "#000000",
   viewport: {

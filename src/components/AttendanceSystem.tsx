@@ -19,7 +19,12 @@ import {
   Smartphone,
   Check,
   MessageSquare,
-  Loader2
+  Loader2,
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  ShieldAlert,
+  ExternalLink
 } from 'lucide-react';
 import Loader from './Loader';
 
@@ -87,10 +92,11 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
   const [isFetchingLeaves, setIsFetchingLeaves] = useState(userLeaves.length === 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
   const today = new Date();
-  const currentMonthIdx = today.getMonth();
-  const currentYear = today.getFullYear();
-  const monthName = today.toLocaleString('default', { month: 'long' });
+  const currentMonthIdx = currentCalendarMonth.getMonth();
+  const currentYear = currentCalendarMonth.getFullYear();
+  const monthName = currentCalendarMonth.toLocaleString('default', { month: 'long' });
   const daysInMonth = new Date(currentYear, currentMonthIdx + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonthIdx, 1).getDay();
 
@@ -100,6 +106,10 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
   const [capturedSelfie, setCapturedSelfie] = useState<string | null>(null);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const [notificationStatus, setNotificationStatus] = useState<'granted' | 'denied' | 'default'>('default');
+  
+  const [selectedDayDetails, setSelectedDayDetails] = useState<any>(null);
+  const [activePhotoTab, setActivePhotoTab] = useState<'in' | 'out'>('in');
+  const [selectedStatList, setSelectedStatList] = useState<{label: string, type: 'present' | 'late' | 'leave', items: any[]} | null>(null);
 
   useEffect(() => {
     if ("Notification" in window) {
@@ -151,6 +161,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
       const primary = day.firstIn || day.lastOut;
       day.location = primary?.location || 'Detecting...';
       day.selfie = primary?.selfie;
+      day.remark = day.lastOut?.remark || day.firstIn?.remark || '';
       return day;
     });
   }, [attendanceLogs]);
@@ -167,11 +178,25 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
        return y === currentYear && (m - 1) === currentMonthIdx;
     });
     
+    const lateDays = monthLogs.filter((d: any) => d.firstIn?.status === 'Late');
+    const approvedLeaves = userLeaves.filter(l => {
+       const isApproved = l.status === 'approved' || l.status === 'Approved';
+       if (!isApproved) return false;
+       const start = new Date(l.startDate);
+       const end = new Date(l.endDate);
+       // Simple check if it overlaps with current month
+       const monthStart = new Date(currentYear, currentMonthIdx, 1);
+       const monthEnd = new Date(currentYear, currentMonthIdx + 1, 0);
+       return (start <= monthEnd && end >= monthStart);
+    });
+
     return {
        totalWorkingDays: monthLogs.length,
-       totalLeave: userLeaves.filter(l => l.status === 'approved' || l.status === 'Approved').length,
-       lateCount: monthLogs.filter((d: any) => d.firstIn?.status === 'Late').length,
-       monthLogs
+       totalLeave: approvedLeaves.length,
+       lateCount: lateDays.length,
+       presentDays: monthLogs,
+       lateDays,
+       leaveDays: approvedLeaves
     };
   }, [dailyLogs, userLeaves, currentYear, currentMonthIdx]);
 
@@ -193,7 +218,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
         // Determine status specifically for today
         const todayLogs = data.filter((l: any) => l.date === todayStr);
         if (todayLogs.length > 0) {
-          const latest = [...todayLogs].sort((a: any) => parseTime(a.time))[todayLogs.length - 1];
+          const latest = [...todayLogs].sort((a: any, b: any) => parseTime(a.time) - parseTime(b.time))[todayLogs.length - 1];
           setIsCheckedIn(latest.status === 'Checked In' || latest.status === 'Late');
         } else {
           setIsCheckedIn(false);
@@ -248,9 +273,9 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
 
   const startCamera = async () => {
     const now = new Date();
-    if (isShiftComplete) return alert("You have already finished your shift for today.");
+    if (isShiftComplete) return alert("You have already marked your shift as done today.");
     if (!isCheckedIn && (now.getHours() > 19 || (now.getHours() === 19 && now.getMinutes() >= 30))) {
-      return alert("Shift over. Punch-in is not permitted after 07:30 PM.");
+      return alert("Shift is over. You can no longer punch in after 7:30 PM.");
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
@@ -272,8 +297,11 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
   };
 
   useEffect(() => {
-    if (videoRef.current && videoStream) videoRef.current.srcObject = videoStream;
-  }, [videoStream]);
+    if (videoRef.current && videoStream) {
+       videoRef.current.srcObject = videoStream;
+       videoRef.current.play().catch(e => console.error("Camera play error:", e));
+    }
+  }, [videoStream, isCapturing]);
 
   const handleAttendance = async () => {
     if (!capturedSelfie) return;
@@ -330,16 +358,22 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
         setIsCapturing(false);
         setCapturedSelfie(null);
         setTimeout(() => setShowSuccess(false), 3000);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Something went wrong. Please try again.');
+        // If photo was too large, clear it so user can retake
+        if (res.status === 413) setCapturedSelfie(null);
       }
     } catch (err) { 
-      console.error(err); 
+      console.error(err);
+      alert('No internet connection. Please check your network and try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleLeaveSubmit = async () => {
-    if (!leaveDates.start || !leaveDates.end || !leaveReason) return alert("Please fill all details");
+    if (!leaveDates.start || !leaveDates.end || !leaveReason) return alert("Please fill in all the details before submitting.");
     
     setIsSubmitting(true);
     try {
@@ -357,7 +391,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
         })
       });
       if (res.ok) {
-        alert("Leave request submitted successfully");
+        alert("Your leave request has been sent successfully.");
         setShowLeaveModal(false);
         setLeaveReason('');
         setLeaveDates({ start: '', end: '' });
@@ -370,8 +404,23 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
     }
   };
 
+  const BackgroundDecorations = () => (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-brand-red/10 rounded-full blur-[120px] animate-float-red" style={{ animationDelay: '0s' }}></div>
+      <div className="absolute bottom-[0%] right-[-5%] w-[40vw] h-[40vw] bg-brand-red/5 rounded-full blur-[100px] animate-float-red" style={{ animationDelay: '-5s' }}></div>
+      <div className="absolute top-[30%] right-[10%] w-[30vw] h-[30vw] bg-brand-red/5 rounded-full blur-[90px] animate-float-red" style={{ animationDelay: '-12s' }}></div>
+      
+      <div className="absolute top-[15%] left-[25%] w-1 h-1 bg-brand-red rounded-full animate-pulse-dot" style={{ animationDelay: '0s' }}></div>
+      <div className="absolute top-[55%] left-[12%] w-1.5 h-1.5 bg-brand-red rounded-full animate-pulse-dot" style={{ animationDelay: '1.2s' }}></div>
+      <div className="absolute bottom-[25%] right-[35%] w-1 h-1 bg-brand-red rounded-full animate-pulse-dot" style={{ animationDelay: '2.5s' }}></div>
+      <div className="absolute top-[12%] right-[18%] w-1.5 h-1.5 bg-brand-red/40 rounded-full animate-pulse-dot" style={{ animationDelay: '3.8s' }}></div>
+      <div className="absolute bottom-[15%] left-[45%] w-1 h-1 bg-brand-red/30 rounded-full animate-pulse-dot" style={{ animationDelay: '0.8s' }}></div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-black text-white flex relative overflow-x-hidden font-sans selection:bg-brand-red selection:text-white">
+      <BackgroundDecorations />
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex w-72 bg-brand-card/80 backdrop-blur-xl border-r border-brand-border flex-col p-8 sticky top-0 h-screen z-50">
         <div className="flex items-center gap-4 mb-12">
@@ -407,16 +456,17 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
       </aside>
 
       {/* Mobile Nav */}
-      <nav className="lg:hidden fixed bottom-6 left-6 right-6 h-18 bg-brand-card/95 backdrop-blur-2xl border border-white/10 rounded-2xl flex justify-around items-center px-4 z-[100] shadow-2xl">
+      <nav className="lg:hidden fixed bottom-6 left-6 right-6 h-20 bg-brand-card/90 backdrop-blur-2xl border border-white/10 rounded-[28px] flex justify-around items-center px-6 z-[100] shadow-3xl pb-safe">
         {[
           { id: 'dashboard', icon: BarChart3, label: 'Logs' },
           { id: 'attendance', icon: Calendar, label: 'Calendar' },
           { id: 'reports', icon: TrendingUp, label: 'Stats' },
-          { id: 'leave', icon: FileText, label: 'Leave' }
+          { id: 'leave', icon: FileText, label: 'Apply' }
         ].map(item => (
-          <button key={item.id} onClick={() => setView(item.id as any)} className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-300 ${view === item.id ? 'text-brand-red scale-110' : 'text-zinc-600'}`}>
-            <item.icon size={24} />
-            <span className="text-[9px] font-black uppercase tracking-tighter">{item.label}</span>
+          <button key={item.id} onClick={() => setView(item.id as any)} className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl transition-all duration-500 relative ${view === item.id ? 'text-brand-red scale-110' : 'text-zinc-600 hover:text-zinc-400'}`}>
+            {view === item.id && <div className="absolute inset-0 bg-brand-red/5 rounded-2xl animate-pulse" />}
+            <item.icon size={22} className={view === item.id ? 'drop-shadow-[0_0_10px_rgba(230,30,42,0.4)]' : ''} />
+            <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
           </button>
         ))}
       </nav>
@@ -493,6 +543,15 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                           <span className={`text-xl font-black ${day.lastOut ? 'text-red-500' : (day.firstIn ? 'text-white italic' : 'text-zinc-900')}`}>{day.lastOut?.time || (day.firstIn ? 'ACTIVE' : '--:--')}</span>
                         </div>
                       </div>
+                      {day.remark && day.remark.includes('forgot to log out') && (
+                        <div className="mt-2 bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 flex items-start gap-2">
+                          <Activity size={12} className="text-orange-500 shrink-0 mt-0.5" />
+                          <div>
+                             <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">System Note</p>
+                             <p className="text-[10px] font-bold text-orange-400">{day.remark}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -510,12 +569,19 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                     </thead>
                     <tbody>
                       {isFetchingLogs ? (
-                        <tr><td colSpan={5} className="px-8 py-20 text-center"><Loader className="mx-auto" /><p className="text-[10px] font-black uppercase text-zinc-700 tracking-widest mt-4">Syncing History Node...</p></td></tr>
+                        <tr><td colSpan={5} className="px-8 py-20 text-center"><Loader className="mx-auto" /><p className="text-[10px] font-black uppercase text-zinc-700 tracking-widest mt-4">Loading records...</p></td></tr>
                       ) : dailyLogs.length === 0 ? (
                         <tr><td colSpan={5} className="px-8 py-10 text-center text-zinc-800 font-black uppercase text-xs">No Records Found</td></tr>
                       ) : dailyLogs.slice(0, 5).map((day: any, i) => (
                         <tr key={i} onClick={() => setExpandedDay(expandedDay === day.date ? null : day.date)} className="group cursor-pointer border-b border-white/5 transition-colors hover:bg-white/5">
-                          <td className="px-8 py-6 font-bold text-zinc-300">{new Date(day.date).toLocaleDateString()}</td>
+                          <td className="px-8 py-6">
+                            <div className="font-bold text-zinc-300">{new Date(day.date).toLocaleDateString()}</div>
+                            {day.remark && day.remark.includes('forgot to log out') && (
+                              <div className="mt-2 text-[9px] font-bold text-orange-500 bg-orange-500/10 inline-block px-2 py-1 rounded">
+                                SYSTEM: Auto Checked Out
+                              </div>
+                            )}
+                          </td>
                           <td className="px-8 py-6 text-green-500 font-black text-lg">{day.firstIn?.time || '--'}</td>
                           <td className="px-8 py-6">{day.lastOut ? <span className="text-red-500 font-black text-lg">{day.lastOut.time}</span> : (day.firstIn ? <span className="px-3 py-1 bg-green-500/10 text-green-500 text-[10px] font-bold rounded">ACTIVE</span> : <span className="text-zinc-900 font-black">--</span>)}</td>
                           <td className="px-8 py-6">
@@ -536,7 +602,11 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-2">
                 <div>
                   <h2 className="text-3xl font-black tracking-tight underline decoration-brand-red decoration-4">Monthly Attendance</h2>
-                  <p className="text-zinc-600 font-bold uppercase text-[10px] tracking-widest mt-1">{monthName} {currentYear}</p>
+                  <div className="flex items-center gap-4 mt-2">
+                     <button onClick={() => setCurrentCalendarMonth(new Date(currentYear, currentMonthIdx - 1))} className="text-zinc-500 hover:text-white"><ChevronLeft size={16} /></button>
+                     <p className="text-zinc-600 font-bold uppercase text-[10px] tracking-widest">{monthName} {currentYear}</p>
+                     <button onClick={() => setCurrentCalendarMonth(new Date(currentYear, currentMonthIdx + 1))} className="text-zinc-500 hover:text-white"><ChevronRight size={16} /></button>
+                  </div>
                 </div>
                 <div className="flex gap-4">
                   <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-zinc-500"><div className="w-2 h-2 bg-green-500 rounded-full"></div> Present</div>
@@ -553,10 +623,30 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                   {[...Array(daysInMonth)].map((_, i) => {
                     const dayNum = i + 1;
                     const dStr = `${currentYear}-${String(currentMonthIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                    const isPresent = dailyLogs.some((d: any) => d.date === dStr);
-                    const isToday = dayNum === today.getDate() && currentMonthIdx === today.getMonth();
+                    const targetDayLogs = dailyLogs.find((d: any) => d.date === dStr);
+                    const isPresent = !!targetDayLogs;
+                    const isToday = dayNum === today.getDate() && currentMonthIdx === today.getMonth() && currentYear === today.getFullYear();
                     return (
-                      <div key={dayNum} className={`relative aspect-square lg:h-24 bg-white/5 border border-white/5 rounded-xl lg:rounded-2xl p-2 lg:p-4 transition-all duration-300 group hover:bg-white/10 ${isPresent ? 'border-green-500/30 bg-green-500/5' : ''} ${isToday ? 'border-brand-red ring-1 ring-brand-red/50 !bg-brand-red/5' : ''}`}>
+                      <div key={dayNum} 
+                        onClick={() => {
+                           if(isPresent) {
+                              const pIn = targetDayLogs.firstIn?.time || '--:--';
+                              const pOut = targetDayLogs.lastOut?.time || '--:--';
+                              setSelectedDayDetails({
+                                 date: dStr,
+                                 userName: profile?.name || 'Unknown',
+                                 punchIn: pIn,
+                                 punchOut: pOut,
+                                 selfie: targetDayLogs.firstIn?.selfie || null,
+                                 punchOutSelfie: targetDayLogs.lastOut?.selfie || null,
+                                 status: targetDayLogs.firstIn?.status === 'Late' ? 'Late' : 'Checked In',
+                                 location: targetDayLogs.firstIn?.location || '',
+                                 remark: targetDayLogs.remark || ''
+                              });
+                              setActivePhotoTab('in');
+                           }
+                        }}
+                        className={`relative aspect-square lg:h-24 bg-white/5 border border-white/5 rounded-xl lg:rounded-2xl p-2 lg:p-4 transition-all duration-300 group hover:bg-white/10 ${isPresent ? 'border-green-500/30 bg-green-500/5 cursor-pointer' : ''} ${isToday ? 'border-brand-red ring-1 ring-brand-red/50 !bg-brand-red/5' : ''}`}>
                         <span className={`text-base lg:text-xl font-black ${isPresent ? 'text-green-500' : (isToday ? 'text-white' : 'text-zinc-800')}`}>{dayNum}</span>
                         {isPresent && <div className="absolute right-2 bottom-2 w-1.5 h-1.5 bg-green-500 rounded-full shadow-lg shadow-green-900/50"></div>}
                       </div>
@@ -571,11 +661,14 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
             <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                  { label: 'Total Present', val: stats.totalWorkingDays, icon: Calendar, color: 'text-white' },
-                  { label: 'Leave Approved', val: stats.totalLeave, icon: FileText, color: 'text-zinc-600' },
-                  { label: 'Late Entries', val: stats.lateCount, icon: Clock, color: 'text-brand-red' }
+                  { label: 'Total Present', val: stats.totalWorkingDays, icon: Calendar, color: 'text-white', type: 'present', items: stats.presentDays },
+                  { label: 'Leave Approved', val: stats.totalLeave, icon: FileText, color: 'text-zinc-600', type: 'leave', items: stats.leaveDays },
+                  { label: 'Late Entries', val: stats.lateCount, icon: Clock, color: 'text-brand-red', type: 'late', items: stats.lateDays }
                 ].map((s, i) => (
-                  <div key={i} className="bg-brand-card/50 border border-brand-border p-8 rounded-3xl flex justify-between items-center transition-all hover:border-brand-red/20 group">
+                  <div key={i} 
+                    onClick={() => setSelectedStatList({ label: s.label, type: s.type as any, items: s.items })}
+                    className="bg-brand-card/50 border border-brand-border p-8 rounded-3xl flex justify-between items-center transition-all hover:border-brand-red/20 active:scale-95 cursor-pointer group"
+                  >
                     <div className="space-y-1">
                       <div className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest">{s.label}</div>
                       <div className={`text-4xl font-black ${s.color}`}>{s.val}</div>
@@ -587,7 +680,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
               <div className="bg-brand-card/30 border border-brand-border p-8 lg:p-12 rounded-[32px] h-64 flex flex-col justify-between">
                  <div>
                     <h3 className="text-xl font-bold text-zinc-100 italic uppercase">Activity Chart</h3>
-                    <p className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest">Consistency Mapping Nodes</p>
+                    <p className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest">This month's attendance</p>
                  </div>
                  <div className="flex items-end justify-between h-32 gap-1 lg:gap-3 overflow-x-auto pb-2 scrollbar-hide">
                     {[...Array(daysInMonth)].map((_, i) => {
@@ -610,25 +703,25 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
             <div className="max-w-4xl mx-auto space-y-12 animate-fade-in pb-20">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="space-y-2">
-                  <h2 className="text-4xl font-black tracking-tight underline decoration-brand-red decoration-4 uppercase italic">Leave Control</h2>
-                  <p className="text-zinc-600 font-bold uppercase text-[10px] tracking-widest">Track & Manage your Applications</p>
-                </div>
-                <button onClick={() => setShowLeaveModal(true)} className="px-8 py-5 bg-brand-red text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/40">Open New Node</button>
+                  <h2 className="text-4xl font-black tracking-tight underline decoration-brand-red decoration-4 uppercase italic">My Leave</h2>
+                   <p className="text-zinc-600 font-bold uppercase text-[10px] tracking-widest">View & manage your leave requests</p>
+                 </div>
+                 <button onClick={() => setShowLeaveModal(true)} className="px-8 py-5 bg-brand-red text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/40">Apply for Leave</button>
               </div>
 
               {/* Status Timeline View */}
               <div className="space-y-6">
-                 <h3 className="text-sm font-black uppercase text-zinc-700 border-l-2 border-brand-red pl-4">Creative Timeline</h3>
+                 <h3 className="text-sm font-black uppercase text-zinc-700 border-l-2 border-brand-red pl-4">Leave History</h3>
                  <div className="space-y-4">
                     {isFetchingLeaves ? (
                       <div className="bg-brand-card/20 border border-brand-border p-12 rounded-[32px] text-center">
                         <Loader className="mx-auto" />
-                        <p className="text-zinc-600 font-bold uppercase text-[10px] tracking-[3px] mt-4">Syncing Timeline Data</p>
+                         <p className="text-zinc-600 font-bold uppercase text-[10px] tracking-[3px] mt-4">Loading leave data...</p>
                       </div>
                     ) : userLeaves.length === 0 ? (
                       <div className="bg-brand-card/20 border border-brand-border p-12 rounded-[32px] text-center">
                         <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 text-zinc-800"><FileText size={32}/></div>
-                        <p className="text-zinc-600 font-bold uppercase text-xs tracking-widest">No Leave History Data Sync</p>
+                         <p className="text-zinc-600 font-bold uppercase text-xs tracking-widest">No leave requests yet</p>
                       </div>
                     ) : (
                       userLeaves.map((l, i) => (
@@ -685,7 +778,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                </div>
                <div className="aspect-[4/3] w-full bg-black rounded-2xl overflow-hidden border border-white/10 relative group">
                   {!capturedSelfie ? (
-                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover grayscale brightness-75 group-hover:grayscale-0 transition-all duration-700" />
+                    <video ref={videoRef} autoPlay playsInline muted className="-scale-x-100 w-full h-full object-cover grayscale brightness-75 group-hover:grayscale-0 transition-all duration-700" />
                   ) : (
                     <Image src={capturedSelfie} alt="Verified" className="w-full h-full object-cover" width={640} height={480} unoptimized />
                   )}
@@ -693,13 +786,13 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                </div>
                <div className="grid gap-4">
                   {!capturedSelfie ? (
-                    <button onClick={takeSnapshot} className="py-5 bg-brand-red text-white text-lg font-black uppercase tracking-widest rounded-xl hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/30">Take Photo</button>
+                    <button onClick={takeSnapshot} className="py-5 bg-brand-red text-white text-lg font-black uppercase tracking-widest rounded-xl hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/30">Capture Photo</button>
                   ) : (
                      <div className="grid grid-cols-2 gap-4">
                         <button disabled={isSubmitting} onClick={handleAttendance} className="py-5 bg-green-600 text-white font-black text-lg rounded-xl hover:bg-green-700 transition-all disabled:opacity-50 disabled:grayscale">
                            {isSubmitting ? <Loader className="w-8 h-8 mx-auto" /> : 'Submit'}
                         </button>
-                        <button disabled={isSubmitting} onClick={() => { setCapturedSelfie(null); startCamera(); }} className="py-5 bg-zinc-800 text-zinc-400 font-bold rounded-xl hover:text-white disabled:opacity-50">Retake</button>
+                        <button disabled={isSubmitting} onClick={() => { setCapturedSelfie(null); }} className="py-5 bg-zinc-800 text-zinc-400 font-bold rounded-xl hover:text-white disabled:opacity-50">Retake</button>
                      </div>
                   )}
                </div>
@@ -739,14 +832,175 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
           </div>
       )}
 
+      {/* Selected Day Modal */}
+      {selectedDayDetails && (
+         <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-6 backdrop-blur-3xl animate-fade-in" onClick={() => setSelectedDayDetails(null)}>
+            <div className="bg-brand-card border border-white/10 w-full max-w-4xl rounded-[48px] overflow-hidden shadow-3xl flex flex-col lg:flex-row relative" onClick={e => e.stopPropagation()}>
+               <button
+                  onClick={() => setSelectedDayDetails(null)}
+                  className="absolute top-6 right-6 z-50 w-12 h-12 bg-white/5 hover:bg-brand-red text-white rounded-2xl flex items-center justify-center transition-all"
+               >
+                  <X size={24} />
+               </button>
+
+               <div 
+                  className={`w-full lg:w-1/2 aspect-square lg:aspect-auto bg-zinc-900 flex flex-col relative border-r border-white/5 ${selectedDayDetails.punchOutSelfie ? 'cursor-pointer group/photo' : ''}`}
+                  onClick={() => { if(selectedDayDetails.punchOutSelfie) setActivePhotoTab(p => p === 'in' ? 'out' : 'in'); }}
+               >
+                  {activePhotoTab === 'in' ? (
+                     selectedDayDetails.selfie ? (
+                        <div className="relative flex-1 transition-all animate-fade-in">
+                           <Image src={selectedDayDetails.selfie} alt="Punch In Selfie" className="w-full h-full object-cover" width={800} height={800} unoptimized />
+                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                           <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-6 sm:right-10">
+                              <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1.5 flex items-center justify-between">
+                                 Check-in Photo
+                                 {selectedDayDetails.punchOutSelfie && <span className="bg-white/10 text-white px-2 py-1 rounded-md text-[8px] group-hover/photo:bg-white/20 transition-all">Click to see Check-Out</span>}
+                              </p>
+                              <h3 className="text-3xl font-black italic uppercase text-white truncate">{selectedDayDetails.userName}</h3>
+                           </div>
+                        </div>
+                     ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-zinc-800 animate-fade-in">
+                           <ShieldAlert size={64} />
+                           <p className="font-bold text-xs uppercase tracking-widest">No Check-in Photo</p>
+                        </div>
+                     )
+                  ) : (
+                     <div className="relative flex-1 transition-all animate-fade-in">
+                        <Image src={selectedDayDetails.punchOutSelfie} alt="Punch Out Selfie" className="w-full h-full object-cover" width={800} height={800} unoptimized />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                        <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-6 sm:right-10">
+                           <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1.5 flex items-center justify-between">
+                              Check-out Photo
+                              {selectedDayDetails.selfie && <span className="bg-white/10 text-white px-2 py-1 rounded-md text-[8px] group-hover/photo:bg-white/20 transition-all">Click to see Check-In</span>}
+                           </p>
+                           <h3 className="text-3xl font-black italic uppercase text-white truncate">{selectedDayDetails.userName}</h3>
+                        </div>
+                     </div>
+                  )}
+               </div>
+
+               <div className="p-10 lg:p-14 flex-grow flex flex-col justify-between space-y-10">
+                  <div className="space-y-8">
+                     <div className="flex justify-between items-start">
+                        <div>
+                           <p className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.2em] mb-2">{new Date(selectedDayDetails.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                           <div className="text-3xl font-black italic uppercase text-white leading-none">Record Log</div>
+                        </div>
+                     </div>
+
+                     <div className="grid grid-cols-2 gap-8">
+                        <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
+                           <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mb-2">Punch In</p>
+                           <div className="text-2xl font-black text-white">{selectedDayDetails.punchIn || '--:--'}</div>
+                        </div>
+                        <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
+                           <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-2">Punch Out</p>
+                           <div className="text-2xl font-black text-white">{selectedDayDetails.punchOut || '--:--'}</div>
+                        </div>
+                     </div>
+
+                     <div className="space-y-3">
+                        <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest pl-1">Location</p>
+                        <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-start gap-4">
+                           <div className="w-10 h-10 bg-brand-red/10 rounded-xl flex items-center justify-center shrink-0">
+                              <MapPin size={20} className="text-brand-red" />
+                           </div>
+                           <div>
+                              <p className="text-sm text-zinc-300 font-bold leading-relaxed">{selectedDayDetails.location || 'N/A'}</p>
+                           </div>
+                        </div>
+                     </div>
+
+                     {selectedDayDetails.remark && (
+                        <div className="bg-orange-500/10 border border-orange-500/20 rounded-3xl p-6 flex flex-col items-start gap-2">
+                           <div className="flex items-center gap-2">
+                              <Activity size={16} className="text-orange-500" />
+                              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">System Note</span>
+                           </div>
+                           <p className="text-sm font-bold text-orange-400 leading-relaxed">{selectedDayDetails.remark}</p>
+                        </div>
+                     )}
+                  </div>
+               </div>
+            </div>
+         </div>
+      )}
+
+      {/* Stat Detail Modal */}
+      {selectedStatList && (
+         <div className="fixed inset-0 bg-black/95 z-[2100] flex items-center justify-center p-6 backdrop-blur-3xl animate-fade-in" onClick={() => setSelectedStatList(null)}>
+            <div className="bg-brand-card border border-white/10 w-full max-w-2xl rounded-[40px] overflow-hidden shadow-3xl flex flex-col relative" onClick={e => e.stopPropagation()}>
+               <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                  <div>
+                     <p className="text-[10px] font-black text-brand-red uppercase tracking-widest mb-1">{monthName} {currentYear}</p>
+                     <h3 className="text-2xl font-black italic uppercase text-white">{selectedStatList.label}</h3>
+                  </div>
+                  <button onClick={() => setSelectedStatList(null)} className="w-10 h-10 bg-white/5 hover:bg-brand-red text-white rounded-xl flex items-center justify-center transition-all"><X size={20} /></button>
+               </div>
+               
+               <div className="flex-grow overflow-y-auto max-h-[60vh] p-4 space-y-2 custom-scrollbar">
+                  {selectedStatList.items.length === 0 ? (
+                     <div className="py-20 text-center text-zinc-800 font-black uppercase text-xs tracking-widest">No records found</div>
+                  ) : selectedStatList.items.map((item, i) => (
+                     <div key={i} 
+                        onClick={() => {
+                           if (selectedStatList.type !== 'leave') {
+                              setSelectedDayDetails({
+                                 date: item.date,
+                                 userName: profile?.name || 'Unknown',
+                                 punchIn: item.firstIn?.time || '--:--',
+                                 punchOut: item.lastOut?.time || '--:--',
+                                 selfie: item.firstIn?.selfie || null,
+                                 punchOutSelfie: item.lastOut?.selfie || null,
+                                 status: item.firstIn?.status === 'Late' ? 'Late' : 'Checked In',
+                                 location: item.firstIn?.location || '',
+                                 remark: item.remark || ''
+                              });
+                           }
+                        }}
+                        className={`bg-white/5 border border-white/5 p-5 rounded-2xl flex items-center justify-between group transition-all ${selectedStatList.type !== 'leave' ? 'hover:bg-brand-red/10 hover:border-brand-red/20 cursor-pointer' : ''}`}
+                     >
+                        <div className="flex items-center gap-4">
+                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm ${
+                              selectedStatList.type === 'late' ? 'bg-brand-red/10 text-brand-red' : 
+                              selectedStatList.type === 'leave' ? 'bg-orange-500/10 text-orange-500' :
+                              'bg-green-500/10 text-green-500'
+                           }`}>
+                              {selectedStatList.type === 'leave' ? (
+                                 new Date(item.startDate).getDate()
+                              ) : (
+                                 new Date(item.date).getDate()
+                              )}
+                           </div>
+                           <div>
+                              <p className="text-xs font-bold text-white">
+                                 {selectedStatList.type === 'leave' ? (
+                                    `${new Date(item.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} - ${new Date(item.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                                 ) : (
+                                    new Date(item.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                                 )}
+                              </p>
+                              <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
+                                 {selectedStatList.type === 'leave' ? item.reason : (item.firstIn?.time || '--:--')}
+                              </p>
+                           </div>
+                        </div>
+                        {selectedStatList.type !== 'leave' && <MoreHorizontal size={18} className="text-zinc-800 group-hover:text-brand-red transition-colors" />}
+                     </div>
+                  ))}
+               </div>
+            </div>
+         </div>
+      )}
+
       {/* Success Notification */}
       {showSuccess && (
         <div className="fixed bottom-32 lg:bottom-12 left-1/2 -translate-x-1/2 z-[2000] animate-bounce">
-           <div className="bg-green-600 text-white px-8 py-4 rounded-xl font-bold shadow-2xl flex items-center gap-3"><CheckCircle2 size={20} /> Verified Successfully</div>
+           <div className="bg-green-600 text-white px-8 py-4 rounded-xl font-bold shadow-2xl flex items-center gap-3"><CheckCircle2 size={20} /> Attendance saved!</div>
         </div>
       )}
     </div>
   );
 }
-
-// Footer helper

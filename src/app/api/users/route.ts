@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import User from '@/models/User';
 import Counter from '@/models/Counter';
+import { isAdminRequest, unauthorizedResponse } from '@/lib/adminAuth';
 
 export async function GET() {
   try {
@@ -14,6 +15,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!isAdminRequest(request)) return unauthorizedResponse();
+
   try {
     const { name, email, password, department, staffType, isAdmin, expectedInTime, expectedOutTime } = await request.json();
     await dbConnect();
@@ -28,10 +31,10 @@ export async function POST(request: Request) {
     const seqString = String(counter.seq).padStart(3, '0');
     const employeeId = `MWG-${seqString}`;
 
-    // 2. Create User
+    // 2. Create User (email is optional)
     const newUser = await User.create({
       name,
-      email: email || `${employeeId.toLowerCase()}@mwg.temporary`, // Fallback if no email provided
+      ...(email ? { email } : {}),
       employeeId,
       password,
       department,
@@ -48,15 +51,17 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  if (!isAdminRequest(request)) return unauthorizedResponse();
+
   try {
     const { id, password, ...rest } = await request.json();
     await dbConnect();
-    
+
     const updateBody: any = { ...rest };
-    if (password && password.trim() !== "") {
-       updateBody.password = password;
+    if (password && password.trim() !== '') {
+      updateBody.password = password;
     }
-    
+
     const updatedUser = await User.findByIdAndUpdate(id, updateBody, { new: true });
     return NextResponse.json(updatedUser);
   } catch (error: any) {
@@ -65,6 +70,8 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!isAdminRequest(request)) return unauthorizedResponse();
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

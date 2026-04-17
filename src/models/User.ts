@@ -22,8 +22,9 @@ const UserSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    required: false,   // Email is optional — admin can add users without one
     unique: true,
+    sparse: true,      // Allows multiple docs to have no email without unique-key clash
     trim: true,
     lowercase: true,
   },

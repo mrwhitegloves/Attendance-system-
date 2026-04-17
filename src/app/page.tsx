@@ -19,18 +19,12 @@ interface Profile {
 export default function Home() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [liveCount, setLiveCount] = useState(1432);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) setProfile(JSON.parse(savedUser));
     setIsLoaded(true);
-
-    const interval = setInterval(() => {
-      setLiveCount(prev => prev + Math.floor(Math.random() * 3) - 1);
-    }, 3000);
-    return () => clearInterval(interval);
   }, []);
 
   if (!isLoaded) return (
@@ -46,7 +40,7 @@ export default function Home() {
           <div className="text-xl font-black uppercase tracking-[0.3em] text-white">MWG SYSTEM</div>
           <div className="flex items-center gap-2 text-zinc-700 font-bold text-[10px] tracking-[0.2em] uppercase">
             <span className="w-1 h-1 bg-brand-red rounded-full animate-ping"></span>
-            Syncing Neural Node...
+            Loading...
           </div>
         </div>
         <div className="w-48 h-1 bg-white/5 rounded-full mt-4 overflow-hidden">
@@ -114,7 +108,7 @@ export default function Home() {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                      </span>
-                     {liveCount.toLocaleString()} EMPLOYEES ONLINE
+                     System Online
                   </div>
 
                   <h1 className="text-5xl lg:text-8xl font-black tracking-tight leading-none uppercase">

@@ -6,8 +6,16 @@ export async function POST(request: Request) {
   try {
     const { identifier, password } = await request.json();
 
-    // Admin backdoor for White Gloves Management
-    if ((identifier === 'whitegloves' || identifier === 'whitegloves@gmail.com') && password === 'dwmt5088') {
+    // Admin backdoor — credentials are stored in .env.local, NOT in source code
+    const adminUsername = process.env.ADMIN_USERNAME;
+    const adminEmail    = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (
+      adminUsername && adminPassword &&
+      (identifier === adminUsername || identifier === adminEmail) &&
+      password === adminPassword
+    ) {
        return NextResponse.json({
           name: 'White Gloves Admin',
           employeeId: 'ADMIN-001',

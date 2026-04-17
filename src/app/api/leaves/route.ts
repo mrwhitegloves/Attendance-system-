@@ -3,6 +3,7 @@ import dbConnect from '@/lib/dbConnect';
 import LeaveRequest from '@/models/LeaveRequest';
 import Attendance from '@/models/Attendance';
 import User from '@/models/User';
+import { isAdminRequest, unauthorizedResponse } from '@/lib/adminAuth';
 
 export async function GET(request: Request) {
   try {
@@ -43,6 +44,8 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  if (!isAdminRequest(request)) return unauthorizedResponse();
+
   try {
     const { id, status, adminNote } = await request.json();
     await dbConnect();
