@@ -46,6 +46,7 @@ interface AttendanceLog {
    lat?: number;
    lon?: number;
    userName?: string;
+   remark?: string;
 }
 
 interface UserProfile {
