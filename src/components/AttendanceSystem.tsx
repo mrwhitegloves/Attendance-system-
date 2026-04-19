@@ -289,7 +289,12 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
         const canvas = document.createElement('canvas');
         canvas.width = videoRef.current.videoWidth;
         canvas.height = videoRef.current.videoHeight;
-        canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(videoRef.current, 0, 0);
+        }
         setCapturedSelfie(canvas.toDataURL('image/png'));
         videoStream?.getTracks().forEach(t => t.stop());
         setVideoStream(null);
@@ -792,7 +797,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
                         <button disabled={isSubmitting} onClick={handleAttendance} className="py-5 bg-green-600 text-white font-black text-lg rounded-xl hover:bg-green-700 transition-all disabled:opacity-50 disabled:grayscale">
                            {isSubmitting ? <Loader className="w-8 h-8 mx-auto" /> : 'Submit'}
                         </button>
-                        <button disabled={isSubmitting} onClick={() => { setCapturedSelfie(null); }} className="py-5 bg-zinc-800 text-zinc-400 font-bold rounded-xl hover:text-white disabled:opacity-50">Retake</button>
+                        <button disabled={isSubmitting} onClick={() => { setCapturedSelfie(null); startCamera(); }} className="py-5 bg-zinc-800 text-zinc-400 font-bold rounded-xl hover:text-white disabled:opacity-50">Retake</button>
                      </div>
                   )}
                </div>
