@@ -7,30 +7,41 @@ import User from '@/models/User';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const date = searchParams.get('date'); // Filter by date (YYYY-MM-DD or today)
+    const date = searchParams.get('date');
     const employeeId = searchParams.get('employeeId');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '100', 10);
 
     await dbConnect();
-    
-    let query: any = {};
+
+    const query: Record<string, any> = {};
     if (date) {
       query.date = { $regex: date };
     } else if (!employeeId) {
-       // Default to today's logs only if no employee filter
-       query.date = new Date().toLocaleDateString('en-CA');
+      // Default: today's logs only when no filters set
+      query.date = new Date().toLocaleDateString('en-CA');
     }
     if (employeeId) query.employeeId = employeeId;
 
-    const logs = await Attendance.find(query).sort({ date: -1, lastPunch: -1 }).limit(100);
-    
-    // Enrich with user name
-    const employeeIds = [...new Set(logs.map(l => l.employeeId))];
-    const users = await User.find({ employeeId: { $in: employeeIds } }, 'name employeeId department');
-    const userMap = users.reduce((acc, u) => ({ ...acc, [u.employeeId]: u }), {});
+    const skip = (page - 1) * limit;
 
-    const enrichedLogs = logs.map(l => ({
-      ...l.toObject(),
-      userName: userMap[l.employeeId]?.name || 'Unknown',
+    const logs = await Attendance.find(query)
+      .sort({ date: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Enrich with user info
+    const employeeIds = [...new Set(logs.map((l: any) => l.employeeId))];
+    const users = await User.find(
+      { employeeId: { $in: employeeIds } },
+      'name employeeId department'
+    ).lean();
+    const userMap = users.reduce((acc: any, u: any) => ({ ...acc, [u.employeeId]: u }), {});
+
+    const enrichedLogs = logs.map((l: any) => ({
+      ...l,
+      userName: userMap[l.employeeId]?.name || l.userName || 'Unknown',
       department: userMap[l.employeeId]?.department || 'N/A'
     }));
 

@@ -25,7 +25,7 @@ const AttendanceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Checked In', 'Checked Out', 'Leave', 'Late'],
+    enum: ['Checked In', 'Checked Out', 'Leave', 'Late', 'Absent'],
     required: true,
   },
   lat: Number,

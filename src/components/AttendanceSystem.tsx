@@ -117,33 +117,52 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
     }
   }, []);
 
+  // ── SW-based Punch Reminder Scheduler ─────────────────────────────────────
+  // Runs once on mount (and whenever isCheckedIn changes) to schedule / reschedule
+  // local reminders 30 min before the employee's expected punch-in and punch-out.
+  // The service worker handles the actual notification delivery — works even when
+  // the browser tab is in the background.
   useEffect(() => {
-    const checkNotification = () => {
-      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-      const now = new Date();
-      const h = now.getHours();
-      const m = now.getMinutes();
-      const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-      const shiftStartStr = "09:00";
-      const shiftEndStr = "18:00";
-      const startSplit = shiftStartStr.split(':').map(Number);
-      const startTime = new Date();
-      startTime.setHours(startSplit[0], startSplit[1] - 10, 0);
-      const startNotifyStr = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`;
-      const endSplit = shiftEndStr.split(':').map(Number);
-      const endTime = new Date();
-      endTime.setHours(endSplit[0], endSplit[1] + 10, 0);
-      const endNotifyStr = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
-      if (timeStr === startNotifyStr && !isCheckedIn) {
-        new Notification("Attendance Reminder", { body: "Your shift starts in 10 minutes. Please punch in.", icon: "/logo.png" });
+    const scheduleReminders = async () => {
+      if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
+
+      // Request permission if not yet granted (silent — no UI prompt if already decided)
+      if (Notification.permission === 'default') {
+        await Notification.requestPermission();
       }
-      if (timeStr === endNotifyStr && isCheckedIn) {
-        new Notification("Attendance Reminder", { body: "Your shift has ended. Please remember to punch out.", icon: "/logo.png" });
+      if (Notification.permission !== 'granted') return;
+
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      const todayLogs = attendanceLogs.filter(l => l.date === todayStr);
+      const alreadyOut = todayLogs.some(l => l.status === 'Checked Out');
+
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        if (!reg.active) return;
+
+        reg.active.postMessage({
+          type: 'SCHEDULE_REMINDERS',
+          expectedInTime: profile.expectedInTime || '09:30',
+          expectedOutTime: (profile as any).expectedOutTime || '18:30',
+          employeeName: profile.name,
+          isCheckedIn,          // if true → skip punch-in reminder, schedule punch-out reminder
+          isCheckedOut: alreadyOut,  // if true → skip punch-out reminder too
+        });
+
+        console.log('[Reminders] Schedule posted to SW:', {
+          in: profile.expectedInTime,
+          out: (profile as any).expectedOutTime,
+          isCheckedIn,
+          alreadyOut,
+        });
+      } catch (err) {
+        console.error('[Reminders] SW message error:', err);
       }
     };
-    const interval = setInterval(checkNotification, 60000); 
-    return () => clearInterval(interval);
-  }, [isCheckedIn]);
+
+    scheduleReminders();
+  }, [isCheckedIn, attendanceLogs]); // Re-schedule whenever check-in state changes
+
 
   const dailyLogs = React.useMemo(() => {
     const groups: Record<string, any> = {};
@@ -314,18 +333,37 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
     
     let finalStatus = isCheckedIn ? 'Checked Out' : 'Checked In';
     
-    // Automatic Late Logic (15-Min Grace Period)
+    // Strict Late Logic — NO grace period. Any punch-in after expected time = Late.
     if (!isCheckedIn && profile.expectedInTime) {
        try {
           const [expH, expM] = profile.expectedInTime.split(':').map(Number);
           const expected = new Date();
           expected.setHours(expH, expM, 0, 0);
-          const graceLimit = new Date(expected.getTime() + 15 * 60 * 1000);
-          if (now > graceLimit) {
+          if (now > expected) {
              finalStatus = 'Late';
           }
        } catch (e) {
-          console.error("Grace period calc error:", e);
+          console.error('Late check error:', e);
+       }
+    }
+
+    // Enforce 2-late limit per month
+    if (finalStatus === 'Late') {
+       const mm = String(now.getMonth() + 1).padStart(2, '0');
+       const yyyy = now.getFullYear();
+       const monthPrefix = `${yyyy}-${mm}`;
+       const lateDaysThisMonth = attendanceLogs.filter(
+         (l: any) => l.status === 'Late' && l.date.startsWith(monthPrefix)
+       );
+       if (lateDaysThisMonth.length >= 2) {
+          const proceed = confirm(
+            `⚠️ Late Limit Reached!\n\nYou already have ${lateDaysThisMonth.length} late entries this month (maximum is 2).\n\nYour punch-in will still be recorded as LATE. Please contact your manager.\n\nPress OK to proceed or Cancel to abort.`
+          );
+          if (!proceed) {
+             setIsCapturing(false);
+             setCapturedSelfie(null);
+             return;
+          }
        }
     }
 
@@ -664,7 +702,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
           
           {view === 'reports' && (
             <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                 {[
                   { label: 'Total Present', val: stats.totalWorkingDays, icon: Calendar, color: 'text-white', type: 'present', items: stats.presentDays },
                   { label: 'Leave Approved', val: stats.totalLeave, icon: FileText, color: 'text-zinc-600', type: 'leave', items: stats.leaveDays },
@@ -708,7 +746,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
             <div className="max-w-4xl mx-auto space-y-12 animate-fade-in pb-20">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="space-y-2">
-                  <h2 className="text-4xl font-black tracking-tight underline decoration-brand-red decoration-4 uppercase italic">My Leave</h2>
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight underline decoration-brand-red decoration-4 uppercase italic">My Leave</h2>
                    <p className="text-zinc-600 font-bold uppercase text-[10px] tracking-widest">View & manage your leave requests</p>
                  </div>
                  <button onClick={() => setShowLeaveModal(true)} className="px-8 py-5 bg-brand-red text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-900/40">Apply for Leave</button>
@@ -808,7 +846,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
       {/* Leave Application Modal */}
       {showLeaveModal && (
           <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[1000] flex items-center justify-center p-6">
-             <div className="bg-brand-card border border-white/10 w-full max-w-lg p-8 lg:p-10 rounded-[32px] space-y-8">
+             <div className="bg-brand-card border border-white/10 w-full max-w-lg p-6 sm:p-8 lg:p-10 rounded-[24px] sm:rounded-[32px] space-y-6 sm:space-y-8 max-h-[90vh] overflow-y-auto">
                 <div className="space-y-1">
                    <h3 className="text-2xl font-black uppercase tracking-tight">Apply for Leave</h3>
                    <p className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest">Fill details for HR approval</p>
@@ -837,97 +875,121 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
           </div>
       )}
 
-      {/* Selected Day Modal */}
+      {/* Selected Day Modal — responsive bottom-sheet (mobile) / side-by-side (desktop) */}
       {selectedDayDetails && (
-         <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-6 backdrop-blur-3xl animate-fade-in" onClick={() => setSelectedDayDetails(null)}>
-            <div className="bg-brand-card border border-white/10 w-full max-w-4xl rounded-[48px] overflow-hidden shadow-3xl flex flex-col lg:flex-row relative" onClick={e => e.stopPropagation()}>
+         <div
+            className="fixed inset-0 bg-black/95 z-[2000] flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-6 backdrop-blur-3xl animate-fade-in"
+            onClick={() => setSelectedDayDetails(null)}
+         >
+            <div
+               className="bg-brand-card border border-white/10 w-full sm:max-w-4xl rounded-t-[36px] sm:rounded-[44px] overflow-hidden shadow-3xl flex flex-col lg:flex-row relative max-h-[92vh] sm:max-h-[88vh]"
+               onClick={e => e.stopPropagation()}
+            >
+               {/* Always-visible close button */}
                <button
                   onClick={() => setSelectedDayDetails(null)}
-                  className="absolute top-6 right-6 z-50 w-12 h-12 bg-white/5 hover:bg-brand-red text-white rounded-2xl flex items-center justify-center transition-all"
+                  className="absolute top-4 right-4 z-50 w-10 h-10 sm:w-12 sm:h-12 bg-black/60 hover:bg-brand-red text-white rounded-2xl flex items-center justify-center transition-all border border-white/10 backdrop-blur-sm shadow-xl"
                >
-                  <X size={24} />
+                  <X size={20} />
                </button>
 
-               <div 
-                  className={`w-full lg:w-1/2 aspect-square lg:aspect-auto bg-zinc-900 flex flex-col relative border-r border-white/5 ${selectedDayDetails.punchOutSelfie ? 'cursor-pointer group/photo' : ''}`}
+               {/* Photo Panel — tall on mobile, half-width on desktop */}
+               <div
+                  className={`relative w-full lg:w-1/2 h-[48vh] lg:h-auto bg-zinc-900 border-b lg:border-b-0 lg:border-r border-white/5 overflow-hidden shrink-0 ${selectedDayDetails.punchOutSelfie ? 'cursor-pointer' : ''}`}
                   onClick={() => { if(selectedDayDetails.punchOutSelfie) setActivePhotoTab(p => p === 'in' ? 'out' : 'in'); }}
                >
-                  {activePhotoTab === 'in' ? (
-                     selectedDayDetails.selfie ? (
-                        <div className="relative flex-1 transition-all animate-fade-in">
-                           <Image src={selectedDayDetails.selfie} alt="Punch In Selfie" className="w-full h-full object-cover" width={800} height={800} unoptimized />
-                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-                           <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-6 sm:right-10">
-                              <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1.5 flex items-center justify-between">
-                                 Check-in Photo
-                                 {selectedDayDetails.punchOutSelfie && <span className="bg-white/10 text-white px-2 py-1 rounded-md text-[8px] group-hover/photo:bg-white/20 transition-all">Click to see Check-Out</span>}
-                              </p>
-                              <h3 className="text-3xl font-black italic uppercase text-white truncate">{selectedDayDetails.userName}</h3>
+                  <div className="relative w-full h-full">
+                     {activePhotoTab === 'in' ? (
+                        selectedDayDetails.selfie ? (
+                           <>
+                              <Image src={selectedDayDetails.selfie} alt="Punch In Selfie" fill className="object-cover object-center" unoptimized />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+                              <div className="absolute bottom-4 left-5 right-14">
+                                 <p className="text-[9px] font-black text-green-400 uppercase tracking-widest mb-0.5">Check-in Photo</p>
+                                 <h3 className="text-xl sm:text-2xl font-black italic uppercase text-white truncate">{selectedDayDetails.userName}</h3>
+                                 {selectedDayDetails.punchOutSelfie && (
+                                    <span className="inline-block mt-1 bg-white/10 text-white/60 px-2 py-0.5 rounded text-[8px] font-bold">Tap → Check-Out</span>
+                                 )}
+                              </div>
+                           </>
+                        ) : (
+                           <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-zinc-800">
+                              <ShieldAlert size={56} />
+                              <p className="text-xs font-black uppercase tracking-widest">No Check-in Photo</p>
+                              <p className="text-base font-black text-white/20 uppercase italic truncate max-w-[80%]">{selectedDayDetails.userName}</p>
                            </div>
-                        </div>
+                        )
                      ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-zinc-800 animate-fade-in">
-                           <ShieldAlert size={64} />
-                           <p className="font-bold text-xs uppercase tracking-widest">No Check-in Photo</p>
+                        <>
+                           <Image src={selectedDayDetails.punchOutSelfie} alt="Punch Out Selfie" fill className="object-cover object-center" unoptimized />
+                           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+                           <div className="absolute bottom-4 left-5 right-14">
+                              <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-0.5">Check-out Photo</p>
+                              <h3 className="text-xl sm:text-2xl font-black italic uppercase text-white truncate">{selectedDayDetails.userName}</h3>
+                              {selectedDayDetails.selfie && (
+                                 <span className="inline-block mt-1 bg-white/10 text-white/60 px-2 py-0.5 rounded text-[8px] font-bold">Tap → Check-In</span>
+                              )}
+                           </div>
+                        </>
+                     )}
+                  </div>
+               </div>
+
+               {/* Details Panel — scrollable */}
+               <div className="flex-grow overflow-y-auto p-5 sm:p-8 lg:p-10 space-y-4 scrollbar-hide">
+                  {/* Date + status */}
+                  <div className="flex items-center justify-between">
+                     <div>
+                        <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">
+                           {new Date(selectedDayDetails.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                        <div className="text-xl sm:text-2xl font-black italic uppercase text-white leading-tight">Record Log</div>
+                     </div>
+                  </div>
+
+                  {/* Punch times */}
+                  <div className="grid grid-cols-2 gap-3">
+                     <div className="bg-green-500/10 border border-green-500/10 rounded-2xl p-4">
+                        <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mb-1">Punch In</p>
+                        <div className="text-xl sm:text-2xl font-black text-white">{selectedDayDetails.punchIn || '--:--'}</div>
+                     </div>
+                     <div className="bg-red-500/10 border border-red-500/10 rounded-2xl p-4">
+                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Punch Out</p>
+                        <div className="text-xl sm:text-2xl font-black text-white">{selectedDayDetails.punchOut || '--:--'}</div>
+                     </div>
+                  </div>
+
+                  {/* Location */}
+                  {selectedDayDetails.location && (
+                     <div className="bg-white/5 rounded-2xl p-4 flex items-start gap-3">
+                        <div className="w-8 h-8 bg-brand-red/10 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                           <MapPin size={14} className="text-brand-red" />
                         </div>
-                     )
-                  ) : (
-                     <div className="relative flex-1 transition-all animate-fade-in">
-                        <Image src={selectedDayDetails.punchOutSelfie} alt="Punch Out Selfie" className="w-full h-full object-cover" width={800} height={800} unoptimized />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-                        <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-6 sm:right-10">
-                           <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1.5 flex items-center justify-between">
-                              Check-out Photo
-                              {selectedDayDetails.selfie && <span className="bg-white/10 text-white px-2 py-1 rounded-md text-[8px] group-hover/photo:bg-white/20 transition-all">Click to see Check-In</span>}
-                           </p>
-                           <h3 className="text-3xl font-black italic uppercase text-white truncate">{selectedDayDetails.userName}</h3>
+                        <div className="min-w-0">
+                           <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Location</p>
+                           <p className="text-sm text-zinc-300 font-bold leading-relaxed break-words">{selectedDayDetails.location}</p>
                         </div>
                      </div>
                   )}
-               </div>
 
-               <div className="p-10 lg:p-14 flex-grow flex flex-col justify-between space-y-10">
-                  <div className="space-y-8">
-                     <div className="flex justify-between items-start">
-                        <div>
-                           <p className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.2em] mb-2">{new Date(selectedDayDetails.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                           <div className="text-3xl font-black italic uppercase text-white leading-none">Record Log</div>
+                  {/* System Note */}
+                  {selectedDayDetails.remark && (
+                     <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-1.5">
+                           <Activity size={12} className="text-orange-500" />
+                           <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest">System Note</span>
                         </div>
+                        <p className="text-xs font-bold text-orange-400 leading-relaxed">{selectedDayDetails.remark}</p>
                      </div>
+                  )}
 
-                     <div className="grid grid-cols-2 gap-8">
-                        <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
-                           <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mb-2">Punch In</p>
-                           <div className="text-2xl font-black text-white">{selectedDayDetails.punchIn || '--:--'}</div>
-                        </div>
-                        <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
-                           <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-2">Punch Out</p>
-                           <div className="text-2xl font-black text-white">{selectedDayDetails.punchOut || '--:--'}</div>
-                        </div>
-                     </div>
-
-                     <div className="space-y-3">
-                        <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest pl-1">Location</p>
-                        <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-start gap-4">
-                           <div className="w-10 h-10 bg-brand-red/10 rounded-xl flex items-center justify-center shrink-0">
-                              <MapPin size={20} className="text-brand-red" />
-                           </div>
-                           <div>
-                              <p className="text-sm text-zinc-300 font-bold leading-relaxed">{selectedDayDetails.location || 'N/A'}</p>
-                           </div>
-                        </div>
-                     </div>
-
-                     {selectedDayDetails.remark && (
-                        <div className="bg-orange-500/10 border border-orange-500/20 rounded-3xl p-6 flex flex-col items-start gap-2">
-                           <div className="flex items-center gap-2">
-                              <Activity size={16} className="text-orange-500" />
-                              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">System Note</span>
-                           </div>
-                           <p className="text-sm font-bold text-orange-400 leading-relaxed">{selectedDayDetails.remark}</p>
-                        </div>
-                     )}
-                  </div>
+                  {/* Close tap target for mobile */}
+                  <button
+                     onClick={() => setSelectedDayDetails(null)}
+                     className="lg:hidden w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-black uppercase tracking-widest text-zinc-500 active:bg-white/10 transition-all"
+                  >
+                     ← Close
+                  </button>
                </div>
             </div>
          </div>

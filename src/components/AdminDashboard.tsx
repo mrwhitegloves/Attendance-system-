@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -76,6 +76,123 @@ interface LeaveRequest {
    processedAt?: string | Date;
 }
 
+
+// ── PWA Push Notification Button ─────────────────────────────────────────────
+function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+   const rawData = window.atob(base64);
+   const arr = new Uint8Array(rawData.length);
+   for (let i = 0; i < rawData.length; i++) arr[i] = rawData.charCodeAt(i);
+   return arr.buffer;
+}
+
+function NotificationToggleButton() {
+   const [status, setStatus] = React.useState<'default' | 'granted' | 'denied' | 'loading'>('default');
+
+   React.useEffect(() => {
+      if ('Notification' in window) {
+         setStatus(Notification.permission as any);
+      }
+   }, []);
+
+   const handleEnable = async () => {
+      if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+         alert('Push notifications are not supported in this browser.');
+         return;
+      }
+      setStatus('loading');
+      try {
+         const permission = await Notification.requestPermission();
+         setStatus(permission as any);
+         if (permission !== 'granted') return;
+
+         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
+         const reg = await navigator.serviceWorker.ready;
+         let sub = await reg.pushManager.getSubscription();
+         if (!sub) {
+            sub = await reg.pushManager.subscribe({
+               userVisibleOnly: true,
+               applicationServerKey: urlBase64ToUint8Array(vapidKey),
+            });
+         }
+         const subJSON = sub.toJSON();
+         await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: subJSON.endpoint, keys: subJSON.keys }),
+         });
+         alert('Push notifications enabled! You will now receive alerts when employees punch in/out.');
+      } catch (err) {
+         console.error('[Push] Enable error:', err);
+         setStatus('default');
+      }
+   };
+
+   const handleDisable = async () => {
+      try {
+         const reg = await navigator.serviceWorker.ready;
+         const sub = await reg.pushManager.getSubscription();
+         if (sub) {
+            await fetch('/api/push/subscribe', {
+               method: 'DELETE',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ endpoint: sub.endpoint }),
+            });
+            await sub.unsubscribe();
+         }
+         setStatus('default');
+         alert('Push notifications disabled for this device.');
+      } catch (err) {
+         console.error('[Push] Disable error:', err);
+      }
+   };
+
+   if (status === 'loading') {
+      return (
+         <button disabled className="flex items-center gap-2 px-5 py-3 bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 rounded-xl text-xs font-black uppercase tracking-widest opacity-70">
+            <Bell size={14} className="animate-pulse" /> Enabling...
+         </button>
+      );
+   }
+
+   if (status === 'granted') {
+      return (
+         <button
+            onClick={handleDisable}
+            title="Push notifications are ON. Click to disable."
+            className="flex items-center gap-2 px-5 py-3 bg-green-600/20 border border-green-500/40 text-green-400 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-600/20 hover:border-red-500/40 hover:text-red-400 transition-all group"
+         >
+            <Bell size={14} className="group-hover:hidden" />
+            <Bell size={14} className="hidden group-hover:block" />
+            <span className="group-hover:hidden">Notifs ON</span>
+            <span className="hidden group-hover:block">Disable</span>
+         </button>
+      );
+   }
+
+   if (status === 'denied') {
+      return (
+         <button
+            onClick={() => alert('Notifications are blocked. Please enable them in your browser/phone settings:\n\nAndroid Chrome: Settings > Site Settings > Notifications\niOS Safari: Settings > Safari > Notifications')}
+            className="flex items-center gap-2 px-5 py-3 bg-red-600/20 border border-red-500/30 text-red-400 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-600/30 transition-all"
+         >
+            <Bell size={14} /> Notifs Blocked
+         </button>
+      );
+   }
+
+   return (
+      <button
+         onClick={handleEnable}
+         title="Enable push notifications to get alerts when employees punch in/out"
+         className="flex items-center gap-2 px-5 py-3 bg-brand-red/20 border border-brand-red/40 text-brand-red rounded-xl text-xs font-black uppercase tracking-widest hover:bg-brand-red hover:text-white transition-all"
+      >
+         <Bell size={14} /> Enable Notifs
+      </button>
+   );
+}
+
 export default function AdminDashboard({ profile }: { profile: any }) {
    const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'leaves' | 'users'>('dashboard');
    const [search, setSearch] = useState('');
@@ -132,14 +249,14 @@ export default function AdminDashboard({ profile }: { profile: any }) {
    const fetchData = async () => {
       setIsLoading(true);
       try {
+         // Use limit=500 to cap the initial payload; pagination handles the rest
          const [lRes, wRes, lvRes] = await Promise.all([
-            adminFetch('/api/attendance'), // Admin fetch — returns all records
+            adminFetch('/api/attendance?limit=500'),
             fetch('/api/users'),
             fetch('/api/leaves')
          ]);
          if (lRes.ok) {
             const data = await lRes.json();
-            console.log("Admin Data Fetch (Logs):", data);
             setLogs(data);
          }
          if (wRes.ok) setWorkforce(await wRes.json());
@@ -150,11 +267,12 @@ export default function AdminDashboard({ profile }: { profile: any }) {
 
    useEffect(() => {
       fetchData();
+      // Refresh every 60s (was 15s) to reduce DB pressure; only when tab is visible
       const interval = setInterval(() => {
          if (document.visibilityState === 'visible') {
             fetchData();
          }
-      }, 15000); // 15s heartbeat
+      }, 60000);
       return () => clearInterval(interval);
    }, []);
 
@@ -330,6 +448,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
          const isPresent = dayLogs.some(l => l.status === 'Checked In' || l.status === 'Checked Out' || l.status === 'Late');
          const isLate = dayLogs.some(l => l.status === 'Late');
          const isLeave = dayLogs.some(l => l.status === 'Leave');
+         const isAbsent = dayLogs.some(l => l.status === 'Absent');
          const isPendingLeave = leaves.some(l =>
             (l.employeeId === user.employeeId || l.userId === user._id) &&
             (l.status === 'pending') &&
@@ -342,7 +461,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
 
          const punchIn = dayLogs.find(l => l.status === 'Checked In' || l.status === 'Late')?.time || '--:--';
          const punchOut = dayLogs.find(l => l.status === 'Checked Out')?.time || '--:--';
-         const status = isPendingLeave ? 'Pending' : (isLate ? 'Late' : isPresent ? 'On-Time' : isLeave ? 'Leave' : 'Absent');
+         const status = isPendingLeave ? 'Pending' : (isLate ? 'Late' : isPresent ? 'On-Time' : isLeave ? 'Leave' : isAbsent ? 'Auto-Absent' : 'Absent');
          // Grab selfie and note from logs
          const daySelfie = dayLogs.find(l => l.selfie)?.selfie || null;
          const dayRemark = dayLogs.find(l => l.remark && l.remark.includes('You forgot to log out'))?.remark || dayLogs.find(l => l.remark)?.remark || '';
@@ -374,97 +493,114 @@ export default function AdminDashboard({ profile }: { profile: any }) {
 
       return (
          <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
                <button onClick={() => setSelectedUser(null)} className="flex items-center gap-2 text-zinc-500 hover:text-white"><ChevronLeft size={20} /> Back</button>
                <div className="flex items-center gap-4">
                   <button onClick={() => setCurrentCalendarMonth(new Date(currentYear, currentMonthIdx - 1))}><ChevronLeft size={20} /></button>
-                  <h3 className="text-xl font-bold italic uppercase">{monthYearStr}</h3>
+                  <h3 className="text-sm sm:text-xl font-bold italic uppercase">{monthYearStr}</h3>
                   <button onClick={() => setCurrentCalendarMonth(new Date(currentYear, currentMonthIdx + 1))}><ChevronRight size={20} /></button>
                </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               <div className="bg-green-500/10 border border-green-500/20 p-6 rounded-3xl shadow-lg shadow-green-900/5">
+            <div className="grid grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+               <div className="bg-green-500/10 border border-green-500/20 p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-lg shadow-green-900/5">
                   <div className="flex items-center gap-3 mb-2">
                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                      <p className="text-[10px] font-black text-green-500 uppercase tracking-widest">Present</p>
                   </div>
-                  <h4 className="text-4xl font-black">{presentDays} <small className="text-lg font-bold opacity-50">Days</small></h4>
+                  <h4 className="text-2xl sm:text-4xl font-black">{presentDays} <small className="text-lg font-bold opacity-50">Days</small></h4>
                </div>
-               <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-3xl shadow-lg shadow-red-900/5">
+               <div className="bg-red-500/10 border border-red-500/20 p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-lg shadow-red-900/5">
                   <div className="flex items-center gap-3 mb-2">
                      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                      <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Leaves</p>
                   </div>
-                  <h4 className="text-4xl font-black">{leaveDays} <small className="text-lg font-bold opacity-50">Days</small></h4>
+                  <h4 className="text-2xl sm:text-4xl font-black">{leaveDays} <small className="text-lg font-bold opacity-50">Days</small></h4>
                </div>
-               <div className="bg-orange-500/10 border border-orange-500/20 p-6 rounded-3xl shadow-lg shadow-orange-900/5">
+               <div className="bg-orange-500/10 border border-orange-500/20 p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-lg shadow-orange-900/5">
                   <div className="flex items-center gap-3 mb-2">
                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
                      <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Late Days</p>
                   </div>
-                  <h4 className="text-4xl font-black">{lateDays} <small className="text-lg font-bold opacity-50">Late</small></h4>
+                  <h4 className="text-2xl sm:text-4xl font-black">{lateDays} <small className="text-lg font-bold opacity-50">Late</small></h4>
                </div>
             </div>
-            <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-[32px] grid grid-cols-7 gap-2 shadow-inner">
+            <div className="bg-zinc-900/20 border border-white/5 p-3 sm:p-5 lg:p-6 rounded-[24px] sm:rounded-[32px] grid grid-cols-7 gap-1 sm:gap-2 shadow-inner">
                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} className="text-center text-[10px] font-black text-zinc-700 uppercase p-2">{d}</div>)}
                {calendarGrid}
             </div>
 
-            {/* Calendar Day Detail Popup — with selfie */}
+            {/* Calendar Day Detail Popup — redesigned responsive modal */}
             {selectedDayDetails && (
-               <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-6" onClick={() => setSelectedDayDetails(null)}>
+               <div
+                  className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-6"
+                  onClick={() => setSelectedDayDetails(null)}
+               >
                   <div
-                     className="bg-brand-card border border-white/10 w-full sm:max-w-md rounded-t-[40px] sm:rounded-[40px] overflow-hidden shadow-2xl animate-fade-in flex flex-col"
+                     className="bg-brand-card border border-white/10 w-full sm:max-w-lg lg:max-w-2xl rounded-t-[36px] sm:rounded-[36px] lg:rounded-[44px] overflow-hidden shadow-2xl animate-fade-in flex flex-col lg:flex-row max-h-[92vh] sm:max-h-[85vh]"
                      onClick={e => e.stopPropagation()}
                   >
-                     {/* Selfie header */}
-                     <div className="relative bg-zinc-900 aspect-video sm:aspect-[4/3] flex items-center justify-center overflow-hidden">
-                        {selectedDayDetails.selfie ? (
-                           <>
-                              <Image src={selectedDayDetails.selfie} alt="Selfie" fill className="object-cover" unoptimized />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                              <div className="absolute bottom-4 left-5 right-5">
-                                 <p className="text-[9px] font-black text-brand-red uppercase tracking-widest mb-0.5">Check-in Photo</p>
-                                 <h3 className="text-xl font-black text-white uppercase italic">{selectedDayDetails.userName}</h3>
-                              </div>
-                           </>
-                        ) : (
-                           <div className="flex flex-col items-center gap-3 text-zinc-700 py-10">
-                              <ShieldAlert size={48} />
-                              <p className="text-xs font-black uppercase tracking-widest">No selfie for this day</p>
-                           </div>
-                        )}
+                     {/* ── LEFT / TOP: Selfie Panel with circular avatar ── */}
+                     <div className="relative bg-gradient-to-b from-zinc-900 to-black lg:w-2/5 shrink-0 flex flex-col items-center justify-center p-6 sm:p-8 gap-4 border-b lg:border-b-0 lg:border-r border-white/5">
+                        {/* Close button — always visible */}
                         <button
                            onClick={() => setSelectedDayDetails(null)}
-                           className="absolute top-4 right-4 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/10 text-white hover:bg-brand-red transition-all"
+                           className="absolute top-4 right-4 z-50 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/10 text-white hover:bg-brand-red transition-all"
                         >
                            <X size={18} />
                         </button>
+
+                        {/* Circular selfie frame */}
+                        {selectedDayDetails.selfie ? (
+                           <div className="relative">
+                              {/* Glow ring */}
+                              <div className={`absolute inset-0 rounded-full blur-2xl opacity-40 scale-110 ${
+                                 selectedDayDetails.status === 'Late' ? 'bg-orange-500' : 'bg-green-500'
+                              }`} />
+                              {/* Photo circle */}
+                              <div className={`relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 rounded-full overflow-hidden border-4 shadow-2xl ${
+                                 selectedDayDetails.status === 'Late' ? 'border-orange-500/60' : 'border-green-500/60'
+                              }`}>
+                                 <Image src={selectedDayDetails.selfie} alt="Selfie" fill className="object-cover object-top" unoptimized />
+                              </div>
+                              {/* Status dot */}
+                              <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-2 border-brand-card ${
+                                 selectedDayDetails.status === 'Late' ? 'bg-orange-500' : 'bg-green-500'
+                              }`} />
+                           </div>
+                        ) : (
+                           <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 rounded-full bg-zinc-900 border-2 border-white/10 flex flex-col items-center justify-center gap-2 text-zinc-700">
+                              <ShieldAlert size={40} />
+                              <p className="text-[8px] font-black uppercase tracking-widest text-center px-2">No Photo</p>
+                           </div>
+                        )}
+
+                        {/* Name & Date */}
+                        <div className="text-center space-y-1">
+                           <h3 className="text-lg sm:text-xl font-black italic uppercase text-white">{selectedDayDetails.userName}</h3>
+                           <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">
+                              {new Date(selectedDayDetails.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                           </p>
+                           <span className={`inline-block text-[10px] font-black uppercase px-3 py-1.5 rounded-xl mt-1 ${
+                              selectedDayDetails.status === 'Late' ? 'bg-orange-500/20 text-orange-400' :
+                              selectedDayDetails.status === 'On-Time' ? 'bg-green-500/20 text-green-400' :
+                              selectedDayDetails.status === 'Leave' ? 'bg-blue-500/20 text-blue-400' :
+                              selectedDayDetails.status === 'Auto-Absent' ? 'bg-red-900/40 text-red-300' :
+                              'bg-zinc-800 text-zinc-500'
+                           }`}>{selectedDayDetails.status}</span>
+                        </div>
                      </div>
 
-                     {/* Details */}
-                     <div className="p-6 space-y-4">
+                     {/* ── RIGHT / BOTTOM: Details ── */}
+                     <div className="flex-grow overflow-y-auto p-5 sm:p-6 lg:p-8 space-y-3 scrollbar-hide">
+                        {/* Punch times */}
                         <div className="grid grid-cols-2 gap-3">
-                           <div className="bg-white/5 rounded-2xl p-4">
-                              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Date</p>
-                              <p className="text-sm font-bold text-white">{new Date(selectedDayDetails.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                           </div>
-                           <div className="bg-white/5 rounded-2xl p-4">
-                              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Status</p>
-                              <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg ${
-                                 selectedDayDetails.status === 'Late' ? 'bg-orange-500/20 text-orange-400' :
-                                 selectedDayDetails.status === 'On-Time' ? 'bg-green-500/20 text-green-400' :
-                                 selectedDayDetails.status === 'Leave' ? 'bg-red-500/20 text-red-400' :
-                                 'bg-zinc-800 text-zinc-500'
-                              }`}>{selectedDayDetails.status}</span>
-                           </div>
                            <div className="bg-green-500/10 border border-green-500/10 rounded-2xl p-4">
                               <p className="text-[9px] font-black text-green-600 uppercase tracking-widest mb-1">Punch In</p>
-                              <p className={`text-lg font-black ${selectedDayDetails.status === 'Late' ? 'text-orange-400' : 'text-green-400'}`}>{selectedDayDetails.punchIn}</p>
+                              <p className={`text-xl font-black ${selectedDayDetails.status === 'Late' ? 'text-orange-400' : 'text-green-400'}`}>{selectedDayDetails.punchIn}</p>
                            </div>
                            <div className="bg-red-500/10 border border-red-500/10 rounded-2xl p-4">
                               <p className="text-[9px] font-black text-red-600 uppercase tracking-widest mb-1">Punch Out</p>
-                              <p className={`text-lg font-black ${selectedDayDetails.punchOut !== '--:--' ? 'text-white' : 'text-zinc-700'}`}>{selectedDayDetails.punchOut}</p>
+                              <p className={`text-xl font-black ${selectedDayDetails.punchOut !== '--:--' ? 'text-white' : 'text-zinc-700'}`}>{selectedDayDetails.punchOut}</p>
                            </div>
                         </div>
 
@@ -479,10 +615,12 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                         {/* Location */}
                         {selectedDayDetails.location && (
                            <div className="bg-white/5 rounded-2xl p-4 flex items-start gap-3">
-                              <MapPin size={16} className="text-brand-red shrink-0 mt-0.5" />
-                              <div>
+                              <div className="w-8 h-8 bg-brand-red/10 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                                 <MapPin size={14} className="text-brand-red" />
+                              </div>
+                              <div className="min-w-0">
                                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Location</p>
-                                 <p className="text-xs text-zinc-300 font-bold leading-relaxed">{selectedDayDetails.location}</p>
+                                 <p className="text-xs text-zinc-300 font-bold leading-relaxed break-words">{selectedDayDetails.location}</p>
                                  {selectedDayDetails.lat && (
                                     <a href={`https://maps.google.com/?q=${selectedDayDetails.lat},${selectedDayDetails.lon}`} target="_blank"
                                        className="inline-flex items-center gap-1.5 mt-2 text-[9px] font-black text-brand-red uppercase tracking-widest hover:underline">
@@ -493,17 +631,23 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                            </div>
                         )}
 
-                        {/* Auto-logout System Note */}
+                        {/* System Note */}
                         {selectedDayDetails.remark && (
-                           <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4 mt-2">
-                              <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-2 mb-1">
+                           <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4">
+                              <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-2 mb-1.5">
                                  <Activity size={10} /> System Note
                               </p>
                               <p className="text-xs text-orange-400 font-bold leading-relaxed">{selectedDayDetails.remark}</p>
                            </div>
                         )}
 
-                        <button onClick={() => setSelectedDayDetails(null)} className="w-full py-4 bg-brand-red text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-red-900/30">Close</button>
+                        {/* Close */}
+                        <button
+                           onClick={() => setSelectedDayDetails(null)}
+                           className="w-full py-4 bg-brand-red text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-red-900/30 mt-1"
+                        >
+                           ← Close
+                        </button>
                      </div>
                   </div>
                </div>
@@ -601,7 +745,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                </div>
             </header>
 
-            <main className="flex-grow p-6 lg:p-10 overflow-y-auto bg-black scrollbar-hide">
+            <main className="flex-grow p-4 sm:p-6 lg:p-10 pb-32 lg:pb-10 overflow-y-auto bg-black scrollbar-hide">
                {activeTab === 'dashboard' && (() => {
                   const groupedLogsMap = new Map();
                   [...logs].reverse().forEach((l: any) => {
@@ -645,10 +789,13 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                   return (
                   <div className="space-y-6 animate-fade-in">
                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-2xl lg:text-3xl font-black italic uppercase underline decoration-brand-red decoration-4">Attendance History</h2>
-                        <button onClick={fetchData} className="flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all self-start sm:self-auto">
+                        <h2 className="text-xl sm:text-2xl lg:text-3xl font-black italic uppercase underline decoration-brand-red decoration-4">Attendance History</h2>
+                        <div className="flex items-center gap-3 self-start sm:self-auto">
+                        <button onClick={fetchData} className="flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all">
                            <RefreshCcw size={14} /> Refresh
                         </button>
+                        <NotificationToggleButton />
+                        </div>
                      </div>
 
                      {/* Filter Bar */}
@@ -684,6 +831,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                            <option value="Checked Out">Checked Out</option>
                            <option value="Late">Late</option>
                            <option value="Leave">Leave</option>
+                            <option value="Absent">Absent</option>
                         </select>
                      </div>
 
@@ -738,6 +886,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                                           log.status === 'Checked In' ? 'bg-green-500/15 text-green-400' :
                                           log.status === 'Checked Out' ? 'bg-blue-500/15 text-blue-400' :
                                           log.status === 'Leave' ? 'bg-red-500/15 text-red-400' :
+                                          log.status === 'Absent' ? 'bg-red-900/40 text-red-300 border border-red-700/30' :
                                           'bg-zinc-800 text-zinc-500'
                                        }`}>{log.status}</span>
                                     </td>
@@ -759,7 +908,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                         </table>
                      </div>
 
-                     {/* Mobile Cards — with selfie */}
+                     {/* Mobile Cards — circular selfie redesign */}
                      <div className="lg:hidden space-y-3">
                         {isLoading ? (
                            <div className="py-20 text-center"><Loader className="mx-auto" /><p className="text-zinc-700 font-black uppercase text-[10px] tracking-widest mt-4">Loading...</p></div>
@@ -768,69 +917,76 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                         ) : pagedLogs.map((log, i) => {
                            const empName = (log.userName && log.userName !== 'Unknown User') ? log.userName :
                               (workforce.find(w => w.employeeId === log.employeeId)?.name || 'Unknown');
+                           const ringColor = log.status === 'Late' ? 'border-orange-500/60' :
+                              log.status === 'Checked In' ? 'border-green-500/60' :
+                              log.status === 'Checked Out' ? 'border-blue-500/60' :
+                              'border-zinc-700/40';
+                           const badgeColor = log.status === 'Late' ? 'bg-orange-500/20 text-orange-400' :
+                              log.status === 'Checked In' ? 'bg-green-500/20 text-green-400' :
+                              log.status === 'Checked Out' ? 'bg-blue-500/20 text-blue-400' :
+                              log.status === 'Absent' ? 'bg-red-900/30 text-red-300' :
+                              'bg-zinc-800 text-zinc-500';
                            return (
                            <div key={i}
                               onClick={() => { setSelectedGroupLog({ ...log, userName: empName, punchIn: log.punchIn, punchOut: log.punchOut, latestSelfie: log.selfie, punchOutSelfie: log.punchOutSelfie, latestLocation: log.location }); setActivePhotoTab('in'); }}
-                              className="bg-brand-card/40 border border-brand-border rounded-[24px] overflow-hidden active:scale-[0.98] transition-all cursor-pointer"
+                              className="bg-brand-card/40 border border-brand-border rounded-[20px] p-4 active:scale-[0.98] transition-all cursor-pointer flex items-start gap-4"
                            >
-                              {/* Selfie strip at top */}
-                              {log.selfie && (
-                                 <div className="relative h-36 bg-zinc-900 overflow-hidden">
-                                    <Image src={log.selfie} alt="Selfie" fill className="object-cover object-top" unoptimized />
-                                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/90" />
-                                    <div className="absolute bottom-0 left-0 right-0 px-4 pb-3 flex items-center justify-between">
-                                       <span className="text-white font-bold text-xs">{empName}</span>
-                                       <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
-                                          log.status === 'Late' ? 'bg-orange-500/80 text-white' :
-                                          log.status === 'Checked In' ? 'bg-green-600/80 text-white' :
-                                          log.status === 'Checked Out' ? 'bg-blue-600/80 text-white' :
-                                          'bg-red-600/80 text-white'
-                                       }`}>{log.status}</span>
-                                    </div>
-                                 </div>
-                              )}
-                              <div className="p-4 space-y-3">
-                                 {!log.selfie && (
-                                    <div className="flex items-center justify-between">
-                                       <div>
-                                          <div className="font-bold text-white text-sm">{empName}</div>
-                                          <div className="text-[9px] text-zinc-600 font-bold uppercase">{log.employeeId}</div>
+                              {/* Circular Selfie Avatar */}
+                              <div className="shrink-0 relative">
+                                 <div className={`w-14 h-14 rounded-full overflow-hidden border-2 ${ringColor} bg-zinc-900 shadow-lg`}>
+                                    {log.selfie ? (
+                                       <Image src={log.selfie} alt={empName} className="w-full h-full object-cover object-top" width={56} height={56} unoptimized />
+                                    ) : (
+                                       <div className="w-full h-full flex items-center justify-center text-zinc-600 font-black text-xl">
+                                          {empName.charAt(0).toUpperCase()}
                                        </div>
-                                       <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${
-                                          log.status === 'Late' ? 'bg-orange-500/15 text-orange-400' :
-                                          log.status === 'Checked In' ? 'bg-green-500/15 text-green-400' :
-                                          log.status === 'Checked Out' ? 'bg-blue-500/15 text-blue-400' :
-                                          'bg-red-500/15 text-red-400'
-                                       }`}>{log.status}</span>
+                                    )}
+                                 </div>
+                                 {/* Status dot */}
+                                 <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-brand-card ${
+                                    log.status === 'Late' ? 'bg-orange-500' :
+                                    log.status === 'Checked In' ? 'bg-green-500' :
+                                    log.status === 'Checked Out' ? 'bg-blue-500' :
+                                    'bg-zinc-700'
+                                 }`} />
+                              </div>
+
+                              {/* Card Content */}
+                              <div className="flex-grow min-w-0 space-y-2">
+                                 {/* Name + Badge */}
+                                 <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                       <div className="font-bold text-white text-sm leading-tight truncate">{empName}</div>
+                                       <div className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider">{log.employeeId} &bull; {workforce.find(w => w.employeeId === log.employeeId)?.department || ''}</div>
                                     </div>
-                                 )}
-                                 <div className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
-                                    <div>
-                                       <p className="text-[8px] font-black text-zinc-700 uppercase">Date</p>
-                                       <p className="text-xs font-bold text-white">{new Date(log.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                                    <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg shrink-0 ${badgeColor}`}>{log.status}</span>
+                                 </div>
+
+                                 {/* Date + Times row */}
+                                 <div className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5">
+                                    <div className="shrink-0">
+                                       <p className="text-[8px] font-black text-zinc-700 uppercase leading-none">Date</p>
+                                       <p className="text-xs font-bold text-zinc-300 leading-tight mt-0.5">
+                                          {new Date(log.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                       </p>
                                     </div>
-                                    <div className="w-px h-6 bg-white/10" />
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex flex-col text-right">
-                                           <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest leading-none">IN</span>
-                                           <span className={`text-xs font-black ${log.punchIn && log.status === 'Late' ? 'text-orange-400' : 'text-green-400'}`}>{log.punchIn || '--:--'}</span>
-                                        </div>
-                                        <div className="text-zinc-800 font-black">/</div>
-                                        <div className="flex flex-col">
-                                           <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest leading-none">OUT</span>
-                                           <span className="text-xs font-black text-blue-400">{log.punchOut || '--:--'}</span>
-                                        </div>
-                                     </div>
-                                    <div className="w-px h-6 bg-white/10" />
-                                    <div className="text-right">
-                                       <p className="text-[8px] font-black text-zinc-700 uppercase">{log.employeeId}</p>
-                                       <p className="text-[10px] font-bold text-zinc-500">{workforce.find(w => w.employeeId === log.employeeId)?.department || ''}</p>
+                                    <div className="w-px h-6 bg-white/10 shrink-0" />
+                                    <div className="shrink-0">
+                                       <p className="text-[8px] font-black text-zinc-700 uppercase leading-none">In</p>
+                                       <p className={`text-xs font-black leading-tight mt-0.5 ${log.punchIn && log.status === 'Late' ? 'text-orange-400' : 'text-green-400'}`}>{log.punchIn || '--:--'}</p>
+                                    </div>
+                                    <div className="w-px h-6 bg-white/10 shrink-0" />
+                                    <div className="shrink-0">
+                                       <p className="text-[8px] font-black text-zinc-700 uppercase leading-none">Out</p>
+                                       <p className="text-xs font-black text-blue-400 leading-tight mt-0.5">{log.punchOut || '--:--'}</p>
                                     </div>
                                  </div>
+
+                                 {/* Location */}
                                  {log.location && (
-                                    <div className="flex items-center gap-2 px-1">
-                                       <MapPin size={11} className="text-brand-red shrink-0" />
-                                       <span className="text-[10px] text-zinc-500 font-bold truncate">{log.location}</span>
+                                    <div className="flex items-center gap-1.5">
+                                       <MapPin size={10} className="text-brand-red shrink-0" />
+                                       <span className="text-[10px] text-zinc-600 font-bold truncate">{log.location}</span>
                                     </div>
                                  )}
                               </div>
@@ -854,7 +1010,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                {activeTab === 'employees' && (
                   <div className="space-y-10 animate-fade-in">
                      {!selectedUser ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                            {workforce.filter(w => w.name.toLowerCase().includes(search.toLowerCase()) || w.employeeId.includes(search)).map((emp, i) => (
                               <div key={i} onClick={() => setSelectedUser(emp)} className="bg-brand-card/40 border border-brand-border p-6 rounded-[32px] hover:border-brand-red cursor-pointer text-center group">
                                  <div className="w-20 h-20 bg-zinc-900 rounded-3xl flex items-center justify-center font-black mx-auto mb-4 group-hover:bg-brand-red transition-all">{emp.name.charAt(0)}</div>
@@ -868,9 +1024,9 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                )}
 
                {activeTab === 'leaves' && (
-                  <div className="space-y-12 animate-fade-in">
+                  <div className="space-y-8 sm:space-y-12 animate-fade-in">
                      <div className="space-y-8">
-                        <h2 className="text-3xl font-black italic uppercase underline decoration-brand-red decoration-4">Pending Approvals</h2>
+                        <h2 className="text-2xl lg:text-3xl font-black italic uppercase underline decoration-brand-red decoration-4">Pending Approvals</h2>
                         {/* Desktop View */}
                         <div className="hidden lg:block vfx-card !bg-brand-card/20 rounded-[40px] border-white/5 overflow-hidden shadow-2xl">
                            <table className="w-full text-left">
@@ -941,9 +1097,9 @@ export default function AdminDashboard({ profile }: { profile: any }) {
 
                      </div>
 
-                     <div className="space-y-8 pb-20">
-                        <h3 className="text-xl font-bold uppercase text-zinc-700 italic border-l-4 border-white/10 pl-4">Past Leave Requests</h3>
-                        <div className="vfx-card !bg-brand-card/10 rounded-[40px] border-white/5 overflow-hidden opacity-80 hover:opacity-100 transition-opacity">
+                     <div className="space-y-6 pb-24">
+                        <h3 className="text-lg lg:text-xl font-bold uppercase text-zinc-700 italic border-l-4 border-white/10 pl-4">Past Leave Requests</h3>
+                        <div className="hidden lg:block vfx-card !bg-brand-card/10 rounded-[40px] border-white/5 overflow-hidden opacity-80 hover:opacity-100 transition-opacity">
                            <table className="w-full text-left">
                               <thead>
                                  <tr className="bg-white/5 text-[9px] font-black uppercase text-zinc-700 tracking-[0.2em]"><th className="px-8 py-4">Employee</th><th className="px-8 py-4">Status</th><th className="px-8 py-4">Admin Note</th><th className="px-8 py-4">Date Resolved</th></tr>
@@ -964,15 +1120,35 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                               </tbody>
                            </table>
                         </div>
+
+                        {/* Mobile Cards — Past Leave History */}
+                        <div className="lg:hidden space-y-3 mt-3">
+                           {leaves.filter(l => l.status !== 'pending').slice(0, 10).length === 0 ? (
+                              <div className="text-center text-zinc-700 font-black uppercase text-xs py-10">No resolved requests</div>
+                           ) : leaves.filter(l => l.status !== 'pending').slice(0, 10).map((request, i) => (
+                              <div key={i} className="bg-brand-card/20 border border-white/5 rounded-[20px] p-4 space-y-2 opacity-80">
+                                 <div className="flex items-center justify-between">
+                                    <div className="font-bold text-zinc-300 text-sm">{request.employeeName}</div>
+                                    <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${request.status === 'approved' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>{request.status}</span>
+                                 </div>
+                                 {request.adminNote && (
+                                    <p className="text-[10px] text-zinc-600 italic leading-relaxed pl-2 border-l-2 border-white/10">&quot;{request.adminNote}&quot;</p>
+                                 )}
+                                 <div className="text-[9px] font-black text-zinc-800 uppercase tracking-widest">
+                                    {request.processedAt ? new Date(request.processedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) : 'Date N/A'}
+                                 </div>
+                              </div>
+                           ))}
+                        </div>
                      </div>
                   </div>
                )}
 
                {activeTab === 'users' && (
                   <div className="space-y-8 animate-fade-in">
-                     <div className="flex justify-between items-center">
-                        <h2 className="text-3xl font-black italic uppercase italic underline decoration-brand-red decoration-4">Manage Users</h2>
-                        <button onClick={() => setShowAddUserModal(true)} className="flex items-center gap-3 bg-brand-red text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-red-900/40 hover:bg-red-700 transition-all active:scale-95">
+                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                        <h2 className="text-xl sm:text-2xl lg:text-3xl font-black italic uppercase underline decoration-brand-red decoration-4">Manage Users</h2>
+                        <button onClick={() => setShowAddUserModal(true)} className="flex items-center gap-3 bg-brand-red text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-red-900/40 hover:bg-red-700 transition-all active:scale-95 self-start sm:self-auto">
                            <UserPlus size={16} /> Create New User
                         </button>
                      </div>
@@ -1060,12 +1236,12 @@ export default function AdminDashboard({ profile }: { profile: any }) {
          {/* Add User Modal */}
          {showAddUserModal && (
             <div className="fixed inset-0 bg-black/95 z-[1000] flex items-center justify-center p-6 backdrop-blur-2xl">
-               <div className="bg-brand-card border border-white/10 w-full max-w-xl p-10 rounded-[40px] space-y-8 animate-fade-in">
+               <div className="bg-brand-card border border-white/10 w-full max-w-xl p-6 sm:p-10 rounded-[28px] sm:rounded-[40px] space-y-6 sm:space-y-8 animate-fade-in max-h-[90vh] overflow-y-auto">
                   <div className="flex justify-between items-center">
                      <h3 className="text-2xl font-black italic uppercase">Add New Employee</h3>
                      <button onClick={() => setShowAddUserModal(false)}><X size={24} /></button>
                   </div>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Full Name</label>
                         <input type="text" placeholder="John Doe" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-brand-red" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
@@ -1091,7 +1267,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                         <input type="text" placeholder="Set password" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-brand-red" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
                      </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Department</label>
                         <select className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-brand-red" value={newUser.department} onChange={(e) => setNewUser({ ...newUser, department: e.target.value, staffType: e.target.value })}>
@@ -1115,12 +1291,12 @@ export default function AdminDashboard({ profile }: { profile: any }) {
 
          {isEditingUser && (
             <div className="fixed inset-0 bg-black/95 z-[1000] flex items-center justify-center p-6 backdrop-blur-2xl">
-               <div className="bg-brand-card border border-white/10 w-full max-w-xl p-10 rounded-[40px] space-y-8">
+               <div className="bg-brand-card border border-white/10 w-full max-w-xl p-6 sm:p-10 rounded-[28px] sm:rounded-[40px] space-y-6 sm:space-y-8 max-h-[90vh] overflow-y-auto">
                   <div className="flex justify-between items-center">
                      <h3 className="text-2xl font-black italic uppercase">Edit Employee: {isEditingUser.employeeId}</h3>
                      <button onClick={() => setIsEditingUser(null)}><X size={24} /></button>
                   </div>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-zinc-500 italic">Full Name</label>
                         <input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none" value={isEditingUser.name} onChange={(e) => setIsEditingUser({ ...isEditingUser, name: e.target.value })} />
@@ -1158,101 +1334,133 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                </div>
             </div>
          )}
-         {/* Detailed Log Modal */}
+         {/* Detailed Log Modal — responsive bottom-sheet (mobile) / side-by-side (desktop) */}
          {selectedGroupLog && (
-            <div className="fixed inset-0 bg-black/95 z-[2000] flex items-center justify-center p-6 backdrop-blur-3xl animate-fade-in" onClick={() => setSelectedGroupLog(null)}>
-               <div className="bg-brand-card border border-white/10 w-full max-w-4xl rounded-[48px] overflow-hidden shadow-3xl flex flex-col lg:flex-row relative" onClick={e => e.stopPropagation()}>
+            <div
+               className="fixed inset-0 bg-black/95 z-[2000] flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-6 backdrop-blur-3xl animate-fade-in"
+               onClick={() => setSelectedGroupLog(null)}
+            >
+               <div
+                  className="bg-brand-card border border-white/10 w-full sm:max-w-4xl rounded-t-[36px] sm:rounded-[40px] lg:rounded-[48px] overflow-hidden shadow-3xl flex flex-col lg:flex-row relative max-h-[92vh] sm:max-h-[88vh]"
+                  onClick={e => e.stopPropagation()}
+               >
+                  {/* Sticky close button — always visible */}
                   <button
                      onClick={() => setSelectedGroupLog(null)}
-                     className="absolute top-6 right-6 z-50 w-12 h-12 bg-white/5 hover:bg-brand-red text-white rounded-2xl flex items-center justify-center transition-all"
+                     className="absolute top-4 right-4 z-50 w-10 h-10 sm:w-12 sm:h-12 bg-black/60 hover:bg-brand-red text-white rounded-2xl flex items-center justify-center transition-all border border-white/10 backdrop-blur-sm shadow-xl"
                   >
-                     <X size={24} />
+                     <X size={20} />
                   </button>
 
-                  <div 
-                     className={`w-full lg:w-1/2 aspect-square lg:aspect-auto bg-zinc-900 flex flex-col relative border-r border-white/5 ${selectedGroupLog.punchOutSelfie ? 'cursor-pointer group/photo' : ''}`}
-                     onClick={() => { if(selectedGroupLog.punchOutSelfie) setActivePhotoTab(p => p === 'in' ? 'out' : 'in'); }}
+                  {/* LEFT / TOP: Selfie Panel */}
+                  <div
+                     className={`relative w-full lg:w-5/12 h-[48vh] lg:h-auto bg-zinc-900 border-b lg:border-b-0 lg:border-r border-white/5 overflow-hidden shrink-0 ${selectedGroupLog.punchOutSelfie ? 'cursor-pointer' : ''}`}
+                     onClick={() => { if (selectedGroupLog.punchOutSelfie) setActivePhotoTab(p => p === 'in' ? 'out' : 'in'); }}
                   >
-                     {activePhotoTab === 'in' ? (
-                        selectedGroupLog.latestSelfie ? (
-                           <div className="relative flex-1 transition-all animate-fade-in">
-                              <Image src={selectedGroupLog.latestSelfie} alt="Punch In Selfie" className="w-full h-full object-cover" width={800} height={800} unoptimized />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-                              <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-6 sm:right-10">
-                                 <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1.5 flex items-center justify-between">
-                                    Check-in Photo
-                                    {selectedGroupLog.punchOutSelfie && <span className="bg-white/10 text-white px-2 py-1 rounded-md text-[8px] group-hover/photo:bg-white/20 transition-all">Click to see Check-Out</span>}
-                                 </p>
-                                 <h3 className="text-3xl font-black italic uppercase text-white truncate">{selectedGroupLog.userName}</h3>
+                     <div className="relative w-full h-full">
+                        {activePhotoTab === 'in' ? (
+                           selectedGroupLog.latestSelfie ? (
+                              <>
+                                 <Image src={selectedGroupLog.latestSelfie} alt="Check-in" fill className="object-cover object-center" unoptimized />
+                                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
+                                 <div className="absolute bottom-4 left-5 right-14">
+                                    <p className="text-[9px] font-black text-green-400 uppercase tracking-widest mb-0.5">Check-in Photo</p>
+                                    <h3 className="text-xl sm:text-2xl font-black italic uppercase text-white truncate">{selectedGroupLog.userName}</h3>
+                                    {selectedGroupLog.punchOutSelfie && (
+                                       <span className="inline-block mt-1 bg-white/10 text-white/60 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide">Tap → Check-Out</span>
+                                    )}
+                                 </div>
+                              </>
+                           ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-zinc-800 p-8">
+                                 <ShieldAlert size={48} />
+                                 <p className="text-xs font-black uppercase tracking-widest text-center">No Check-in Photo</p>
+                                 <p className="text-lg font-black text-white/20 uppercase italic truncate max-w-full">{selectedGroupLog.userName}</p>
                               </div>
-                           </div>
+                           )
                         ) : (
-                           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-zinc-800 animate-fade-in">
-                              <ShieldAlert size={64} />
-                              <p className="font-bold text-xs uppercase tracking-widest">No Check-in Photo</p>
+                           <>
+                              <Image src={selectedGroupLog.punchOutSelfie} alt="Check-out" fill className="object-cover object-center" unoptimized />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
+                              <div className="absolute bottom-4 left-5 right-14">
+                                 <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-0.5">Check-out Photo</p>
+                                 <h3 className="text-xl sm:text-2xl font-black italic uppercase text-white truncate">{selectedGroupLog.userName}</h3>
+                                 {selectedGroupLog.latestSelfie && (
+                                    <span className="inline-block mt-1 bg-white/10 text-white/60 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide">Tap → Check-In</span>
+                                 )}
+                              </div>
+                           </>
+                        )}
+                     </div>
+                  </div>
+
+                  {/* RIGHT / BOTTOM: Details Panel — scrollable */}
+                  <div className="flex-grow overflow-y-auto p-5 sm:p-8 lg:p-10 space-y-4 sm:space-y-6 scrollbar-hide">
+                     {/* Hours Worked */}
+                     <div>
+                        <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest mb-1">Hours Worked</p>
+                        <div className="text-3xl sm:text-5xl font-black italic uppercase text-white leading-none">
+                           {calculateHours(selectedGroupLog.punchIn, selectedGroupLog.punchOut)}
+                        </div>
+                        <p className="text-xs font-bold text-zinc-600 mt-1">Active working duration</p>
+                     </div>
+
+                     {/* Punch Times */}
+                     <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-green-500/10 border border-green-500/10 rounded-2xl p-4">
+                           <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mb-1">Punch In</p>
+                           <div className="text-xl sm:text-2xl font-black text-white">{selectedGroupLog.punchIn || '--:--'}</div>
+                        </div>
+                        <div className="bg-red-500/10 border border-red-500/10 rounded-2xl p-4">
+                           <p className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-1">Punch Out</p>
+                           <div className="text-xl sm:text-2xl font-black text-white">{selectedGroupLog.punchOut || '--:--'}</div>
+                        </div>
+                     </div>
+
+                     {/* Status */}
+                     <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between">
+                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Status</p>
+                        <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-xl ${
+                           selectedGroupLog.status === 'Late' ? 'bg-orange-500/20 text-orange-400' :
+                           selectedGroupLog.status === 'Checked In' ? 'bg-green-500/20 text-green-400' :
+                           selectedGroupLog.status === 'Checked Out' ? 'bg-blue-500/20 text-blue-400' :
+                           selectedGroupLog.status === 'Absent' ? 'bg-red-900/40 text-red-300 border border-red-700/30' :
+                           'bg-zinc-800 text-zinc-500'
+                        }`}>{selectedGroupLog.status}</span>
+                     </div>
+
+                     {/* Location */}
+                     {selectedGroupLog.latestLocation && (
+                        <div className="bg-white/5 rounded-2xl p-4 flex items-start gap-3">
+                           <div className="w-9 h-9 bg-brand-red/10 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                              <MapPin size={16} className="text-brand-red" />
                            </div>
-                        )
-                     ) : (
-                        <div className="relative flex-1 transition-all animate-fade-in">
-                           <Image src={selectedGroupLog.punchOutSelfie} alt="Punch Out Selfie" className="w-full h-full object-cover" width={800} height={800} unoptimized />
-                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-                           <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-6 sm:right-10">
-                              <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1.5 flex items-center justify-between">
-                                 Check-out Photo
-                                 {selectedGroupLog.latestSelfie && <span className="bg-white/10 text-white px-2 py-1 rounded-md text-[8px] group-hover/photo:bg-white/20 transition-all">Click to see Check-In</span>}
-                              </p>
-                              <h3 className="text-3xl font-black italic uppercase text-white truncate">{selectedGroupLog.userName}</h3>
+                           <div className="min-w-0">
+                              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Location</p>
+                              <p className="text-sm font-bold text-white leading-relaxed break-words">{selectedGroupLog.latestLocation}</p>
+                              {selectedGroupLog.lat && (
+                                 <a
+                                    href={`https://maps.google.com/?q=${selectedGroupLog.lat},${selectedGroupLog.lon}`}
+                                    target="_blank"
+                                    className="inline-flex items-center gap-1.5 mt-2 text-[9px] font-black text-brand-red uppercase tracking-widest hover:underline"
+                                 >
+                                    <ExternalLink size={11} /> Open on Google Maps
+                                 </a>
+                              )}
                            </div>
                         </div>
                      )}
-                  </div>
 
-                  <div className="p-10 lg:p-14 flex-grow flex flex-col justify-between space-y-10">
-                     <div className="space-y-8">
-                        <div className="flex justify-between items-start">
-                           <div>
-                              <p className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.2em] mb-2">Hours Worked Today</p>
-                              <div className="text-5xl font-black italic uppercase text-white leading-none">{calculateHours(selectedGroupLog.punchIn, selectedGroupLog.punchOut)}</div>
-                              <p className="text-xs font-bold text-zinc-500 mt-2">Active Working Duration Today</p>
-                           </div>
-                        </div>
+                     {/* Employee ID */}
+                     <p className="text-[9px] font-black text-zinc-800 uppercase tracking-widest text-center pb-1">{selectedGroupLog.employeeId}</p>
 
-                        <div className="grid grid-cols-2 gap-8">
-                           <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
-                              <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mb-2">Punch In</p>
-                              <div className="text-2xl font-black text-white">{selectedGroupLog.punchIn || '--:--'}</div>
-                           </div>
-                           <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
-                              <p className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-2">Punch Out</p>
-                              <div className="text-2xl font-black text-white">{selectedGroupLog.punchOut || '--:--'}</div>
-                           </div>
-                        </div>
-
-                        <div className="space-y-3">
-                           <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest pl-1">Location</p>
-                           <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-start gap-4">
-                              <div className="w-10 h-10 bg-brand-red/10 rounded-xl flex items-center justify-center shrink-0">
-                                 <MapPin size={20} className="text-brand-red" />
-                              </div>
-                              <div>
-                                 <p className="text-white font-bold text-sm leading-relaxed">{selectedGroupLog.latestLocation}</p>
-                                 {selectedGroupLog.lat && (
-                                    <a
-                                       href={`https://maps.google.com/?q=${selectedGroupLog.lat},${selectedGroupLog.lon}`}
-                                       target="_blank"
-                                       className="inline-flex items-center gap-2 mt-4 text-[10px] font-black bg-white text-black px-6 py-3 rounded-xl hover:bg-brand-red hover:text-white transition-all uppercase tracking-widest"
-                                    >
-                                       Open on Google Maps
-                                    </a>
-                                 )}
-                              </div>
-                           </div>
-                        </div>
-                     </div>
-
-                     <div className="space-y-4">
-                        <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest text-center italic">Employee ID: {selectedGroupLog.employeeId}</p>
-                     </div>
+                     {/* Back button — extra tap target on mobile */}
+                     <button
+                        onClick={() => setSelectedGroupLog(null)}
+                        className="lg:hidden w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-black uppercase tracking-widest text-zinc-500 active:bg-white/10 transition-all"
+                     >
+                        ← Close
+                     </button>
                   </div>
                </div>
             </div>
