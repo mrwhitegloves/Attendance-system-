@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const counter = await Counter.findOneAndUpdate(
       { id: 'employeeId' },
       { $inc: { seq: 1 } },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
 
     const seqString = String(counter.seq).padStart(3, '0');
@@ -62,7 +62,7 @@ export async function PUT(request: Request) {
       updateBody.password = password;
     }
 
-    const updatedUser = await User.findByIdAndUpdate(id, updateBody, { new: true });
+    const updatedUser = await User.findByIdAndUpdate(id, updateBody, { returnDocument: 'after' });
     return NextResponse.json(updatedUser);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -23,7 +23,7 @@ export async function POST(request: Request) {
         keys: subscription.keys,
         adminId: 'admin',
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     return NextResponse.json({ success: true });
