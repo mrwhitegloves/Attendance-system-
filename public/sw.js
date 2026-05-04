@@ -58,20 +58,30 @@ self.addEventListener('message', (event) => {
 
   const firstName = (employeeName || 'there').split(' ')[0];
 
+  const inMessages = [
+    `Hi ${firstName}! 🌟 15 mins to go! Shift shuru hone wali hai, jaldi punch in karein! ⏱️`,
+    `Namaste ${firstName}! 🙏 Ready for the day? Sirf 15 minute bache hain punch in ke liye! 🚀`,
+    `Hello ${firstName}! 👋 Aaj ka din acha jaye! Don't forget to punch in within 15 mins. ⏰`,
+    `Hi ${firstName}! ✨ Kaam ka waqt ho gaya hai! Please mark your attendance in 15 mins. 📅`
+  ];
+
+  const outMessages = [
+    `Great job today, ${firstName}! 🌟 Shift khatam hone mein bas 15 minute baaki hain. Punch out zaroor karein! 🏁`,
+    `Thak gaye ${firstName}? 🛋️ Just 15 mins left! Yaad se punch out kar lena. Good job! 👍`,
+    `Hello ${firstName}! 👋 Din khatam! Don't forget to punch out in 15 mins. Ghar jaane ka time! 🏠`,
+    `Awesome work ${firstName}! ✨ Bas 15 minute aur! Punch out karna mat bhoolna. Take care! 🌇`
+  ];
+
   // Only remind to punch in if employee hasn't punched in yet today
   if (!isCheckedIn && expectedInTime) {
-    scheduleLocalReminder(expectedInTime, '⏰ Punch In Reminder',
-      `Hi ${firstName}! Your shift starts at ${formatTime(expectedInTime)}. You have 15 minutes to punch in.`,
-      'reminder-in'
-    );
+    const randomInMsg = inMessages[Math.floor(Math.random() * inMessages.length)];
+    scheduleLocalReminder(expectedInTime, '⏰ Punch In Reminder', randomInMsg, 'reminder-in');
   }
 
   // Only remind to punch out if employee is currently checked in
   if (isCheckedIn && !isCheckedOut && expectedOutTime) {
-    scheduleLocalReminder(expectedOutTime, '🏁 Punch Out Reminder',
-      `Hi ${firstName}! Your shift ends at ${formatTime(expectedOutTime)}. Don't forget to punch out in 15 minutes.`,
-      'reminder-out'
-    );
+    const randomOutMsg = outMessages[Math.floor(Math.random() * outMessages.length)];
+    scheduleLocalReminder(expectedOutTime, '🏁 Punch Out Reminder', randomOutMsg, 'reminder-out');
   }
 });
 
