@@ -30,17 +30,23 @@ export interface PushPayload {
 }
 
 /**
- * Sends a push notification to every stored admin subscription.
+ * Sends a push notification to stored subscriptions.
  * Automatically removes expired/invalid subscriptions (HTTP 410).
  *
  * @returns { sent, failed, total }
  */
-export async function sendPushToAdmins(payload: PushPayload): Promise<{ sent: number; failed: number; total: number }> {
+export async function sendPushToAdmins(payload: PushPayload, targetRole: 'admin' | 'employee' | 'all' = 'admin'): Promise<{ sent: number; failed: number; total: number }> {
   ensureVapidConfigured();
   if (!vapidConfigured) return { sent: 0, failed: 0, total: 0 };
 
   await dbConnect();
-  const subscriptions = await PushSubscriptionModel.find({}).lean();
+  
+  // Backward compatibility: If no role is stored in DB, we treat them as admins for now.
+  const query = targetRole === 'all' ? {} : 
+                targetRole === 'admin' ? { $or: [{ role: 'admin' }, { adminId: 'admin' }, { role: { $exists: false } }] } 
+                                       : { role: 'employee' };
+                                       
+  const subscriptions = await PushSubscriptionModel.find(query).lean();
 
   if (subscriptions.length === 0) {
     return { sent: 0, failed: 0, total: 0 };

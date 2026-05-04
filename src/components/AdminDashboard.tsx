@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -29,7 +29,9 @@ import {
    Save,
    Plus,
    RefreshCcw,
-   Bell
+   Bell,
+   Send,
+   MessageSquare
 } from 'lucide-react';
 import Loader from './Loader';
 import { adminFetch } from '@/lib/adminFetch';
@@ -221,6 +223,9 @@ export default function AdminDashboard({ profile }: { profile: any }) {
    // Notification State
    const [notificationPermission, setNotificationPermission] = useState('default');
    const prevPendingCount = useRef<number | null>(null);
+   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+   const [broadcastMessage, setBroadcastMessage] = useState({ title: '', body: '' });
+   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
    useEffect(() => {
       if ("Notification" in window) {
@@ -245,6 +250,32 @@ export default function AdminDashboard({ profile }: { profile: any }) {
       }
       prevPendingCount.current = currentCount;
    }, [leaves, notificationPermission]);
+
+   const handleBroadcast = async () => {
+      if(!broadcastMessage.title || !broadcastMessage.body) {
+         alert("Please enter title and body.");
+         return;
+      }
+      setIsBroadcasting(true);
+      try {
+         const res = await fetch('/api/push/broadcast', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(broadcastMessage)
+         });
+         const data = await res.json();
+         if(data.success) {
+            alert(`Sent to ${data.sent} devices!`);
+            setShowBroadcastModal(false);
+            setBroadcastMessage({ title: '', body: '' });
+         } else {
+            alert('Failed: ' + data.error);
+         }
+      } catch(err) {
+         alert("Error broadcasting");
+      }
+      setIsBroadcasting(false);
+   };
 
    const fetchData = async () => {
       setIsLoading(true);
@@ -738,7 +769,12 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                </div>
                <div className="flex items-center gap-6">
                   <div className="text-right">
-                     <div className="text-sm font-bold">Administrator</div>
+                     <div className="text-sm font-bold flex items-center justify-end gap-2">
+                        Administrator
+                        <button onClick={() => setShowBroadcastModal(true)} className="text-zinc-600 hover:text-brand-red transition-colors" title="Send Push Notification to Employees">
+                           <MessageSquare size={14} />
+                        </button>
+                     </div>
                      <div className="text-[10px] font-bold text-brand-red uppercase tracking-widest">System Manager</div>
                   </div>
                   <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center font-bold text-brand-red">A</div>
@@ -1232,6 +1268,32 @@ export default function AdminDashboard({ profile }: { profile: any }) {
                )}
             </main>
          </div>
+
+         {/* Broadcast Modal */}
+         {showBroadcastModal && (
+            <div className="fixed inset-0 bg-black/95 z-[1000] flex items-center justify-center p-6 backdrop-blur-2xl">
+               <div className="bg-brand-card border border-white/10 w-full max-w-lg p-6 sm:p-10 rounded-[28px] sm:rounded-[40px] space-y-6 sm:space-y-8 animate-fade-in">
+                  <div className="flex justify-between items-center">
+                     <h3 className="text-2xl font-black italic uppercase">Send Push Notification</h3>
+                     <button onClick={() => setShowBroadcastModal(false)}><X size={24} /></button>
+                  </div>
+                  <div className="space-y-4">
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Notification Title</label>
+                        <input type="text" placeholder="e.g. Keep working!" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-brand-red" value={broadcastMessage.title} onChange={(e) => setBroadcastMessage({ ...broadcastMessage, title: e.target.value })} />
+                     </div>
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Message Body</label>
+                        <textarea placeholder="Write your message here..." rows={4} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-brand-red resize-none" value={broadcastMessage.body} onChange={(e) => setBroadcastMessage({ ...broadcastMessage, body: e.target.value })} />
+                     </div>
+                  </div>
+                  <button disabled={isBroadcasting} onClick={handleBroadcast} className="w-full py-5 bg-brand-red text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-700 shadow-xl shadow-red-900/30 flex items-center justify-center gap-3 active:scale-95 disabled:grayscale disabled:opacity-50">
+                     {isBroadcasting ? <Loader className="w-6 h-6 animate-spin" /> : <Send size={18} />}
+                     {isBroadcasting ? 'Sending...' : 'Send to All Employees'}
+                  </button>
+               </div>
+            </div>
+         )}
 
          {/* Add User Modal */}
          {showAddUserModal && (

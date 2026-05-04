@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       {
         endpoint: subscription.endpoint,
         keys: subscription.keys,
-        adminId: 'admin',
+        role: subscription.role || 'admin',
       },
       { upsert: true, returnDocument: 'after' }
     );

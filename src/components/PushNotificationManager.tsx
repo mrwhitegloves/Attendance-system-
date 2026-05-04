@@ -63,26 +63,25 @@ export default function PushNotificationManager() {
 
       const registration = await navigator.serviceWorker.ready;
 
-      if (profile?.isAdmin) {
-        // ── ADMIN: subscribe to server-push ─────────────────────────────────
-        // Server sends a push when any employee punches in/out
-        let subscription = await registration.pushManager.getSubscription();
-        if (!subscription) {
-          subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-          });
-        }
-        const subJSON = subscription.toJSON();
-        await fetch("/api/push/subscribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ endpoint: subJSON.endpoint, keys: subJSON.keys }),
+      // ── Subscribe to server-push for EVERYONE (Admins & Employees) ─────────
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
-        console.log("[Push] Admin server-push subscription saved ✓");
       }
-      // Employees: permission is now granted → AttendanceSystem.tsx will post
-      // SCHEDULE_REMINDERS to the SW when it mounts, scheduling local notifications.
+      const subJSON = subscription.toJSON();
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          endpoint: subJSON.endpoint, 
+          keys: subJSON.keys,
+          role: profile?.isAdmin ? 'admin' : 'employee'
+        }),
+      });
+      console.log(`[Push] ${profile?.isAdmin ? 'Admin' : 'Employee'} server-push subscription saved ✓`);
     };
 
     navigator.serviceWorker.ready.then(init).catch((err) =>
