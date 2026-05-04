@@ -258,9 +258,8 @@ export default function AdminDashboard({ profile }: { profile: any }) {
       }
       setIsBroadcasting(true);
       try {
-         const res = await fetch('/api/push/broadcast', {
+         const res = await adminFetch('/api/push/broadcast', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(broadcastMessage)
          });
          const data = await res.json();
