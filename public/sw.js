@@ -58,30 +58,45 @@ self.addEventListener('message', (event) => {
 
   const firstName = (employeeName || 'there').split(' ')[0];
 
-  const inMessages = [
-    `Hi ${firstName}! 🌟 15 mins to go! Shift shuru hone wali hai, jaldi punch in karein! ⏱️`,
-    `Namaste ${firstName}! 🙏 Ready for the day? Sirf 15 minute bache hain punch in ke liye! 🚀`,
-    `Hello ${firstName}! 👋 Aaj ka din acha jaye! Don't forget to punch in within 15 mins. ⏰`,
-    `Hi ${firstName}! ✨ Kaam ka waqt ho gaya hai! Please mark your attendance in 15 mins. 📅`
+  const workingMessages = [
+    `Keep working ${firstName}, you can do it! 💪 Lage raho!`,
+    `Great focus ${firstName}! 🌟 Keep up the good work!`,
+    `You're doing awesome ${firstName}! 🔥 Thoda aur push karo!`,
+    `Stay productive ${firstName}! 🚀 You got this!`,
+    `Brilliant work ${firstName}! ✨ Keep the momentum going!`,
+    `Shabaash ${firstName}! 👏 Mehnat ka fal zaroor milega!`
   ];
 
-  const outMessages = [
-    `Great job today, ${firstName}! 🌟 Shift khatam hone mein bas 15 minute baaki hain. Punch out zaroor karein! 🏁`,
-    `Thak gaye ${firstName}? 🛋️ Just 15 mins left! Yaad se punch out kar lena. Good job! 👍`,
-    `Hello ${firstName}! 👋 Din khatam! Don't forget to punch out in 15 mins. Ghar jaane ka time! 🏠`,
-    `Awesome work ${firstName}! ✨ Bas 15 minute aur! Punch out karna mat bhoolna. Take care! 🌇`
+  const notWorkingMessages = [
+    `Hi ${firstName}! 🌟 We are waiting for you, join us soon!`,
+    `Hello ${firstName}! 👋 Aaj ka din miss mat karo, jaldi aao!`,
+    `Missing your energy ${firstName}! ⚡ Come punch in soon!`,
+    `Namaste ${firstName}! 🙏 Team is waiting, jaldi se join karein!`,
+    `Hey ${firstName}! 📅 We'd love to see you soon!`
   ];
 
-  // Only remind to punch in if employee hasn't punched in yet today
+  // 1. Normal 15-Minute Punch Reminders
   if (!isCheckedIn && expectedInTime) {
-    const randomInMsg = inMessages[Math.floor(Math.random() * inMessages.length)];
-    scheduleLocalReminder(expectedInTime, '⏰ Punch In Reminder', randomInMsg, 'reminder-in');
+    scheduleLocalReminder(expectedInTime, '⏰ Punch In Reminder',
+      `Hi ${firstName}! Your shift starts at ${formatTime(expectedInTime)}. You have 15 minutes to punch in.`,
+      'reminder-in'
+    );
   }
 
-  // Only remind to punch out if employee is currently checked in
   if (isCheckedIn && !isCheckedOut && expectedOutTime) {
-    const randomOutMsg = outMessages[Math.floor(Math.random() * outMessages.length)];
-    scheduleLocalReminder(expectedOutTime, '🏁 Punch Out Reminder', randomOutMsg, 'reminder-out');
+    scheduleLocalReminder(expectedOutTime, '🏁 Punch Out Reminder',
+      `Hi ${firstName}! Your shift ends at ${formatTime(expectedOutTime)}. Don't forget to punch out in 15 minutes.`,
+      'reminder-out'
+    );
+  }
+
+  // 2. Casual All-Day Reminders (3 times a day: +2h, +4h, +6h from Expected In Time)
+  if (expectedInTime && !isCheckedOut) {
+    const msgs = isCheckedIn ? workingMessages : notWorkingMessages;
+    [2, 4, 6].forEach((hoursToAdd, index) => {
+       const randomMsg = msgs[Math.floor(Math.random() * msgs.length)];
+       scheduleCasualReminder(expectedInTime, hoursToAdd, `💬 ${isCheckedIn ? 'Keep Going!' : 'Join Us!'}`, randomMsg, `casual-${index}`);
+    });
   }
 });
 
@@ -133,6 +148,36 @@ function scheduleLocalReminder(timeStr, title, body, tag) {
         { action: 'open', title: '📲 Open App' },
         { action: 'dismiss', title: 'Dismiss' },
       ],
+    });
+  }, msUntilReminder);
+
+  reminderTimers.push(timerId);
+}
+
+/**
+ * Schedules a casual all-day reminder at (ExpectedInTime + hoursToAdd).
+ */
+function scheduleCasualReminder(timeStr, hoursToAdd, title, body, tag) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+
+  const totalMinutes = hours * 60 + minutes + (hoursToAdd * 60);
+  const remHours = Math.floor(totalMinutes / 60) % 24;
+  const remMinutes = totalMinutes % 60;
+
+  const now = new Date();
+  const reminderTime = new Date();
+  reminderTime.setHours(remHours, remMinutes, 0, 0);
+
+  const msUntilReminder = reminderTime.getTime() - now.getTime();
+  if (msUntilReminder <= 0) return; // Time already passed today
+
+  const timerId = setTimeout(() => {
+    self.registration.showNotification(title, {
+      body,
+      icon: '/logo.png',
+      badge: '/logo.png',
+      tag,
+      requireInteraction: false
     });
   }, msUntilReminder);
 
