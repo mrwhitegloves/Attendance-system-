@@ -333,13 +333,15 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
     
     let finalStatus = isCheckedIn ? 'Checked Out' : 'Checked In';
     
-    // Strict Late Logic — NO grace period. Any punch-in after expected time = Late.
+    // Late Logic: Only mark Late if the employee punches in AFTER the expected minute.
+    // e.g. expectedInTime = "10:30" → punching at 10:30:xx is ON TIME; 10:31+ is LATE.
     if (!isCheckedIn && profile.expectedInTime) {
        try {
           const [expH, expM] = profile.expectedInTime.split(':').map(Number);
-          const expected = new Date();
-          expected.setHours(expH, expM, 0, 0);
-          if (now > expected) {
+          // Use total minutes for comparison to avoid seconds/milliseconds skewing the result
+          const nowTotalMinutes = now.getHours() * 60 + now.getMinutes();
+          const expectedTotalMinutes = expH * 60 + expM;
+          if (nowTotalMinutes > expectedTotalMinutes) {
              finalStatus = 'Late';
           }
        } catch (e) {
@@ -447,6 +449,18 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId: profile.employeeId, name: profile.name })
+      });
+    } catch(e) {}
+    localStorage.removeItem('user');
+    window.location.reload();
+  };
+
   const BackgroundDecorations = () => (
     <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
       <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-brand-red/10 rounded-full blur-[120px] animate-float-red" style={{ animationDelay: '0s' }}></div>
@@ -492,7 +506,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
           <button disabled={isShiftComplete || isSubmitting} onClick={startCamera} className={`w-full py-4 rounded-xl font-bold text-lg transition-all active:scale-95 shadow-2xl ${isShiftComplete || isSubmitting ? 'bg-zinc-900 text-zinc-600 grayscale cursor-not-allowed' : 'bg-brand-red text-white hover:bg-red-700 shadow-red-900/40'}`}>
             {isSubmitting ? <span className="flex items-center justify-center gap-2"><Loader className="w-6 h-6" /> PUNCHING...</span> : (isShiftComplete ? 'SHIFT ENDED' : (isCheckedIn ? 'PUNCH OUT' : 'PUNCH IN'))}
           </button>
-          <div onClick={() => { localStorage.removeItem('user'); window.location.reload(); }} className="flex items-center gap-4 text-zinc-600 hover:text-white font-bold cursor-pointer transition-colors px-2">
+          <div onClick={handleLogout} className="flex items-center gap-4 text-zinc-600 hover:text-white font-bold cursor-pointer transition-colors px-2">
             <LogOut size={18} /> Logout
           </div>
         </div>
@@ -521,7 +535,7 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
             <Image src="/logo.png" alt="MWG" width={32} height={32} className="rounded-lg shadow-lg" />
             <span className="font-bold text-sm tracking-tight text-white">Hello, {profile.name.split(' ')[0]}</span>
           </div>
-          <button onClick={() => { localStorage.removeItem('user'); window.location.reload(); }} className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-zinc-500"><LogOut size={16} /></button>
+          <button onClick={handleLogout} className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-zinc-500"><LogOut size={16} /></button>
         </header>
 
         {/* Top Header Desktop */}

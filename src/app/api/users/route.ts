@@ -3,6 +3,7 @@ import dbConnect from '@/lib/dbConnect';
 import User from '@/models/User';
 import Counter from '@/models/Counter';
 import { isAdminRequest, unauthorizedResponse } from '@/lib/adminAuth';
+import { sendPushToAdmins } from '@/lib/sendPushNotification';
 
 export async function GET() {
   try {
@@ -43,6 +44,14 @@ export async function POST(request: Request) {
       expectedInTime: expectedInTime || '09:30',
       expectedOutTime: expectedOutTime || '18:30'
     });
+
+    // 3. Notify all admins about the new employee (non-blocking)
+    sendPushToAdmins({
+      title: `👤 New Employee Added`,
+      body: `${name} (${employeeId}) has been added to the ${department || staffType || 'team'}.`,
+      icon: '/logo.png',
+      data: { employeeId, action: 'new_employee' },
+    }).catch(e => console.error('[Push] New employee notify error:', e));
 
     return NextResponse.json(newUser, { status: 201 });
   } catch (error: any) {

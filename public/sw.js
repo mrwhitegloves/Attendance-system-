@@ -61,7 +61,7 @@ self.addEventListener('message', (event) => {
   // Only remind to punch in if employee hasn't punched in yet today
   if (!isCheckedIn && expectedInTime) {
     scheduleLocalReminder(expectedInTime, '⏰ Punch In Reminder',
-      `Hi ${firstName}! Your shift starts at ${formatTime(expectedInTime)}. You have 30 minutes to punch in.`,
+      `Hi ${firstName}! Your shift starts at ${formatTime(expectedInTime)}. You have 15 minutes to punch in.`,
       'reminder-in'
     );
   }
@@ -69,7 +69,7 @@ self.addEventListener('message', (event) => {
   // Only remind to punch out if employee is currently checked in
   if (isCheckedIn && !isCheckedOut && expectedOutTime) {
     scheduleLocalReminder(expectedOutTime, '🏁 Punch Out Reminder',
-      `Hi ${firstName}! Your shift ends at ${formatTime(expectedOutTime)}. Don't forget to punch out in 30 minutes.`,
+      `Hi ${firstName}! Your shift ends at ${formatTime(expectedOutTime)}. Don't forget to punch out in 15 minutes.`,
       'reminder-out'
     );
   }
@@ -86,14 +86,14 @@ function formatTime(timeStr) {
 }
 
 /**
- * Schedules a local notification 30 minutes before the given time (HH:mm).
+ * Schedules a local notification 15 minutes before the given time (HH:mm).
  * If the reminder time has already passed today, the notification is skipped.
  */
 function scheduleLocalReminder(timeStr, title, body, tag) {
   const [hours, minutes] = timeStr.split(':').map(Number);
 
-  // Reminder fires 30 minutes BEFORE the target time
-  const totalReminderMinutes = hours * 60 + minutes - 30;
+  // Reminder fires 15 minutes BEFORE the target time
+  const totalReminderMinutes = hours * 60 + minutes - 15;
   const remHours = Math.floor(totalReminderMinutes / 60);
   const remMinutes = totalReminderMinutes % 60;
 

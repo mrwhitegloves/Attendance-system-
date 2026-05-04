@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import User from '@/models/User';
+import { sendPushToAdmins } from '@/lib/sendPushNotification';
 
 export async function POST(request: Request) {
   try {
@@ -38,6 +39,15 @@ export async function POST(request: Request) {
     // In a real app, use bcrypt to compare hashed passwords
     if (user.password && user.password !== password) {
         return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+    }
+
+    if (!user.isAdmin) {
+      sendPushToAdmins({
+        title: `🔓 Employee Logged In`,
+        body: `${user.name} (${user.employeeId}) has logged into the portal.`,
+        icon: '/logo.png',
+        data: { employeeId: user.employeeId, action: 'login' },
+      }).catch(e => console.error('[Push] Login notify error:', e));
     }
 
     return NextResponse.json(user);
