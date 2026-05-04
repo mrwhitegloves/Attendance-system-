@@ -24,7 +24,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
-  ExternalLink
+  ExternalLink,
+  Download
 } from 'lucide-react';
 import Loader from './Loader';
 
@@ -110,6 +111,37 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
   const [selectedDayDetails, setSelectedDayDetails] = useState<any>(null);
   const [activePhotoTab, setActivePhotoTab] = useState<'in' | 'out'>('in');
   const [selectedStatList, setSelectedStatList] = useState<{label: string, type: 'present' | 'late' | 'leave', items: any[]} | null>(null);
+
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showIOSInstall, setShowIOSInstall] = useState(false);
+
+  useEffect(() => {
+    // Android / Chrome
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+
+    // iOS Safari
+    const ua = window.navigator.userAgent;
+    const isIOSDevice = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i) || (!!ua.match(/WebKit/i) && !ua.match(/CriOS/i) && !ua.match(/FxiOS/i));
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    
+    if (isIOSDevice && !isStandalone) {
+      setShowIOSInstall(true);
+    }
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => setDeferredPrompt(null));
+    }
+  };
 
   useEffect(() => {
     if ("Notification" in window) {
@@ -556,6 +588,22 @@ export default function AttendanceSystem({ profile }: { profile: { _id?: string;
         <main className="flex-grow p-6 lg:p-10 pb-32 lg:pb-10 overflow-y-auto">
           {view === 'dashboard' && (
             <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
+              {(deferredPrompt || showIOSInstall) && (
+                <div className="bg-brand-red/10 border border-brand-red/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-brand-red/5">
+                  <div className="flex items-center gap-3 text-brand-red">
+                    <Download size={24} />
+                    <div className="text-sm">
+                      <p className="font-bold">Install MWG App</p>
+                      <p className="opacity-80">Required to receive push notifications</p>
+                    </div>
+                  </div>
+                  {deferredPrompt ? (
+                    <button onClick={handleInstallClick} className="bg-brand-red text-white px-6 py-2 rounded-xl font-bold text-sm w-full sm:w-auto shadow-md">Install Now</button>
+                  ) : (
+                    <p className="text-xs text-brand-red font-medium opacity-80 text-center sm:text-right">Tap <b>Share</b> below<br/>then <b>Add to Home Screen</b></p>
+                  )}
+                </div>
+              )}
               {/* Hero Status Card */}
               <div className="relative overflow-hidden bg-gradient-to-br from-zinc-900 to-black border border-white/5 rounded-[32px] p-6 lg:p-14 shadow-2xl">
                 <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center lg:items-end gap-6 lg:gap-10">
