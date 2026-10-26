@@ -1,0 +1,394 @@
+import { Attendance, PUNCH_IN_STATUSES } from '../models/attendance.model.js';
+import { User } from '../models/user.model.js';
+import { LeaveRequest } from '../models/leaveRequest.model.js';
+import { canSeeEmployee, employeeScopeFilter, requirePermission } from '../permissions/can.js';
+import { createAppError, notFound } from '../lib/errors.js';
+import { runListQuery } from '../lib/pagination.js';
+import {
+  indiaDay,
+  indiaClock,
+  indiaMinutes,
+  clockToMinutes,
+  twelveHourToMinutes,
+  daysBetween,
+  monthBounds,
+} from '../lib/dates.js';
+import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
+import { deleteImageKitFile, isImageKitConfigured } from '../infra/imagekit.js';
+import { notifyPunchWatchers } from './push.service.js';
+
+// Attendance rules (same as the first version, now enforced by the server):
+// - one punch-in and one punch-out a day; the time is the server's, in India time;
+// - "Late" when the punch-in is after the person's expected in-time (09:30 → 09:31 is late);
+// - no punch-in after 7:30 PM;
+// - after 2 late days in a month the person is warned, and must confirm a further late punch;
+// - a punch-in without punch-out on an earlier day becomes "Absent" (daily job).
+
+export const LAST_PUNCH_IN_MINUTES = 19 * 60 + 30;
+export const MONTHLY_LATE_LIMIT = 2;
+
+const isPunchIn = (record) => PUNCH_IN_STATUSES.includes(record.status);
+
+/** Minutes since midnight of a record: from `at` when present, else from the old text time. */
+const recordMinutes = (record) =>
+  record.at ? indiaMinutes(new Date(record.at)) : twelveHourToMinutes(record.time);
+
+async function photoUrl(record) {
+  if (record.selfieKey) return signedUrl(record.selfieKey);
+  return record.selfie || null;
+}
+
+/** A record as the screens see it. */
+export async function toView(record) {
+  return {
+    _id: record._id,
+    employeeId: record.employeeId,
+    userName: record.userName,
+    date: record.date,
+    time: record.time,
+    status: record.status,
+    source: record.source || 'app',
+    location: record.location,
+    lat: record.lat ?? null,
+    lon: record.lon ?? null,
+    remark: record.remark,
+    photoUrl: await photoUrl(record),
+  };
+}
+
+async function lateDaysThisMonth(employeeId, today) {
+  const days = await Attendance.distinct('date', {
+    employeeId,
+    status: 'Late',
+    date: { $gte: `${today.slice(0, 7)}-01`, $lte: today },
+  });
+  return days.length;
+}
+
+/** The person's own day: what they did today and what the next punch will be. */
+export async function getMyDay(actor, now = new Date()) {
+  requirePermission(actor, 'attendance.punch');
+  const today = indiaDay(now);
+  const records = await Attendance.find({ employeeId: actor.employeeId, date: today })
+    .sort({ createdAt: 1 })
+    .lean();
+  const punchIn = records.find(isPunchIn) ?? null;
+  const punchOut = records.find((record) => record.status === 'Checked Out') ?? null;
+  const onLeave = records.some((record) => record.status === 'Leave');
+  return {
+    date: today,
+    expectedInTime: actor.expectedInTime,
+    expectedOutTime: actor.expectedOutTime,
+    punchIn: punchIn ? await toView(punchIn) : null,
+    punchOut: punchOut ? await toView(punchOut) : null,
+    onLeave,
+    next: punchOut ? 'done' : punchIn ? 'out' : 'in',
+    lateDaysThisMonth: await lateDaysThisMonth(actor.employeeId, today),
+    lateLimit: MONTHLY_LATE_LIMIT,
+    punchInClosed: !punchIn && indiaMinutes(now) >= LAST_PUNCH_IN_MINUTES,
+  };
+}
+
+function decodeSelfie(dataUrl) {
+  const [, type, data] = dataUrl.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/) || [];
+  const bytes = Buffer.from(data || '', 'base64');
+  if (!bytes.length) throw createAppError(400, 'Please take a photo first.');
+  if (bytes.length > 2 * 1024 * 1024) {
+    throw createAppError(413, 'The photo is too large. Please take it again.');
+  }
+  return { bytes, type: `image/${type}`, extension: type === 'jpeg' ? 'jpg' : type };
+}
+
+/** Punch in or out (decided by the server from today's records). */
+export async function punch(actor, input, now = new Date()) {
+  requirePermission(actor, 'attendance.punch');
+  const today = indiaDay(now);
+  const minutes = indiaMinutes(now);
+  const records = await Attendance.find({ employeeId: actor.employeeId, date: today }).lean();
+  if (records.some((record) => record.status === 'Checked Out')) {
+    throw createAppError(409, 'You have already punched out today.', 'already_done');
+  }
+  const isOut = records.some(isPunchIn);
+
+  let status = 'Checked Out';
+  if (!isOut) {
+    if (minutes >= LAST_PUNCH_IN_MINUTES) {
+      throw createAppError(
+        409,
+        'The shift is over. Punch-in closes at 7:30 PM.',
+        'punch_in_closed',
+      );
+    }
+    const expected = clockToMinutes(actor.expectedInTime) ?? clockToMinutes('09:30');
+    status = minutes > expected ? 'Late' : 'Checked In';
+    if (status === 'Late' && !input.confirmLate) {
+      const lateDays = await lateDaysThisMonth(actor.employeeId, today);
+      if (lateDays >= MONTHLY_LATE_LIMIT) {
+        throw createAppError(
+          409,
+          `You already have ${lateDays} late days this month (the limit is ${MONTHLY_LATE_LIMIT}). This punch-in will be marked late. Please inform your manager.`,
+          'late_limit',
+        );
+      }
+    }
+  }
+
+  const photo = decodeSelfie(input.selfie);
+  let selfieKey = null;
+  if (isStorageConfigured()) {
+    selfieKey = await putFile(
+      `selfies/${today.slice(0, 7)}/${actor.employeeId}/${today}-${isOut ? 'out' : 'in'}-${now.getTime()}.${photo.extension}`,
+      photo.bytes,
+      photo.type,
+    );
+  }
+
+  const record = await Attendance.create({
+    employeeId: actor.employeeId,
+    userId: actor._id,
+    userName: actor.name,
+    date: today,
+    time: indiaClock(now),
+    at: now,
+    status,
+    source: 'app',
+    lat: input.lat,
+    lon: input.lon,
+    location: input.location || 'Location not available',
+    remark: selfieKey ? 'Selfie verified' : 'Photo not stored (storage not set up)',
+    selfieKey,
+  });
+
+  const verb = {
+    'Checked In': 'punched in',
+    Late: 'punched in (late)',
+    'Checked Out': 'punched out',
+  }[status];
+  notifyPunchWatchers({
+    title: `${actor.name} ${verb}`,
+    body: `${record.time} · ${record.location}`,
+    icon: '/logo.png',
+    data: { url: `/attendance?date=${today}` },
+  }).catch(() => {});
+
+  return toView(record.toObject());
+}
+
+/** Every record in the person's scope, newest first, with filters. */
+export async function listAttendance(actor, query) {
+  const filter = { ...(await employeeScopeFilter(actor, 'attendance.view')) };
+  if (query.employeeId) {
+    if (!(await canSeeEmployee(actor, 'attendance.view', query.employeeId)))
+      return emptyPage(query.page);
+    filter.employeeId = query.employeeId;
+  }
+  if (query.from || query.to) {
+    filter.date = {};
+    if (query.from) filter.date.$gte = query.from;
+    if (query.to) filter.date.$lte = query.to;
+  }
+  if (query.status) filter.status = query.status;
+  const result = await runListQuery(Attendance, {
+    filter,
+    sort: { date: -1, createdAt: -1 },
+    page: query.page,
+    pageSize: 50,
+  });
+  return { ...result, items: await Promise.all(result.items.map(toView)) };
+}
+
+const emptyPage = (page) => ({ items: [], total: 0, page, pageSize: 50, pages: 1 });
+
+function hoursBetween(first, last) {
+  const start = first ? recordMinutes(first) : null;
+  const end = last ? recordMinutes(last) : null;
+  if (start === null || end === null || end <= start) return null;
+  return end - start;
+}
+
+/** Status of one person on one day, from that day's records. */
+function dayStatus(records, pendingLeave) {
+  if (records.some((record) => record.status === 'Leave')) return 'Leave';
+  if (records.some((record) => record.status === 'Late')) return 'Late';
+  if (records.some((record) => record.status === 'Checked In' || record.status === 'Checked Out'))
+    return 'Present';
+  if (records.some((record) => record.status === 'Absent')) return 'Absent';
+  if (pendingLeave) return 'Leave pending';
+  return 'No punch';
+}
+
+/** One day for everyone in scope: who came, when, from where. */
+export async function getDailySheet(actor, date = indiaDay()) {
+  const scope = await employeeScopeFilter(actor, 'attendance.view');
+  queueMissedPunchOutCheck();
+  const [people, records, pending] = await Promise.all([
+    User.find(
+      { ...scope, status: 'active' },
+      '_id name employeeId department staffType expectedInTime',
+    )
+      .sort({ name: 1 })
+      .lean(),
+    Attendance.find({ ...scope, date })
+      .sort({ createdAt: 1 })
+      .lean(),
+    LeaveRequest.find(
+      { ...scope, status: 'pending', startDate: { $lte: date }, endDate: { $gte: date } },
+      'employeeId',
+    ).lean(),
+  ]);
+  const byEmployee = Map.groupBy(records, (record) => record.employeeId);
+  const pendingIds = new Set(pending.map((leave) => leave.employeeId));
+
+  const rows = await Promise.all(
+    people.map(async (person) => {
+      const own = byEmployee.get(person.employeeId) ?? [];
+      const first = own.find(isPunchIn) ?? null;
+      const last = own.findLast((record) => record.status === 'Checked Out') ?? null;
+      return {
+        user: person,
+        status: dayStatus(own, pendingIds.has(person.employeeId)),
+        punchIn: first ? await toView(first) : null,
+        punchOut: last ? await toView(last) : null,
+        minutesWorked: hoursBetween(first, last),
+        remark:
+          own.find((record) => record.status === 'Absent' || record.status === 'Leave')?.remark ??
+          '',
+      };
+    }),
+  );
+
+  const count = (status) => rows.filter((row) => row.status === status).length;
+  return {
+    date,
+    summary: {
+      people: rows.length,
+      present: count('Present') + count('Late'),
+      late: count('Late'),
+      leave: count('Leave'),
+      absent: count('Absent'),
+      noPunch: count('No punch') + count('Leave pending'),
+      stillIn: rows.filter((row) => row.punchIn && !row.punchOut).length,
+    },
+    rows,
+  };
+}
+
+/** One person's month as a calendar, with totals. */
+export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0, 7)) {
+  const person = await User.findById(userId, '_id name employeeId expectedInTime createdAt')
+    .lean()
+    .catch(() => null);
+  if (!person || !(await canSeeEmployee(actor, 'attendance.view', person.employeeId)))
+    throw notFound('Employee');
+  const { first, last } = monthBounds(month);
+  const [records, leaves] = await Promise.all([
+    Attendance.find({ employeeId: person.employeeId, date: { $gte: first, $lte: last } })
+      .sort({ createdAt: 1 })
+      .lean(),
+    LeaveRequest.find({
+      employeeId: person.employeeId,
+      status: 'pending',
+      startDate: { $lte: last },
+      endDate: { $gte: first },
+    }).lean(),
+  ]);
+  const byDay = Map.groupBy(records, (record) => record.date);
+  const today = indiaDay();
+
+  const days = await Promise.all(
+    daysBetween(first, last).map(async (date) => {
+      const own = byDay.get(date) ?? [];
+      const pendingLeave = leaves.some((leave) => leave.startDate <= date && leave.endDate >= date);
+      const firstIn = own.find(isPunchIn) ?? null;
+      const lastOut = own.findLast((record) => record.status === 'Checked Out') ?? null;
+      return {
+        date,
+        future: date > today,
+        status: date > today ? null : dayStatus(own, pendingLeave),
+        punchIn: firstIn ? await toView(firstIn) : null,
+        punchOut: lastOut ? await toView(lastOut) : null,
+        minutesWorked: hoursBetween(firstIn, lastOut),
+        remark: own.find((record) => record.remark && record.status !== 'Checked In')?.remark ?? '',
+      };
+    }),
+  );
+  const count = (status) => days.filter((day) => day.status === status).length;
+  return {
+    user: person,
+    month,
+    days,
+    totals: {
+      present: count('Present') + count('Late'),
+      late: count('Late'),
+      leave: count('Leave'),
+      absent: count('Absent'),
+    },
+  };
+}
+
+// ---- Daily jobs ----
+
+/** Marks earlier days with a punch-in but no punch-out as "Absent" (safe to run twice). */
+export async function markMissedPunchOuts(now = new Date()) {
+  const today = indiaDay(now);
+  const open = await Attendance.find(
+    { date: { $lt: today }, status: { $in: PUNCH_IN_STATUSES } },
+    'employeeId userId userName date time',
+  ).lean();
+  let marked = 0;
+  for (const record of open) {
+    const closed = await Attendance.exists({
+      employeeId: record.employeeId,
+      date: record.date,
+      status: { $in: ['Checked Out', 'Absent'] },
+    });
+    if (closed) continue;
+    await Attendance.create({
+      employeeId: record.employeeId,
+      userId: record.userId,
+      userName: record.userName,
+      date: record.date,
+      time: '12:00 AM',
+      status: 'Absent',
+      source: 'system',
+      location: 'System Generated',
+      remark: `Marked Absent: punched in at ${record.time} but did not punch out by the end of the day. Please contact HR if this is wrong.`,
+    });
+    marked += 1;
+  }
+  return { marked };
+}
+
+let lastCheck = 0;
+/** Runs the missed punch-out check at most every 10 minutes, without waiting for it. */
+function queueMissedPunchOutCheck() {
+  if (Date.now() - lastCheck < 10 * 60 * 1000) return;
+  lastCheck = Date.now();
+  markMissedPunchOuts().catch((error) =>
+    console.error('[attendance] missed punch-out check', error),
+  );
+}
+
+/** Deletes old ImageKit selfies after 30 days (new S3 selfies expire through a bucket rule). */
+export async function cleanupOldImageKitSelfies(now = new Date()) {
+  if (!isImageKitConfigured()) return { deleted: 0 };
+  const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const old = await Attendance.find({ createdAt: { $lt: cutoff }, ikFileId: { $ne: null } })
+    .limit(200)
+    .lean();
+  let deleted = 0;
+  for (const record of old) {
+    if (await deleteImageKitFile(record.ikFileId).catch(() => false)) {
+      await Attendance.updateOne(
+        { _id: record._id },
+        {
+          selfie: null,
+          ikFileId: null,
+          remark: `${record.remark} (Selfie auto-deleted after 30 days)`,
+        },
+      );
+      deleted += 1;
+    }
+  }
+  return { deleted };
+}
