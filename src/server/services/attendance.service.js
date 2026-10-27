@@ -14,7 +14,6 @@ import {
   monthBounds,
 } from '../lib/dates.js';
 import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
-import { deleteImageKitFile, isImageKitConfigured } from '../infra/imagekit.js';
 import { notifyPunchWatchers } from './push.service.js';
 
 // Attendance rules (CEO, 2026-10-27), enforced by the server:
@@ -315,30 +314,4 @@ export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0
       absent: count('Absent'),
     },
   };
-}
-
-// ---- Daily jobs ----
-
-/** Deletes old ImageKit selfies after 30 days (first-version photos only; S3 files are never deleted). */
-export async function cleanupOldImageKitSelfies(now = new Date()) {
-  if (!isImageKitConfigured()) return { deleted: 0 };
-  const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const old = await Attendance.find({ createdAt: { $lt: cutoff }, ikFileId: { $ne: null } })
-    .limit(200)
-    .lean();
-  let deleted = 0;
-  for (const record of old) {
-    if (await deleteImageKitFile(record.ikFileId).catch(() => false)) {
-      await Attendance.updateOne(
-        { _id: record._id },
-        {
-          selfie: null,
-          ikFileId: null,
-          remark: `${record.remark} (Selfie auto-deleted after 30 days)`,
-        },
-      );
-      deleted += 1;
-    }
-  }
-  return { deleted };
 }

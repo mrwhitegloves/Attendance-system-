@@ -29,14 +29,8 @@ export const env = {
   AWS_S3_IAM_SECRET_ACCESS_KEY: read('AWS_S3_IAM_SECRET_ACCESS_KEY'),
   S3_BUCKET: isProduction ? read('S3_PROD_BUCKET') : read('S3_DEV_BUCKET'),
 
-  // Old selfies still live in ImageKit; only used to delete them after 30 days.
-  IMAGEKIT_PRIVATE_KEY: read('IMAGEKIT_PRIVATE_KEY'),
-
   // Web push.
   VAPID_PUBLIC_KEY: read('NEXT_PUBLIC_VAPID_PUBLIC_KEY'),
   VAPID_PRIVATE_KEY: read('VAPID_PRIVATE_KEY'),
   VAPID_SUBJECT: read('VAPID_SUBJECT') || 'mailto:admin@mrwhitegloves.com',
-
-  // Shared secret for the daily job route (sent as "Authorization: Bearer <CRON_SECRET>").
-  CRON_SECRET: read('CRON_SECRET'),
 };

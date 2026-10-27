@@ -6,7 +6,6 @@ import { GET as listUsers } from '@/app/api/users/route.js';
 import { GET as listAttendance } from '@/app/api/attendance/route.js';
 import { GET as listLeaves } from '@/app/api/leaves/route.js';
 import { GET as auditLog } from '@/app/api/audit-log/route.js';
-import { GET as cron } from '@/app/api/cron/daily/route.js';
 import { call, makeUser } from './helpers.js';
 import { User } from '@/server/models/user.model.js';
 import { runMigrations } from '@/server/migrations/index.js';
@@ -72,10 +71,6 @@ describe('every API needs a session', () => {
     ['me', me],
   ])('%s answers 401 when signed out', async (_name, handler) => {
     expect((await call(handler)).status).toBe(401);
-  });
-
-  it('the daily job needs the cron secret', async () => {
-    expect((await call(cron)).status).toBe(401);
   });
 });
 

@@ -16,7 +16,7 @@ const attendanceSchema = new mongoose.Schema(
     time: { type: String, required: true },
     at: { type: Date, default: null },
     status: { type: String, enum: ATTENDANCE_STATUSES, required: true },
-    // app (the person punched), leave (approved leave), system (daily job), admin (corrected by HR)
+    // app (the person punched), leave (approved leave), admin (corrected by HR), system (old auto-absent rows)
     source: { type: String, default: 'app' },
     lat: Number,
     lon: Number,
@@ -24,7 +24,7 @@ const attendanceSchema = new mongoose.Schema(
     remark: { type: String, default: '' },
     // New photos: the S3 key of the private file.
     selfieKey: { type: String, default: null },
-    // Old photos: ImageKit address and file id (deleted after 30 days).
+    // Photos of the first version: an ImageKit address (shown as is; ImageKit is no longer used).
     selfie: { type: String, default: null },
     ikFileId: { type: String, default: null },
     leaveRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'LeaveRequest', default: null },
