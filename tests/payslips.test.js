@@ -75,10 +75,23 @@ describe('salary slips', () => {
       panLast4: '354P',
       accountLast4: '6261',
     });
-    expect(slip.attendance).toMatchObject({ totalWorkingDays: 30, fullDays: 2, leavesTaken: 1 });
+    // September 2026: 30 days, 4 Sundays → 26 working days. 1 full, 1 half (free), 1 leave
+    // (not marked: counted as paid); the other 23 working days have no punch → absent.
+    expect(slip.attendance).toMatchObject({
+      totalWorkingDays: 26,
+      fullDays: 1,
+      halfDays: 1,
+      leavesTaken: 1,
+    });
+    expect(slip.calculation).toMatchObject({
+      absentDays: 23,
+      perDayPaise: paise(900),
+      lossOfPayDays: 23,
+    });
     expect(slip.earnings.basic).toBe(paise(27000));
-    expect(slip.totals.net).toBe(paise(27000));
-    expect(slip.netInWords).toBe('Rupees Twenty-Seven Thousand Only');
+    expect(slip.deductions.lossOfPay).toBe(paise(23 * 900));
+    expect(slip.totals.net).toBe(paise(27000 - 23 * 900));
+    expect(slip.netInWords).toBe('Rupees Six Thousand Three Hundred Only');
     await expect(createPayslip(hr, staff._id, '2026-09')).rejects.toMatchObject({ code: 'exists' });
   });
 
@@ -89,7 +102,8 @@ describe('salary slips', () => {
       employee: { designation: 'Senior Developer', pan: 'ABCDE1234F' },
       attendance: { halfDays: 1, balanceLeaves: 0 },
       earnings: { incentive: paise(2000) },
-      deductions: { penalty: paise(500) },
+      // Loss of pay set to 0 by hand: any filled-in value can be overridden.
+      deductions: { penalty: paise(500), lossOfPay: 0 },
     });
     expect(view.employee).toMatchObject({ designation: 'Senior Developer', pan: '******234F' });
     expect(view.totals).toEqual({

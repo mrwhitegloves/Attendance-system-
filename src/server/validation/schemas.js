@@ -169,6 +169,8 @@ export const leaveBody = z
 export const decideLeaveBody = z.strictObject({
   decision: z.enum(['approved', 'rejected']),
   note: text(500).optional().default(''),
+  // Required when approving: paid leave costs no salary, unpaid leave costs a full day.
+  paid: z.boolean().optional(),
 });
 
 export const listLeavesQuery = z.object({

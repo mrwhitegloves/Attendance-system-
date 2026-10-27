@@ -92,7 +92,14 @@ export function LeaveScreen({
               key: 'status',
               label: 'Status',
               render: (row) => (
-                <Badge tone={statusTone(row.status)}>{capitalize(row.status)}</Badge>
+                <span className="flex flex-wrap gap-1">
+                  <Badge tone={statusTone(row.status)}>{capitalize(row.status)}</Badge>
+                  {row.status === 'approved' && row.paid !== null && row.paid !== undefined && (
+                    <Badge tone={row.paid ? 'info' : 'warning'}>
+                      {row.paid ? 'Paid' : 'Unpaid'}
+                    </Badge>
+                  )}
+                </span>
               ),
             },
             {
@@ -234,6 +241,8 @@ function RequestDialog({ open, onClose, onDone }) {
 
 function DecideDialog({ value, onClose, onDone }) {
   const [note, setNote] = useState('');
+  // Paid leave costs no salary; unpaid leave costs a full day (founder's rule).
+  const [paid, setPaid] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   if (!value) return <Dialog open={false} onClose={onClose} title="" />;
@@ -244,9 +253,14 @@ function DecideDialog({ value, onClose, onDone }) {
     try {
       await apiFetch(`/api/leaves/${value.leave._id}`, {
         method: 'PATCH',
-        body: { decision: value.decision, note },
+        body: {
+          decision: value.decision,
+          note,
+          ...(value.decision === 'approved' ? { paid } : {}),
+        },
       });
       setNote('');
+      setPaid(null);
       onClose();
       onDone();
     } catch (failure) {
@@ -266,7 +280,11 @@ function DecideDialog({ value, onClose, onDone }) {
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button variant={approve ? 'primary' : 'danger'} onClick={submit} disabled={busy}>
+          <Button
+            variant={approve ? 'primary' : 'danger'}
+            onClick={submit}
+            disabled={busy || (approve && paid === null)}
+          >
             {approve ? 'Approve' : 'Reject'}
           </Button>
         </>
@@ -278,6 +296,32 @@ function DecideDialog({ value, onClose, onDone }) {
           {formatDay(value.leave.endDate)}
         </p>
         <p className="text-muted">{value.leave.reason}</p>
+        {approve && (
+          <fieldset className="space-y-2">
+            <legend className="mb-1 font-medium">Is this paid leave?</legend>
+            {[
+              [true, 'Paid leave', 'No salary is cut for these days.'],
+              [false, 'Unpaid leave', 'A full day of salary is cut for each day.'],
+            ].map(([value, label, hint]) => (
+              <label
+                key={label}
+                className="flex items-start gap-2 rounded-lg border border-border p-2"
+              >
+                <input
+                  type="radio"
+                  name="leave-paid"
+                  className="mt-1"
+                  checked={paid === value}
+                  onChange={() => setPaid(value)}
+                />
+                <span>
+                  <span className="block font-medium">{label}</span>
+                  <span className="block text-xs text-muted">{hint}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        )}
         <Field label="Note (optional)" htmlFor="decide-note">
           <input
             id="decide-note"

@@ -1,7 +1,6 @@
 import { Payslip } from '../models/payslip.model.js';
 import { User } from '../models/user.model.js';
 import { Kyc } from '../models/kyc.model.js';
-import { Attendance } from '../models/attendance.model.js';
 import { DEDUCTIONS, EARNINGS } from '../../config/payslipFields.js';
 import { signedUrl } from '../infra/storage.js';
 import { can, canSeeEmployee, employeeScopeFilter, requirePermission } from '../permissions/can.js';
@@ -12,6 +11,8 @@ import { amountInWords } from '../lib/amountInWords.js';
 import { containsRegex } from '../lib/pagination.js';
 import { recordAudit } from './audit.service.js';
 import { salaryInForce } from './salary.service.js';
+import { buildMonthDays } from './attendance.service.js';
+import { calculateMonth } from '../lib/payslipRules.js';
 import { getCompany } from './settings.service.js';
 import { notifyUsers } from './push.service.js';
 
@@ -22,7 +23,7 @@ import { notifyUsers } from './push.service.js';
 // - a final slip is locked; the person who last changed it cannot make it final (maker-checker);
 // - re-opening a final slip needs a reason and is audited;
 // - employees see only their own final slips.
-// The automatic calculation from attendance comes later, when the founder gives the rules.
+// Attendance numbers and loss of pay follow the founder's rules in lib/payslipRules.js.
 
 const sum = (values, lines) => lines.reduce((total, line) => total + (values?.[line.key] ?? 0), 0);
 
@@ -56,29 +57,26 @@ async function loadSlip(actor, id) {
 }
 
 /** First values for a month: employee file, KYC, salary structure in force, attendance counts. */
-async function prefill(user, month) {
-  const { first, last } = monthBounds(month);
-  const [kyc, structure, records] = await Promise.all([
+async function prefill(user, month, now = new Date()) {
+  const { last } = monthBounds(month);
+  const [kyc, structure, days] = await Promise.all([
     Kyc.findOne({ userId: user._id }).lean(),
     salaryInForce(user._id, last),
-    Attendance.find(
-      { employeeId: user.employeeId, date: { $gte: first, $lte: last } },
-      'date status',
-    ).lean(),
+    buildMonthDays(user, month, now),
   ]);
-  const datesWith = (statuses) =>
-    new Set(
-      records.filter((record) => statuses.includes(record.status)).map((record) => record.date),
-    );
-  const leaveDates = datesWith(['Leave']);
-  // Days with a punch that are not leave days.
-  const presentDays = [...datesWith(['Checked In', 'Late', 'Checked Out'])].filter(
-    (date) => !leaveDates.has(date),
-  ).length;
   const fixed = (lines) =>
     Object.fromEntries(
       lines.map((line) => [line.key, line.fixed ? (structure?.components?.[line.key] ?? 0) : 0]),
     );
+  const earnings = fixed(EARNINGS);
+  const calculation = calculateMonth({
+    days,
+    monthlyGrossPaise: sum(
+      earnings,
+      EARNINGS.filter((line) => line.fixed),
+    ),
+    calendarDays: Number(last.slice(8)),
+  });
   return {
     employee: {
       name: user.name,
@@ -93,14 +91,16 @@ async function prefill(user, month) {
       accountLast4: kyc?.bank?.accountLast4 ?? '',
     },
     attendance: {
-      totalWorkingDays: Number(last.slice(8)),
-      fullDays: presentDays,
-      halfDays: 0,
-      leavesTaken: leaveDates.size,
+      totalWorkingDays: calculation.workingDays,
+      fullDays: calculation.fullDays,
+      halfDays: calculation.halfDays,
+      leavesTaken: calculation.paidLeaveDays + calculation.unpaidLeaveDays,
+      // No rule yet: typed by HR.
       balanceLeaves: 0,
     },
-    earnings: fixed(EARNINGS),
-    deductions: fixed(DEDUCTIONS),
+    earnings,
+    deductions: { ...fixed(DEDUCTIONS), lossOfPay: calculation.lossOfPayPaise },
+    calculation,
     salaryStructureId: structure?._id ?? null,
     salaryVersion: structure?.version ?? null,
   };
@@ -156,6 +156,28 @@ export async function getPayslip(actor, id, options = {}) {
     };
   }
   return view;
+}
+
+/** The slip's month day by day, and the numbers the rules give today (for checking by hand). */
+export async function getPayslipAttendance(actor, id) {
+  const slip = await loadSlip(actor, id);
+  const user = await User.findById(slip.userId).lean();
+  const days = await buildMonthDays(user, slip.month);
+  const { last } = monthBounds(slip.month);
+  return {
+    days,
+    calculation: calculateMonth({
+      days,
+      monthlyGrossPaise:
+        slip.calculation?.monthlyGrossPaise ??
+        sum(
+          slip.earnings,
+          EARNINGS.filter((line) => line.fixed),
+        ),
+      calendarDays: Number(last.slice(8)),
+    }),
+    expectedInTime: user.expectedInTime,
+  };
 }
 
 export async function createPayslip(actor, userId, month, { ip } = {}) {

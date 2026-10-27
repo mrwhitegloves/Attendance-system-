@@ -15,6 +15,9 @@ const leaveRequestSchema = new mongoose.Schema(
     adminNote: { type: String, default: '' },
     processedAt: { type: Date, default: null },
     processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    // Chosen when approved: paid leave costs no salary, unpaid leave costs a full day.
+    // null on leave approved before this choice existed (counted as paid).
+    paid: { type: Boolean, default: null },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   },
   { timestamps: true },

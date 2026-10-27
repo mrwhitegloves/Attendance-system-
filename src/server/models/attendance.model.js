@@ -27,6 +27,8 @@ const attendanceSchema = new mongoose.Schema(
     // Photos of the first version: an ImageKit address (shown as is; ImageKit is no longer used).
     selfie: { type: String, default: null },
     ikFileId: { type: String, default: null },
+    // On a "Leave" row: paid (true), unpaid (false) or not marked (null, counted as paid).
+    paidLeave: { type: Boolean, default: null },
     leaveRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'LeaveRequest', default: null },
   },
   { timestamps: true },

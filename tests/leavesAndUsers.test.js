@@ -16,7 +16,11 @@ describe('leave', () => {
       endDate: '2026-11-04',
       reason: 'Family function',
     });
-    const approved = await decideLeave(hr, leave._id, { decision: 'approved', note: '' });
+    const approved = await decideLeave(hr, leave._id, {
+      decision: 'approved',
+      note: '',
+      paid: true,
+    });
     await writeLeaveDays(approved, hr);
     const rows = await Attendance.find({ employeeId: staff.employeeId, status: 'Leave' }).lean();
     expect(rows.map((row) => row.date).sort()).toEqual(['2026-11-02', '2026-11-03', '2026-11-04']);
@@ -30,7 +34,7 @@ describe('leave', () => {
       reason: 'Doctor visit',
     });
     await expect(
-      decideLeave(hr, leave._id, { decision: 'approved', note: '' }),
+      decideLeave(hr, leave._id, { decision: 'approved', note: '', paid: true }),
     ).rejects.toMatchObject({ status: 403 });
   });
 
@@ -43,7 +47,7 @@ describe('leave', () => {
       reason: 'Personal work',
     });
     await expect(
-      decideLeave(manager, leave._id, { decision: 'approved', note: '' }),
+      decideLeave(manager, leave._id, { decision: 'approved', note: '', paid: true }),
     ).rejects.toMatchObject({ status: 404 });
   });
 

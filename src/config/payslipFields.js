@@ -21,6 +21,8 @@ export const DEDUCTIONS = [
   { key: 'pf', label: 'PF', fixed: true },
   { key: 'professionalTax', label: 'Professional Tax', fixed: true },
   { key: 'tds', label: 'TDS', fixed: true },
+  // Worked out from attendance: unpaid leave, absence and half days beyond the free ones.
+  { key: 'lossOfPay', label: 'Loss of Pay (unpaid days)' },
   { key: 'advance', label: 'Advance' },
   { key: 'salaryPaid', label: 'Salary Paid' },
   { key: 'penalty', label: 'Penalty' },

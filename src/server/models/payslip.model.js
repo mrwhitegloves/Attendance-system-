@@ -42,6 +42,9 @@ const payslipSchema = new mongoose.Schema(
       net: { type: Number, default: 0 },
     },
     netInWords: { type: String, default: '' },
+    // How the attendance numbers and loss of pay were worked out when the slip was filled
+    // (lib/payslipRules.js). Shown on the slip screen; changing a field by hand does not change it.
+    calculation: { type: mongoose.Schema.Types.Mixed, default: null },
     notes: { type: String, default: '' },
 
     // Where the first values came from.

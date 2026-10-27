@@ -81,18 +81,27 @@ async function loadLeave(actor, id, permission) {
   return leave;
 }
 
-export async function decideLeave(actor, id, { decision, note }, { ip } = {}) {
+export async function decideLeave(actor, id, { decision, note, paid }, { ip } = {}) {
   requirePermission(actor, 'leave.decide');
   const leave = await loadLeave(actor, id, 'leave.decide');
   if (leave.employeeId === actor.employeeId) {
     throw createAppError(403, 'You cannot approve or reject your own leave.');
+  }
+  if (decision === 'approved' && typeof paid !== 'boolean') {
+    throw createAppError(400, 'Choose paid leave or unpaid leave.');
   }
   if (leave.status !== 'pending')
     throw createAppError(409, `This request is already ${leave.status}.`);
 
   const updated = await LeaveRequest.findOneAndUpdate(
     { _id: id, status: 'pending' },
-    { status: decision, adminNote: note, processedAt: new Date(), processedBy: actor._id },
+    {
+      status: decision,
+      adminNote: note,
+      processedAt: new Date(),
+      processedBy: actor._id,
+      paid: decision === 'approved' ? paid : null,
+    },
     { returnDocument: 'after' },
   ).lean();
   if (!updated) throw createAppError(409, 'This request was just decided by someone else.');
@@ -134,6 +143,7 @@ export async function writeLeaveDays(leave, actor, note = '') {
           location: 'Approved leave',
           remark: `Approved leave: ${leave.reason}${note ? ` (note from ${actor.name}: ${note})` : ''}`,
           leaveRequestId: leave._id,
+          paidLeave: leave.paid ?? null,
         },
       },
       { upsert: true },

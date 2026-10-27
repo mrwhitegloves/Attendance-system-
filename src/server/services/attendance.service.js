@@ -306,3 +306,53 @@ export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0
     },
   };
 }
+
+// ---- One month, day by day, as the salary slip counts it ----
+
+/** How a day counts for the salary slip (rules in lib/payslipRules.js). */
+function countDay(date, own, today) {
+  if (date > today) return 'future';
+  if (new Date(`${date}T00:00:00Z`).getUTCDay() === 0) return 'sunday';
+  const leave = own.find((record) => record.status === 'Leave');
+  if (leave)
+    return leave.paidLeave === false
+      ? 'unpaidLeave'
+      : leave.paidLeave === true
+        ? 'paidLeave'
+        : 'unmarkedLeave';
+  if (own.some((record) => record.status === 'Late')) return 'half';
+  if (own.some((record) => record.status === 'Checked In')) return 'full';
+  return 'absent';
+}
+
+/**
+ * Every day of a month for one employee, with its punches and how it counts. No permission
+ * check: callers load the employee (or the slip) with its access check first.
+ */
+export async function buildMonthDays(person, month, now = new Date()) {
+  const { first, last } = monthBounds(month);
+  const records = await Attendance.find({
+    employeeId: person.employeeId,
+    date: { $gte: first, $lte: last },
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+  const byDay = Map.groupBy(records, (record) => record.date);
+  const today = indiaDay(now);
+  return Promise.all(
+    daysBetween(first, last).map(async (date) => {
+      const own = byDay.get(date) ?? [];
+      const firstIn = own.find(isPunchIn) ?? null;
+      const lastOut = own.findLast((record) => record.status === 'Checked Out') ?? null;
+      const leave = own.find((record) => record.status === 'Leave');
+      return {
+        date,
+        countedAs: countDay(date, own, today),
+        punchIn: firstIn ? await toView(firstIn) : null,
+        punchOut: lastOut ? await toView(lastOut) : null,
+        minutesWorked: hoursBetween(firstIn, lastOut),
+        remark: (leave ?? own.find((record) => record.status === 'Absent'))?.remark ?? '',
+      };
+    }),
+  );
+}
