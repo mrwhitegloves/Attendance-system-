@@ -4,6 +4,7 @@ import { env } from '../config/env.js';
 import { seedLookupsFromEmployees } from '../services/lookups.service.js';
 import { seedDocumentTypes } from '../services/documents.service.js';
 import { seedLetterTemplates } from '../services/letters.service.js';
+import { seedRoles } from '../services/roles.service.js';
 import { recomputeAllCompleteness, refreshCompleteness } from '../services/completeness.service.js';
 
 // Changes to existing data, in order. Each runs once (its name is stored in `migrations`)
@@ -53,6 +54,11 @@ export const MIGRATIONS = [
     name: '006-file-completeness-with-salary',
     // The file checklist now includes an approved salary structure.
     up: () => recomputeAllCompleteness(),
+  },
+  {
+    name: '007-roles-in-database',
+    // Roles move from code into the `roles` collection (Settings → Roles, CEO only).
+    up: () => seedRoles(),
   },
 ];
 

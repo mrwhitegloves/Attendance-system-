@@ -1,5 +1,5 @@
 import 'server-only';
-import { ROLES } from '@/server/permissions/roles.js';
+import { roleOptions } from '@/server/permissions/roles.js';
 import { STAFF_TYPES } from '@/config/employeeOptions.js';
 import { listUserOptions } from '@/server/services/users.service.js';
 import { allLookups } from '@/server/services/lookups.service.js';
@@ -10,7 +10,7 @@ import { toPlain } from '@/server/auth/current.js';
 export async function employeeFormOptions(actor) {
   const [managers, lists] = await Promise.all([listUserOptions(actor), allLookups()]);
   return {
-    roles: Object.entries(ROLES).map(([value, role]) => ({ value, label: role.label })),
+    roles: roleOptions(),
     staffTypes: STAFF_TYPES,
     managers: toPlain(managers),
     lists,

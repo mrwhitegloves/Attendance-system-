@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectDb } from './db.js';
 import { getSessionUser, tokenFromRequest } from './auth/session.js';
 import { requirePermission } from './permissions/can.js';
+import { loadRoles } from './permissions/roles.js';
 import { createAppError } from './lib/errors.js';
 
 // Every API route is built with withApi(): database, sign-in, permission, validation and
@@ -16,6 +17,7 @@ export function withApi(options, handler) {
   return async (request, context) => {
     try {
       await connectDb();
+      await loadRoles();
       const user = auth ? await getSessionUser(tokenFromRequest(request)) : null;
       if (auth && !user) throw createAppError(401, 'Please sign in again.');
       if (permission) requirePermission(user, permission);

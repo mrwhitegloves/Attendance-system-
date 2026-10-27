@@ -5,6 +5,7 @@ import { notFound, redirect } from 'next/navigation';
 import { connectDb } from '../db.js';
 import { getSessionUser, SESSION_COOKIE } from './session.js';
 import { can } from '../permissions/can.js';
+import { loadRoles } from '../permissions/roles.js';
 
 // For server pages and layouts: the signed-in person of this request (read once per request).
 
@@ -14,6 +15,7 @@ export const getCurrentUser = cache(async () => {
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   await connectDb();
+  await loadRoles();
   return getSessionUser(token);
 });
 

@@ -11,7 +11,6 @@ import { LOOKUP_TYPES } from '../models/lookup.model.js';
 import { DOCUMENT_CATEGORIES, DOCUMENT_STATUSES } from '../models/document.model.js';
 import { LETTER_KINDS } from '../models/letter.model.js';
 import { SALARY_COMPONENTS } from '../models/salary.model.js';
-import { ROLE_KEYS } from '../permissions/roles.js';
 import { ATTENDANCE_STATUSES } from '../models/attendance.model.js';
 import { MIN_PASSWORD_LENGTH } from '../auth/password.js';
 
@@ -66,7 +65,8 @@ const profileFields = {
   probationEndDate: optionalDay,
   expectedInTime: clock,
   expectedOutTime: clock,
-  roleKey: z.enum(ROLE_KEYS),
+  // Checked against the roles in use by the employee service.
+  roleKey: text(40).min(1),
   managerId: z.union([objectId, z.literal(''), z.null()]),
 };
 const optionalProfile = Object.fromEntries(
@@ -108,7 +108,7 @@ export const listUsersQuery = z.object({
   q: text(80).optional(),
   status: z.enum([...USER_STATUSES, 'all']).default('active'),
   staffType: z.enum(STAFF_TYPES).optional(),
-  roleKey: z.enum(ROLE_KEYS).optional(),
+  roleKey: text(40).optional(),
   department: text(60).optional(),
   file: z.enum(['incomplete', 'complete']).optional(),
   sort: z
@@ -352,4 +352,16 @@ export const proposeSalaryBody = z.strictObject({
 export const decideSalaryBody = z.strictObject({
   decision: z.enum(['approved', 'rejected']),
   note: text(300).optional().default(''),
+});
+
+// ---- Roles ----
+export const updateRoleBody = z
+  .strictObject({
+    label: text(60).min(2).optional(),
+    permissions: z.record(z.string(), z.union([z.boolean(), z.string(), z.null()])).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, 'nothing to change');
+export const addRoleBody = z.strictObject({
+  label: text(60).min(2, 'enter a name'),
+  copyFrom: text(40).optional(),
 });

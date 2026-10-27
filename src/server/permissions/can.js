@@ -1,4 +1,4 @@
-import { ROLES } from './roles.js';
+import { rolesNow } from './roles.js';
 import { User } from '../models/user.model.js';
 import { createAppError } from '../lib/errors.js';
 
@@ -9,7 +9,7 @@ import { createAppError } from '../lib/errors.js';
  */
 export function can(user, permission) {
   if (!user || user.status !== 'active') return false;
-  return ROLES[user.roleKey]?.permissions?.[permission] || false;
+  return rolesNow()[user.roleKey]?.permissions?.[permission] || false;
 }
 
 /** Throws 403 unless the person has the permission. Returns the scope. */

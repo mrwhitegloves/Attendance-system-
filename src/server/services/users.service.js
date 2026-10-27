@@ -7,6 +7,7 @@ import { runListQuery, containsRegex } from '../lib/pagination.js';
 import { recordAudit, diffFields } from './audit.service.js';
 import { checkLookupValues } from './lookups.service.js';
 import { refreshCompleteness } from './completeness.service.js';
+import { roleExists } from '../permissions/roles.js';
 import { decodeImageDataUrl } from '../lib/images.js';
 import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
 
@@ -135,8 +136,9 @@ async function checkManager(managerId, selfId) {
   return managerId;
 }
 
-/** Only a CEO may give or take the CEO role. */
+/** Only a CEO may give or take the CEO role; the role must exist. */
 function checkRoleChange(actor, roleKey, previous) {
+  if (!roleExists(roleKey)) throw createAppError(400, `roleKey: there is no role "${roleKey}"`);
   if (
     (roleKey === 'ceo' || previous === 'ceo') &&
     roleKey !== previous &&
@@ -283,5 +285,6 @@ export function permissionsOf(user) {
     settings: Boolean(can(user, 'settings.manage')),
     documents: can(user, 'documents.view'),
     salary: can(user, 'salary.view'),
+    roles: Boolean(can(user, 'roles.manage')),
   };
 }

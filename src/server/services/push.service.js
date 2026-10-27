@@ -1,6 +1,6 @@
 import { PushSubscription } from '../models/system.models.js';
 import { User } from '../models/user.model.js';
-import { ROLES } from '../permissions/roles.js';
+import { roleKeysWith } from '../permissions/roles.js';
 import { sendPush } from '../infra/push.js';
 
 // Push subscriptions and who gets which notification.
@@ -32,9 +32,7 @@ export async function notifyUsers(userIds, payload) {
 
 /** Active users whose role has a permission. */
 async function usersWithPermission(permission) {
-  const roleKeys = Object.entries(ROLES)
-    .filter(([, role]) => role.permissions[permission])
-    .map(([key]) => key);
+  const roleKeys = roleKeysWith(permission);
   const users = await User.find({ roleKey: { $in: roleKeys }, status: 'active' }, '_id').lean();
   return users.map((user) => user._id);
 }

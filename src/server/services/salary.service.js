@@ -1,6 +1,6 @@
 import { SalaryStructure } from '../models/salary.model.js';
 import { User } from '../models/user.model.js';
-import { ROLES } from '../permissions/roles.js';
+import { roleKeysWith } from '../permissions/roles.js';
 import { can, canSeeEmployee, employeeScopeFilter, requirePermission } from '../permissions/can.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { indiaDay } from '../lib/dates.js';
@@ -114,9 +114,7 @@ export async function proposeSalary(
     summary: `Salary v${proposal.version} proposed for ${user.name} (${user.employeeId}): annual CTC ${rupees(totals.annualCtc)} from ${effectiveFrom}. ${reason}`,
     ip,
   });
-  const approverRoles = Object.entries(ROLES)
-    .filter(([, role]) => role.permissions['salary.approve'])
-    .map(([key]) => key);
+  const approverRoles = roleKeysWith('salary.approve');
   const approvers = await User.find(
     { roleKey: { $in: approverRoles }, status: 'active', _id: { $ne: actor._id } },
     '_id',

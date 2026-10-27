@@ -3,7 +3,7 @@ import { requirePageUser, toPlain } from '@/server/auth/current.js';
 import { can } from '@/server/permissions/can.js';
 import { listUsers } from '@/server/services/users.service.js';
 import { listUsersQuery } from '@/server/validation/schemas.js';
-import { ROLES } from '@/server/permissions/roles.js';
+import { roleOptions } from '@/server/permissions/roles.js';
 import { STAFF_TYPES } from '@/config/employeeOptions.js';
 import { listLookups } from '@/server/services/lookups.service.js';
 import { ButtonLink, PageHeader } from '@/components/shared/ui.jsx';
@@ -30,7 +30,7 @@ export default async function EmployeesPage({ searchParams }) {
       />
       <EmployeeList
         result={toPlain(result)}
-        roles={Object.entries(ROLES).map(([value, role]) => ({ value, label: role.label }))}
+        roles={roleOptions()}
         staffTypes={STAFF_TYPES}
         departments={departments.map((item) => item.name)}
       />

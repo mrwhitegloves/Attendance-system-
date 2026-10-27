@@ -42,6 +42,8 @@ const ACTIONS = {
   'salary.approved': 'Salary approved',
   'salary.rejected': 'Salary rejected',
   'salary.withdrawn': 'Salary proposal withdrawn',
+  'role.updated': 'Role changed',
+  'role.added': 'Role added',
 };
 
 function describeChanges(changes) {

@@ -1,6 +1,10 @@
+import { Role } from '../models/role.model.js';
+
 // Roles and what each may do. Every check goes through can() in ./can.js; no screen or service
-// checks a role by name. A value is a scope ('all', 'team', 'own') or true for actions without one.
-// Phase 1 moves this list into a `roles` collection edited in Settings → Roles and permissions.
+// checks a role by name. A value is a scope ('all', 'team', 'own') for ".view" permissions, or
+// true for actions. Roles live in the `roles` collection (Settings → Roles, CEO only); the
+// defaults below fill it once and are used until it is loaded. The CEO role always has every
+// permission, so nobody can lock the company out.
 
 export const PERMISSIONS = {
   'attendance.punch': 'Mark own attendance',
@@ -11,10 +15,6 @@ export const PERMISSIONS = {
   'users.view': 'See employees',
   'users.manage': 'Add and edit employees',
   'users.password': 'See an employee password',
-  'notifications.punches': 'Get a notification for every punch',
-  'notifications.broadcast': 'Send a notification to all employees',
-  'audit.view': 'See the audit log',
-  'settings.manage': 'Change settings and lists',
   'kyc.view': 'See KYC and bank status (numbers masked)',
   'kyc.manage': 'Enter KYC and bank details and upload proofs',
   'kyc.verify': 'Verify or reject KYC and bank details',
@@ -27,19 +27,35 @@ export const PERMISSIONS = {
   'salary.view': 'See salary structures',
   'salary.manage': 'Propose salary structures and revisions',
   'salary.approve': 'Approve salary structures (never your own proposal)',
+  'notifications.punches': 'Get a notification for every punch',
+  'notifications.broadcast': 'Send a notification to all employees',
+  'settings.manage': 'Change settings, lists, document types and templates',
+  'roles.manage': 'Change roles and permissions',
+  'audit.view': 'See the audit log',
 };
 
-const everything = (scope) =>
-  Object.fromEntries(
-    Object.keys(PERMISSIONS).map((key) => [key, key.endsWith('.view') ? scope : true]),
-  );
+export const SCOPES = ['own', 'team', 'all'];
+// Permissions that apply to some people only (own / team / all): every ".view", and deciding
+// leave (a manager decides for their team).
+const SCOPED_ACTIONS = new Set(['leave.decide']);
+export const isScoped = (permission) =>
+  permission.endsWith('.view') || SCOPED_ACTIONS.has(permission);
 
-export const ROLES = {
-  ceo: { label: 'CEO', permissions: everything('all') },
+const everything = (scope) =>
+  Object.fromEntries(Object.keys(PERMISSIONS).map((key) => [key, isScoped(key) ? scope : true]));
+
+export const DEFAULT_ROLES = {
+  ceo: { label: 'CEO', locked: true, permissions: everything('all') },
   hr_admin: {
     label: 'HR Admin',
     // HR prepares salary changes; Finance or the CEO approves them (CEO spec, maker-checker).
-    permissions: { ...everything('all'), 'audit.view': false, 'salary.approve': false },
+    // Only the CEO changes roles, so HR cannot give itself more rights.
+    permissions: {
+      ...everything('all'),
+      'audit.view': false,
+      'salary.approve': false,
+      'roles.manage': false,
+    },
   },
   finance: {
     label: 'Finance',
@@ -98,5 +114,50 @@ export const ROLES = {
   },
 };
 
-export const ROLE_KEYS = Object.keys(ROLES);
-export const roleLabel = (key) => ROLES[key]?.label ?? key;
+// ---- The loaded roles (cached for a minute; changes clear the cache) ----
+
+let cache = null;
+let loadedAt = 0;
+const MAX_AGE_MS = 60 * 1000;
+
+/** The roles in use right now (the defaults until the database has been read). */
+export function rolesNow() {
+  return cache ?? DEFAULT_ROLES;
+}
+
+/** Reads the roles from the database at most once a minute. The CEO always gets everything. */
+export async function loadRoles({ force = false } = {}) {
+  if (!force && cache && Date.now() - loadedAt < MAX_AGE_MS) return cache;
+  const rows = await Role.find({}).lean();
+  if (!rows.length) {
+    cache = null;
+  } else {
+    cache = Object.fromEntries(
+      rows.map((row) => [
+        row.key,
+        {
+          label: row.label,
+          locked: row.locked,
+          permissions: row.locked ? everything('all') : (row.permissions ?? {}),
+        },
+      ]),
+    );
+  }
+  loadedAt = Date.now();
+  return rolesNow();
+}
+
+export function resetRolesCache() {
+  cache = null;
+  loadedAt = 0;
+}
+
+export const roleLabel = (key) => rolesNow()[key]?.label ?? key;
+export const roleExists = (key) => Boolean(rolesNow()[key]);
+export const roleOptions = () =>
+  Object.entries(rolesNow()).map(([value, role]) => ({ value, label: role.label }));
+/** Role keys that have a permission (any scope). */
+export const roleKeysWith = (permission) =>
+  Object.entries(rolesNow())
+    .filter(([, role]) => role.permissions[permission])
+    .map(([key]) => key);
