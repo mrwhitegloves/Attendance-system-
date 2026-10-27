@@ -19,6 +19,13 @@ export const NAVIGATION = [
   },
   { href: '/leave', label: 'Leave', icon: 'Plane', show: (p) => p.leaves, mobile: true },
   {
+    href: '/requests',
+    label: 'Requests',
+    icon: 'Inbox',
+    show: (p) => p.requests || p.requestCreate,
+    mobile: true,
+  },
+  {
     href: '/employees',
     label: 'Employees',
     icon: 'Users',

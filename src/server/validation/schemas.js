@@ -15,6 +15,7 @@ import { SALARY_COMPONENTS } from '../models/salary.model.js';
 import { ATTENDANCE_SUMMARY, DEDUCTIONS, EARNINGS } from '../../config/payslipFields.js';
 import { ATTENDANCE_STATUSES } from '../models/attendance.model.js';
 import { MIN_PASSWORD_LENGTH } from '../auth/password.js';
+import { REQUEST_KIND_KEYS, REQUEST_STATUSES } from '../../config/requestKinds.js';
 
 // Input rules of every endpoint. Strict objects: unknown fields are refused.
 
@@ -461,4 +462,32 @@ export const leaveBalanceBody = z.strictObject({
   days: z.coerce.number().min(-60).max(60).multipleOf(0.5, 'use whole or half days'),
   month,
   reason: text(200).min(3, 'write the reason'),
+});
+
+// ---- Requests inbox ----
+
+export const requestBody = z.strictObject({
+  kind: z.enum(REQUEST_KIND_KEYS),
+  subject: text(120).min(3, 'write a short subject'),
+  details: text(2000).optional(),
+  category: text(40).optional(),
+  // Rupees; stored as paise.
+  amount: z.coerce.number().positive('enter the amount').max(1000000).multipleOf(0.01).optional(),
+  date: day.optional(),
+  file: z.string().max(7_200_000, 'the file is larger than 5 MB').optional(),
+  fileName: text(120).optional(),
+});
+
+export const decideRequestBody = z.strictObject({
+  decision: z.enum(['approved', 'rejected']),
+  note: text(500).optional(),
+  approvedAmount: z.coerce.number().min(0).max(1000000).multipleOf(0.01).optional(),
+});
+
+export const listRequestsQuery = z.object({
+  box: z.enum(['mine', 'decide', 'all']).default('mine'),
+  kind: z.enum(REQUEST_KIND_KEYS).optional().catch(undefined),
+  status: z.enum([...REQUEST_STATUSES, 'all']).default('all'),
+  q: text(80).optional(),
+  page,
 });

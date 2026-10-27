@@ -66,6 +66,11 @@ export const MIGRATIONS = [
     up: () =>
       addMissingDefaultPermissions(['payslips.view', 'payslips.manage', 'payslips.finalise']),
   },
+  {
+    name: '009-request-permissions',
+    // Requests inbox: the new permissions reach roles already in the database.
+    up: () => addMissingDefaultPermissions(['requests.create', 'requests.view', 'requests.decide']),
+  },
 ];
 
 export async function runMigrations() {

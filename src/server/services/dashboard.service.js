@@ -8,6 +8,7 @@ import { can, employeeScopeFilter } from '../permissions/can.js';
 import { indiaDay } from '../lib/dates.js';
 import { salaryOverview } from './salary.service.js';
 import { queueExpiryCheck } from './documents.service.js';
+import { countRequestsToDecide } from './requests.service.js';
 
 // The CEO dashboard (CEO spec section 1, "MWG People & Finance Control"): headcount, verified %,
 // payroll exposure, open items and a priority queue. Everything is worked out live from the
@@ -202,8 +203,20 @@ export async function getControlCenter(actor) {
       });
   }
 
+  // ---- Requests (expense, advance, document, grievance) waiting for a decision ----
+  const requestsWaiting = await countRequestsToDecide(actor);
+  if (requestsWaiting)
+    queue.push({
+      key: 'requests',
+      label: 'Requests to decide',
+      count: requestsWaiting,
+      href: '/requests?box=decide',
+      tone: 'brand',
+    });
+
   const order = [
     'salary',
+    'requests',
     'expired',
     'kyc',
     'documents',

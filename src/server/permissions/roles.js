@@ -30,6 +30,9 @@ export const PERMISSIONS = {
   'payslips.view': 'See salary slips',
   'payslips.manage': 'Prepare and change draft salary slips',
   'payslips.finalise': 'Make salary slips final (never one you last changed)',
+  'requests.create': 'Send requests (expense, advance, document, grievance)',
+  'requests.view': 'See requests (a team never includes grievances)',
+  'requests.decide': 'Decide requests (never your own; grievances need everyone)',
   'notifications.punches': 'Get a notification for every punch',
   'notifications.broadcast': 'Send a notification to all employees',
   'settings.manage': 'Change settings, lists, document types and templates',
@@ -39,8 +42,8 @@ export const PERMISSIONS = {
 
 export const SCOPES = ['own', 'team', 'all'];
 // Permissions that apply to some people only (own / team / all): every ".view", and deciding
-// leave (a manager decides for their team).
-const SCOPED_ACTIONS = new Set(['leave.decide']);
+// leave or requests (a manager decides for their team).
+const SCOPED_ACTIONS = new Set(['leave.decide', 'requests.decide']);
 export const isScoped = (permission) =>
   permission.endsWith('.view') || SCOPED_ACTIONS.has(permission);
 
@@ -80,6 +83,9 @@ export const DEFAULT_ROLES = {
       'payslips.view': 'all',
       'payslips.manage': true,
       'payslips.finalise': true,
+      'requests.create': true,
+      'requests.view': 'all',
+      'requests.decide': 'all',
     },
   },
   manager: {
@@ -91,6 +97,8 @@ export const DEFAULT_ROLES = {
       'leave.view': 'team',
       'leave.decide': 'team',
       'users.view': 'team',
+      'requests.create': true,
+      'requests.view': 'team',
     },
   },
   employee: {
@@ -105,6 +113,8 @@ export const DEFAULT_ROLES = {
       'letters.view': 'own',
       'salary.view': 'own',
       'payslips.view': 'own',
+      'requests.create': true,
+      'requests.view': 'own',
     },
   },
   auditor: {
@@ -119,6 +129,7 @@ export const DEFAULT_ROLES = {
       'letters.view': 'all',
       'salary.view': 'all',
       'payslips.view': 'all',
+      'requests.view': 'all',
     },
   },
 };

@@ -294,5 +294,8 @@ export function permissionsOf(user) {
     salary: can(user, 'salary.view'),
     payslips: can(user, 'payslips.view'),
     roles: Boolean(can(user, 'roles.manage')),
+    requestCreate: Boolean(can(user, 'requests.create')),
+    requests: can(user, 'requests.view'),
+    requestDecide: can(user, 'requests.decide'),
   };
 }
