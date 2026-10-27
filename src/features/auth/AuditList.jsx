@@ -30,6 +30,14 @@ const ACTIONS = {
   'document.rejected': 'Document rejected',
   'document_type.added': 'Document type added',
   'document_type.updated': 'Document type changed',
+  'letter.drafted': 'Letter drafted',
+  'letter.edited': 'Letter draft edited',
+  'letter.issued': 'Letter issued',
+  'letter.accepted': 'Letter accepted',
+  'letter.declined': 'Letter declined',
+  'letter_template.added': 'Letter template added',
+  'letter_template.updated': 'Letter template changed',
+  'settings.company': 'Company details changed',
 };
 
 function describeChanges(changes) {

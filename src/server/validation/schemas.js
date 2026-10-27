@@ -9,6 +9,7 @@ import {
 } from '../models/user.model.js';
 import { LOOKUP_TYPES } from '../models/lookup.model.js';
 import { DOCUMENT_CATEGORIES, DOCUMENT_STATUSES } from '../models/document.model.js';
+import { LETTER_KINDS } from '../models/letter.model.js';
 import { ROLE_KEYS } from '../permissions/roles.js';
 import { ATTENDANCE_STATUSES } from '../models/attendance.model.js';
 import { MIN_PASSWORD_LENGTH } from '../auth/password.js';
@@ -271,4 +272,62 @@ export const listDocumentsQuery = z.object({
   typeId: objectId.optional(),
   expiring: z.enum(['soon']).optional(),
   page,
+});
+
+// ---- Letters and company ----
+const letterFields = z.strictObject({
+  // Typed in rupees, stored in paise.
+  ctcAnnual: z.coerce
+    .number()
+    .min(0)
+    .max(100_000_000)
+    .transform((rupees) => Math.round(rupees * 100))
+    .optional(),
+  probationMonths: z.coerce.number().int().min(0).max(24).optional(),
+  acceptBy: optionalDay.optional(),
+  joiningDate: optionalDay.optional(),
+});
+const toStoredFields = (fields = {}) => {
+  const { ctcAnnual, ...rest } = fields;
+  return ctcAnnual === undefined ? rest : { ...rest, ctcAnnualPaise: ctcAnnual };
+};
+export const createLetterBody = z
+  .strictObject({ templateId: objectId, fields: letterFields.optional().default({}) })
+  .transform((value) => ({ ...value, fields: toStoredFields(value.fields) }));
+export const updateLetterBody = z
+  .strictObject({
+    subject: text(200).optional(),
+    body: z.string().max(20000).optional(),
+    fields: letterFields.optional(),
+  })
+  .transform((value) =>
+    value.fields ? { ...value, fields: toStoredFields(value.fields) } : value,
+  );
+export const respondLetterBody = z.strictObject({
+  decision: z.enum(['accepted', 'declined']),
+  note: text(300).optional().default(''),
+});
+export const templateBody = z.strictObject({
+  name: text(80).min(2, 'enter a name'),
+  kind: z.enum(Object.keys(LETTER_KINDS)),
+  subject: text(200).optional().default(''),
+  body: z.string().min(10, 'write the letter').max(20000),
+});
+export const updateTemplateBody = z
+  .strictObject({
+    name: text(80).min(2).optional(),
+    kind: z.enum(Object.keys(LETTER_KINDS)).optional(),
+    subject: text(200).optional(),
+    body: z.string().min(10).max(20000).optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, 'nothing to change');
+export const companyBody = z.strictObject({
+  name: text(120).optional(),
+  address: text(400).optional(),
+  signatoryName: text(100).optional(),
+  signatoryTitle: text(100).optional(),
+  phone: text(30).optional(),
+  email: email.optional(),
+  website: text(120).optional(),
 });

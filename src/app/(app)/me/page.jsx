@@ -11,6 +11,8 @@ import { getKyc } from '@/server/services/kyc.service.js';
 import { getEmployeeDocuments } from '@/server/services/documents.service.js';
 import { DocumentsPanel } from '@/features/documents/DocumentsPanel.jsx';
 import { can } from '@/server/permissions/can.js';
+import { listLettersFor } from '@/server/services/letters.service.js';
+import { MyLetters } from '@/features/letters/MyLetters.jsx';
 
 export const metadata = { title: 'My profile' };
 
@@ -20,6 +22,9 @@ export default async function MePage() {
   const kyc = can(signedIn, 'kyc.view') ? await getKyc(signedIn, signedIn._id) : null;
   const documents = can(signedIn, 'documents.view')
     ? await getEmployeeDocuments(signedIn, signedIn._id)
+    : null;
+  const letters = can(signedIn, 'letters.view')
+    ? await listLettersFor(signedIn, signedIn._id)
     : null;
   return (
     <>
@@ -44,6 +49,7 @@ export default async function MePage() {
           checklist={await fileChecklist(user)}
           canEdit={false}
         />
+        {letters?.letters.length > 0 && <MyLetters letters={toPlain(letters.letters)} />}
         {kyc && (
           <section>
             <h2 className="mb-2 text-sm font-semibold">KYC and bank</h2>

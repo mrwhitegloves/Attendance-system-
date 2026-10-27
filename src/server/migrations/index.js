@@ -3,6 +3,7 @@ import { User } from '../models/user.model.js';
 import { env } from '../config/env.js';
 import { seedLookupsFromEmployees } from '../services/lookups.service.js';
 import { seedDocumentTypes } from '../services/documents.service.js';
+import { seedLetterTemplates } from '../services/letters.service.js';
 import { recomputeAllCompleteness, refreshCompleteness } from '../services/completeness.service.js';
 
 // Changes to existing data, in order. Each runs once (its name is stored in `migrations`)
@@ -42,6 +43,11 @@ export const MIGRATIONS = [
       await seedDocumentTypes();
       await recomputeAllCompleteness();
     },
+  },
+  {
+    name: '005-letter-templates',
+    // The starting offer and appointment letter templates.
+    up: () => seedLetterTemplates(),
   },
 ];
 

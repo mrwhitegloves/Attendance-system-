@@ -47,6 +47,7 @@ export default async function EmployeeLayout({ children, params }) {
         show={{
           kyc: Boolean(can(user, 'kyc.view')),
           documents: Boolean(can(user, 'documents.view')),
+          letters: Boolean(can(user, 'letters.view')),
           leave: Boolean(can(user, 'leave.view')),
         }}
       />

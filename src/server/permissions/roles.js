@@ -22,6 +22,8 @@ export const PERMISSIONS = {
   'documents.view': 'See employee documents',
   'documents.manage': 'Upload employee documents',
   'documents.verify': 'Verify or reject employee documents',
+  'letters.view': 'See letters',
+  'letters.manage': 'Prepare and issue letters',
 };
 
 const everything = (scope) =>
@@ -47,6 +49,7 @@ export const ROLES = {
       'kyc.verify': true,
       'kyc.reveal': true,
       'documents.view': 'all',
+      'letters.view': 'all',
     },
   },
   manager: {
@@ -69,6 +72,7 @@ export const ROLES = {
       'leave.view': 'own',
       'kyc.view': 'own',
       'documents.view': 'own',
+      'letters.view': 'own',
     },
   },
   auditor: {
@@ -80,6 +84,7 @@ export const ROLES = {
       'audit.view': 'all',
       'kyc.view': 'all',
       'documents.view': 'all',
+      'letters.view': 'all',
     },
   },
 };
