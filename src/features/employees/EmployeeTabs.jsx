@@ -7,6 +7,7 @@ import { LinkTabs } from '@/components/shared/Tabs.jsx';
 const SECTIONS = [
   { id: 'profile', label: 'Profile', path: '' },
   { id: 'kyc', label: 'KYC & bank', path: '/kyc', permission: 'kyc' },
+  { id: 'documents', label: 'Documents', path: '/documents', permission: 'documents' },
   { id: 'attendance', label: 'Attendance', path: '/attendance' },
   { id: 'leave', label: 'Leave', path: '/leave', permission: 'leave' },
 ];

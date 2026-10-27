@@ -19,6 +19,9 @@ export const PERMISSIONS = {
   'kyc.manage': 'Enter KYC and bank details and upload proofs',
   'kyc.verify': 'Verify or reject KYC and bank details',
   'kyc.reveal': 'See full PAN and bank account numbers',
+  'documents.view': 'See employee documents',
+  'documents.manage': 'Upload employee documents',
+  'documents.verify': 'Verify or reject employee documents',
 };
 
 const everything = (scope) =>
@@ -43,6 +46,7 @@ export const ROLES = {
       'kyc.view': 'all',
       'kyc.verify': true,
       'kyc.reveal': true,
+      'documents.view': 'all',
     },
   },
   manager: {
@@ -64,6 +68,7 @@ export const ROLES = {
       'leave.request': true,
       'leave.view': 'own',
       'kyc.view': 'own',
+      'documents.view': 'own',
     },
   },
   auditor: {
@@ -74,6 +79,7 @@ export const ROLES = {
       'users.view': 'all',
       'audit.view': 'all',
       'kyc.view': 'all',
+      'documents.view': 'all',
     },
   },
 };

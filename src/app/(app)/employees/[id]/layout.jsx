@@ -44,7 +44,11 @@ export default async function EmployeeLayout({ children, params }) {
       </div>
       <EmployeeTabs
         id={employee._id}
-        show={{ kyc: Boolean(can(user, 'kyc.view')), leave: Boolean(can(user, 'leave.view')) }}
+        show={{
+          kyc: Boolean(can(user, 'kyc.view')),
+          documents: Boolean(can(user, 'documents.view')),
+          leave: Boolean(can(user, 'leave.view')),
+        }}
       />
       {children}
     </>

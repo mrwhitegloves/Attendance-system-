@@ -7,6 +7,7 @@ import { useState } from 'react';
 import {
   Camera,
   CalendarCheck,
+  FolderOpen,
   LayoutDashboard,
   LogOut,
   Moon,
@@ -26,6 +27,7 @@ import { DeviceSetup } from '@/features/notifications/DeviceSetup.jsx';
 const ICONS = {
   Camera,
   CalendarCheck,
+  FolderOpen,
   LayoutDashboard,
   Plane,
   ScrollText,

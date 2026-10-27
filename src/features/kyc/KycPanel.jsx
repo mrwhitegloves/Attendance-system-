@@ -9,14 +9,7 @@ import { ACCEPTED_UPLOADS, readFileAsDataUrl } from '@/lib/readFile.js';
 import { Badge, Button, Card, CardHeader, ErrorText } from '@/components/shared/ui.jsx';
 import { Dialog } from '@/components/shared/Dialog.jsx';
 import { Field, inputClass } from '@/components/shared/form.jsx';
-
-export const KYC_STATUS = {
-  missing: { label: 'Missing', tone: 'neutral' },
-  submitted: { label: 'Submitted', tone: 'info' },
-  under_review: { label: 'Under review', tone: 'warning' },
-  verified: { label: 'Verified', tone: 'success' },
-  rejected: { label: 'Rejected', tone: 'danger' },
-};
+import { REVIEW_STATUS } from '@/config/reviewStatus.js';
 
 // The fields HR types for each item.
 const FORMS = {
@@ -61,7 +54,7 @@ function KycCard({ userId, item, permissions }) {
   const [dialog, setDialog] = useState(null); // 'edit' | 'verify' | 'reject' | 'reveal'
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const status = KYC_STATUS[item.status];
+  const status = REVIEW_STATUS[item.status];
   const base = `/api/users/${userId}/kyc/${item.item}`;
 
   const upload = async (event) => {

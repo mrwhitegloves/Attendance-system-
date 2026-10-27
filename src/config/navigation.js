@@ -25,6 +25,12 @@ export const NAVIGATION = [
     show: (p) => p.users && p.users !== 'own',
     mobile: true,
   },
+  {
+    href: '/documents',
+    label: 'Documents',
+    icon: 'FolderOpen',
+    show: (p) => p.documents && p.documents !== 'own',
+  },
   { href: '/audit-log', label: 'Audit log', icon: 'ScrollText', show: (p) => p.audit },
   { href: '/settings', label: 'Settings', icon: 'Settings', show: (p) => p.settings },
   { href: '/me', label: 'My profile', icon: 'UserRound', show: () => true },

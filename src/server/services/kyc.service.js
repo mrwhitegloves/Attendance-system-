@@ -6,7 +6,7 @@ import { seal, open } from '../lib/secretBox.js';
 import { decodeFileDataUrl, safeFileName } from '../lib/files.js';
 import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
 import { recordAudit } from './audit.service.js';
-import { refreshCompleteness } from './users.service.js';
+import { refreshCompleteness } from './completeness.service.js';
 
 // KYC and bank details (CEO spec section 4: sensitive, restricted, masked, every access logged).
 // Rules:

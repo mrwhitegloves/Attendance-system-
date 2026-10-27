@@ -25,6 +25,11 @@ const ACTIONS = {
   'kyc.verified': 'KYC verified',
   'kyc.rejected': 'KYC rejected',
   'kyc.revealed': 'Full KYC number viewed',
+  'document.uploaded': 'Document uploaded',
+  'document.verified': 'Document verified',
+  'document.rejected': 'Document rejected',
+  'document_type.added': 'Document type added',
+  'document_type.updated': 'Document type changed',
 };
 
 function describeChanges(changes) {

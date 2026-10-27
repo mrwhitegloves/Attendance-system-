@@ -8,6 +8,7 @@ import {
   WORK_MODES,
 } from '../models/user.model.js';
 import { LOOKUP_TYPES } from '../models/lookup.model.js';
+import { DOCUMENT_CATEGORIES, DOCUMENT_STATUSES } from '../models/document.model.js';
 import { ROLE_KEYS } from '../permissions/roles.js';
 import { ATTENDANCE_STATUSES } from '../models/attendance.model.js';
 import { MIN_PASSWORD_LENGTH } from '../auth/password.js';
@@ -233,4 +234,41 @@ export const fileBody = z.strictObject({
 export const kycReviewBody = z.strictObject({
   decision: z.enum(['verified', 'rejected']),
   reason: text(300).optional().default(''),
+});
+
+// ---- Documents ----
+const category = z.enum(Object.keys(DOCUMENT_CATEGORIES));
+export const addDocumentTypeBody = z.strictObject({
+  name: text(80).min(2, 'enter a name'),
+  category,
+  required: z.boolean().optional().default(false),
+  hasExpiry: z.boolean().optional().default(false),
+  needsSignature: z.boolean().optional().default(false),
+});
+export const updateDocumentTypeBody = z
+  .strictObject({
+    name: text(80).min(2, 'enter a name').optional(),
+    category: category.optional(),
+    required: z.boolean().optional(),
+    hasExpiry: z.boolean().optional(),
+    needsSignature: z.boolean().optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, 'nothing to change');
+export const uploadDocumentBody = z.strictObject({
+  typeId: objectId,
+  file: z.string().max(7_200_000, 'the file is larger than 5 MB'),
+  fileName: text(120).optional().default(''),
+  expiresOn: optionalDay.optional().default(''),
+  signed: z.boolean().optional().default(false),
+  note: text(200).optional().default(''),
+});
+export const reviewDocumentBody = kycReviewBody;
+export const listDocumentsQuery = z.object({
+  q: text(80).optional(),
+  status: z.enum(DOCUMENT_STATUSES).optional(),
+  category: category.optional(),
+  typeId: objectId.optional(),
+  expiring: z.enum(['soon']).optional(),
+  page,
 });

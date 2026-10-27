@@ -1,13 +1,14 @@
 // How complete an employee's file is, worked out from the record itself (CEO spec: the
 // dashboard calculates completeness; HR never declares a file complete by hand).
-// KYC and bank items count once they are submitted (verification is shown separately).
+// KYC items and required documents count once they are submitted (verification is shown
+// separately); an expired or rejected document does not count.
 
 const KYC_DONE = ['submitted', 'under_review', 'verified'];
 
 const filled = (value) => (typeof value === 'string' ? value.trim() !== '' : Boolean(value));
 
 /** Every item of the employee's file with its section and whether it is done. */
-export function profileChecklist(user, kyc = null) {
+export function profileChecklist(user, kyc = null, documents = null) {
   const items = [
     ['personal', 'Photo', filled(user.photoKey)],
     ['personal', 'Mobile number', filled(user.phone)],
@@ -38,12 +39,17 @@ export function profileChecklist(user, kyc = null) {
   ]) {
     items.push(['kyc', label, KYC_DONE.includes(kyc?.[item]?.status)]);
   }
+  // documents: { requiredTypes: [{ _id, name }], records: [{ typeId, status }] }
+  for (const type of documents?.requiredTypes ?? []) {
+    const record = documents.records.find((doc) => String(doc.typeId) === String(type._id));
+    items.push(['documents', type.name, KYC_DONE.includes(record?.status)]);
+  }
   return items.map(([section, label, done]) => ({ section, label, done }));
 }
 
 /** { percent: 0–100, missing: [labels] } */
-export function computeCompleteness(user, kyc = null) {
-  const items = profileChecklist(user, kyc);
+export function computeCompleteness(user, kyc = null, documents = null) {
+  const items = profileChecklist(user, kyc, documents);
   const done = items.filter((item) => item.done).length;
   return {
     percent: Math.round((done / items.length) * 100),

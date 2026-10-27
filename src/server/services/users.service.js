@@ -1,13 +1,12 @@
 import { User, PUBLIC_USER_FIELDS } from '../models/user.model.js';
 import { Counter } from '../models/system.models.js';
-import { Kyc } from '../models/kyc.model.js';
 import { can, canSeeEmployee, employeeScopeFilter, requirePermission } from '../permissions/can.js';
 import { destroyUserSessions } from '../auth/session.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { runListQuery, containsRegex } from '../lib/pagination.js';
 import { recordAudit, diffFields } from './audit.service.js';
 import { checkLookupValues } from './lookups.service.js';
-import { computeCompleteness, profileChecklist } from '../lib/completeness.js';
+import { refreshCompleteness } from './completeness.service.js';
 import { decodeImageDataUrl } from '../lib/images.js';
 import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
 
@@ -42,19 +41,8 @@ const EDITABLE = [
   'expectedOutTime',
 ];
 
-/** Works out and saves how complete the employee's file is. */
-export async function refreshCompleteness(id) {
-  const [user, kyc] = await Promise.all([
-    User.findById(id).lean(),
-    Kyc.findOne({ userId: id }).lean(),
-  ]);
-  if (user) await User.updateOne({ _id: id }, { completeness: computeCompleteness(user, kyc) });
-}
-
-/** Every item of an employee's file and whether it is done (profile and KYC). */
-export async function fileChecklist(user) {
-  return profileChecklist(user, await Kyc.findOne({ userId: user._id }).lean());
-}
+// Completeness lives in completeness.service.js; re-exported for the pages that import it here.
+export { fileChecklist, refreshCompleteness } from './completeness.service.js';
 
 /** Adds a short-lived photo link to an employee for the screens. */
 async function withPhoto(user) {
@@ -293,5 +281,6 @@ export function permissionsOf(user) {
     punchAlerts: Boolean(can(user, 'notifications.punches')),
     audit: Boolean(can(user, 'audit.view')),
     settings: Boolean(can(user, 'settings.manage')),
+    documents: can(user, 'documents.view'),
   };
 }

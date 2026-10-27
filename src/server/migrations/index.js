@@ -2,8 +2,8 @@ import { Migration } from '../models/system.models.js';
 import { User } from '../models/user.model.js';
 import { env } from '../config/env.js';
 import { seedLookupsFromEmployees } from '../services/lookups.service.js';
-import { computeCompleteness } from '../lib/completeness.js';
-import { Kyc } from '../models/kyc.model.js';
+import { seedDocumentTypes } from '../services/documents.service.js';
+import { recomputeAllCompleteness, refreshCompleteness } from '../services/completeness.service.js';
 
 // Changes to existing data, in order. Each runs once (its name is stored in `migrations`)
 // and must be safe to run again. Never edit the database by hand; add a migration here.
@@ -35,19 +35,15 @@ export const MIGRATIONS = [
     // The file checklist now includes PAN, Aadhaar and bank account.
     up: () => recomputeAllCompleteness(),
   },
+  {
+    name: '004-document-catalogue',
+    // The starting list of document types (CEO spec table); required ones join the file checklist.
+    up: async () => {
+      await seedDocumentTypes();
+      await recomputeAllCompleteness();
+    },
+  },
 ];
-
-/** Recomputes every employee's file completeness (a migration runs this when the checklist grows). */
-export async function recomputeAllCompleteness() {
-  const [users, records] = await Promise.all([User.find({}).lean(), Kyc.find({}).lean()]);
-  const kycOf = new Map(records.map((record) => [String(record.userId), record]));
-  for (const user of users) {
-    await User.updateOne(
-      { _id: user._id },
-      { completeness: computeCompleteness(user, kycOf.get(String(user._id))) },
-    );
-  }
-}
 
 export async function runMigrations() {
   const done = new Set((await Migration.find({}, 'name').lean()).map((row) => row.name));
@@ -86,10 +82,7 @@ export async function ensureCeoAccount() {
     roleKey: 'ceo',
     status: 'active',
   });
-  await User.updateOne(
-    { _id: created._id },
-    { completeness: computeCompleteness(created.toObject()) },
-  );
+  await refreshCompleteness(created._id);
   await seedLookupsFromEmployees();
   return 'created';
 }
