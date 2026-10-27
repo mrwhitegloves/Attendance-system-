@@ -8,12 +8,14 @@ import { createAppError, notFound } from '../lib/errors.js';
 import { decodeFileDataUrl, safeFileName } from '../lib/files.js';
 import { containsRegex, runListQuery } from '../lib/pagination.js';
 import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
-import { REQUEST_KINDS } from '../../config/requestKinds.js';
+import { REQUEST_KINDS, categoryLabel, missedPunches } from '../../config/requestKinds.js';
 import { recordAudit } from './audit.service.js';
 import { notifyUsers } from './push.service.js';
 import { countPendingLeaves } from './leaves.service.js';
+import { checkMissedPunch, writeMissedPunch } from './attendance.service.js';
 
 // Employee requests (CEO spec section 10). Rules:
+// - a missed punch is added to attendance only when approved, after checking the day again;
 // - a request is always for oneself; it can be withdrawn while it waits;
 // - nobody decides their own request; a decision is final;
 // - a team scope never includes grievances: only people who see everyone see or decide them;
@@ -51,7 +53,24 @@ export async function createRequest(actor, input, { ip } = {}) {
   if (kind.categories && !kind.categories[input.category]) {
     throw createAppError(400, `category: choose the ${kind.categoryLabel.toLowerCase()}`);
   }
-  if (input.kind === 'expense' && !input.date) throw createAppError(400, 'date: enter the day');
+  if ((input.kind === 'expense' || kind.punches) && !input.date) {
+    throw createAppError(400, 'date: enter the day');
+  }
+  if (!kind.punches && !input.subject) throw createAppError(400, 'subject: write a short subject');
+  const punches = kind.punches ? punchTimes(input.category, input) : {};
+  if (kind.punches) {
+    const wanted = missedPunches(input.category);
+    if (wanted.punchIn && !punches.punchInTime) {
+      throw createAppError(400, 'punchInTime: enter the punch-in time');
+    }
+    if (wanted.punchOut && !punches.punchOutTime) {
+      throw createAppError(400, 'punchOutTime: enter the punch-out time');
+    }
+    await checkMissedPunch(actor, { date: input.date, ...punches });
+  }
+  const subject = kind.punches
+    ? `Missed ${categoryLabel(input.kind, input.category).toLowerCase()} on ${input.date}`
+    : input.subject;
   if (kind.detailsRequired && !input.details)
     throw createAppError(400, 'details: write the details');
 
@@ -75,8 +94,9 @@ export async function createRequest(actor, input, { ip } = {}) {
     userId: actor._id,
     employeeId: actor.employeeId,
     employeeName: actor.name,
-    subject: input.subject,
+    subject,
     details: input.details ?? '',
+    ...punches,
     category: kind.categories ? input.category : '',
     amountPaise: kind.money ? Math.round(input.amount * 100) : null,
     date: kind.dateLabel ? input.date || null : null,
@@ -87,11 +107,20 @@ export async function createRequest(actor, input, { ip } = {}) {
     entity: 'request',
     entityId: created._id,
     // A grievance's words stay out of the audit log.
-    summary: `${kind.label} ${number}${isPrivate(input.kind) ? '' : `: ${input.subject}`}`,
+    summary: `${kind.label} ${number}${isPrivate(input.kind) ? '' : `: ${subject}`}`,
     ip,
   });
   notifyDeciders(actor, created).catch(() => {});
   return getRequest(actor, created._id);
+}
+
+/** Only the times that match what was missed. */
+function punchTimes(category, times) {
+  const wanted = missedPunches(category);
+  return {
+    punchInTime: wanted.punchIn ? (times.punchInTime ?? null) : null,
+    punchOutTime: wanted.punchOut ? (times.punchOutTime ?? null) : null,
+  };
 }
 
 /** People who can decide this request: everyone-scope deciders, plus the manager for a team scope. */
@@ -228,7 +257,12 @@ export async function getRequest(actor, id) {
   };
 }
 
-export async function decideRequest(actor, id, { decision, note, approvedAmount }, { ip } = {}) {
+export async function decideRequest(
+  actor,
+  id,
+  { decision, note, approvedAmount, punchInTime, punchOutTime },
+  { ip } = {},
+) {
   const request = await loadRequest(actor, id);
   if (String(request.userId) === String(actor._id)) {
     throw createAppError(403, 'You cannot decide your own request.');
@@ -250,6 +284,17 @@ export async function decideRequest(actor, id, { decision, note, approvedAmount 
   if (decision === 'rejected' && !note) {
     throw createAppError(400, 'note: write a reason for the employee');
   }
+  // Missed punch: HR may correct the times; the day is checked again before anything is written.
+  let owner = null;
+  let approvedPunches = {};
+  if (kind.punches && decision === 'approved') {
+    owner = await User.findById(request.userId).lean();
+    approvedPunches = punchTimes(request.category, {
+      punchInTime: punchInTime ?? request.punchInTime,
+      punchOutTime: punchOutTime ?? request.punchOutTime,
+    });
+    await checkMissedPunch(owner, { date: request.date, ...approvedPunches });
+  }
 
   const updated = await EmployeeRequest.findOneAndUpdate(
     { _id: id, status: 'pending' },
@@ -257,6 +302,8 @@ export async function decideRequest(actor, id, { decision, note, approvedAmount 
       status: decision,
       decisionNote: note ?? '',
       approvedAmountPaise,
+      approvedPunchInTime: approvedPunches.punchInTime ?? null,
+      approvedPunchOutTime: approvedPunches.punchOutTime ?? null,
       decidedBy: actor._id,
       decidedByName: actor.name,
       decidedAt: new Date(),
@@ -264,6 +311,13 @@ export async function decideRequest(actor, id, { decision, note, approvedAmount 
     { returnDocument: 'after' },
   ).lean();
   if (!updated) throw createAppError(409, 'This request was just decided by someone else.');
+  if (owner) {
+    await writeMissedPunch(
+      owner,
+      { date: request.date, ...approvedPunches },
+      { note: `Missed punch ${request.number}, approved by ${actor.name}` },
+    );
+  }
 
   const word = kind.done[decision];
   await recordAudit(actor, {
@@ -271,10 +325,7 @@ export async function decideRequest(actor, id, { decision, note, approvedAmount 
     entity: 'request',
     entityId: id,
     summary: `${word}: ${kind.label} ${request.number} of ${request.employeeName}`,
-    changes:
-      approvedAmountPaise !== null && approvedAmountPaise !== request.amountPaise
-        ? { amountPaise: { from: request.amountPaise, to: approvedAmountPaise } }
-        : undefined,
+    changes: changedOnApproval(request, approvedAmountPaise, approvedPunches),
     ip,
   });
   notifyUsers([request.userId], {
@@ -284,6 +335,20 @@ export async function decideRequest(actor, id, { decision, note, approvedAmount 
     data: { url: `/requests/${id}` },
   }).catch(() => {});
   return getRequest(actor, id);
+}
+
+/** What the decider changed from what was asked (amount, punch times), for the audit log. */
+function changedOnApproval(request, approvedAmountPaise, approvedPunches) {
+  const changes = {};
+  if (approvedAmountPaise !== null && approvedAmountPaise !== request.amountPaise) {
+    changes.amountPaise = { from: request.amountPaise, to: approvedAmountPaise };
+  }
+  for (const key of ['punchInTime', 'punchOutTime']) {
+    if (approvedPunches[key] && approvedPunches[key] !== request[key]) {
+      changes[key] = { from: request[key], to: approvedPunches[key] };
+    }
+  }
+  return Object.keys(changes).length ? changes : undefined;
 }
 
 /** The employee withdraws their own request while it waits. */

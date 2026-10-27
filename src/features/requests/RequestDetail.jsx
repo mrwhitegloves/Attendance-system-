@@ -16,6 +16,12 @@ import { Badge, Button, Card, CardHeader, ErrorText } from '@/components/shared/
 import { ConfirmDialog } from '@/components/shared/Dialog.jsx';
 import { Field, inputClass } from '@/components/shared/form.jsx';
 
+/** "18:40" → "6:40 PM". */
+function clock12(value) {
+  const [hours, minutes] = value.split(':').map(Number);
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours < 12 ? 'AM' : 'PM'}`;
+}
+
 /** One request: what was asked, the files, the decision, and the decide / withdraw actions. */
 export function RequestDetail({ request }) {
   const kind = REQUEST_KINDS[request.kind];
@@ -24,6 +30,8 @@ export function RequestDetail({ request }) {
     kind.categories && [kind.categoryLabel, categoryLabel(request.kind, request.category)],
     kind.money && ['Amount asked', formatRupees(request.amountPaise)],
     kind.dateLabel && request.date && [kind.dateLabel, formatDay(request.date)],
+    request.punchInTime && ['Punch-in asked', clock12(request.punchInTime)],
+    request.punchOutTime && ['Punch-out asked', clock12(request.punchOutTime)],
     ['Sent', formatDateTime(request.createdAt)],
   ].filter(Boolean);
 
@@ -110,6 +118,20 @@ function Decision({ request, kind }) {
             <strong className="tabular-nums">{formatRupees(request.approvedAmountPaise)}</strong>
           </p>
         )}
+        {kind.punches && request.status === 'approved' && (
+          <p>
+            Added to attendance:{' '}
+            <strong>
+              {[
+                request.approvedPunchInTime && `punch-in ${clock12(request.approvedPunchInTime)}`,
+                request.approvedPunchOutTime &&
+                  `punch-out ${clock12(request.approvedPunchOutTime)}`,
+              ]
+                .filter(Boolean)
+                .join(', ')}
+            </strong>
+          </p>
+        )}
         {request.decisionNote && <p className="whitespace-pre-wrap">{request.decisionNote}</p>}
       </div>
     </Card>
@@ -120,6 +142,10 @@ function DecidePanel({ request, kind }) {
   const router = useRouter();
   const [note, setNote] = useState('');
   const [amount, setAmount] = useState(kind.money ? String(request.amountPaise / 100) : '');
+  const [times, setTimes] = useState({
+    punchInTime: request.punchInTime ?? '',
+    punchOutTime: request.punchOutTime ?? '',
+  });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -130,6 +156,10 @@ function DecidePanel({ request, kind }) {
       const body = { decision };
       if (note.trim()) body.note = note.trim();
       if (kind.money && decision === 'approved') body.approvedAmount = Number(amount);
+      if (kind.punches && decision === 'approved') {
+        if (request.punchInTime) body.punchInTime = times.punchInTime;
+        if (request.punchOutTime) body.punchOutTime = times.punchOutTime;
+      }
       await apiFetch(`/api/requests/${request._id}/decide`, { method: 'POST', body });
       router.refresh();
     } catch (failure) {
@@ -143,6 +173,32 @@ function DecidePanel({ request, kind }) {
     <Card>
       <CardHeader title="Your decision" subtitle="The employee gets a notification." />
       <div className="space-y-3 px-4 pb-4">
+        {kind.punches && (
+          <div className="grid grid-cols-2 gap-3">
+            {request.punchInTime && (
+              <Field label="Punch-in to add" htmlFor="approve-in">
+                <input
+                  id="approve-in"
+                  type="time"
+                  className={inputClass}
+                  value={times.punchInTime}
+                  onChange={(event) => setTimes({ ...times, punchInTime: event.target.value })}
+                />
+              </Field>
+            )}
+            {request.punchOutTime && (
+              <Field label="Punch-out to add" htmlFor="approve-out">
+                <input
+                  id="approve-out"
+                  type="time"
+                  className={inputClass}
+                  value={times.punchOutTime}
+                  onChange={(event) => setTimes({ ...times, punchOutTime: event.target.value })}
+                />
+              </Field>
+            )}
+          </div>
+        )}
         {kind.money && (
           <Field
             label="Amount to approve (₹)"

@@ -1,6 +1,7 @@
 import { Attendance, PUNCH_IN_STATUSES } from '../models/attendance.model.js';
 import { User } from '../models/user.model.js';
 import { LeaveRequest } from '../models/leaveRequest.model.js';
+import { Payslip } from '../models/payslip.model.js';
 import { canSeeEmployee, employeeScopeFilter, requirePermission } from '../permissions/can.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { runListQuery } from '../lib/pagination.js';
@@ -28,6 +29,12 @@ export const LATE_GRACE_MINUTES = 5;
 export const MONTHLY_LATE_LIMIT = 3;
 
 const isPunchIn = (record) => PUNCH_IN_STATUSES.includes(record.status);
+
+/** "Late" from the 6th minute after the person's expected time, else "Checked In". */
+const punchInStatus = (person, minutes) => {
+  const expected = clockToMinutes(person.expectedInTime) ?? clockToMinutes('09:30');
+  return minutes > expected + LATE_GRACE_MINUTES ? 'Late' : 'Checked In';
+};
 
 /** Minutes since midnight of a record: from `at` when present, else from the old text time. */
 const recordMinutes = (record) =>
@@ -102,8 +109,7 @@ export async function punch(actor, input, now = new Date()) {
 
   let status = 'Checked Out';
   if (!isOut) {
-    const expected = clockToMinutes(actor.expectedInTime) ?? clockToMinutes('09:30');
-    status = minutes > expected + LATE_GRACE_MINUTES ? 'Late' : 'Checked In';
+    status = punchInStatus(actor, minutes);
     if (status === 'Late' && !input.confirmLate) {
       const lateDays = await lateDaysThisMonth(actor.employeeId, today);
       if (lateDays >= MONTHLY_LATE_LIMIT) {
@@ -376,4 +382,91 @@ export async function buildMonthDays(person, month, now = new Date()) {
       };
     }),
   );
+}
+
+// ---- Missed punches (regularization), added when HR approves the employee's request ----
+
+const momentOf = (date, clock) => new Date(`${date}T${clock}:00+05:30`);
+
+/**
+ * Checks that a missed punch-in and/or punch-out can be added to a past day. Throws a 400/409
+ * error with a plain reason. Rules: not in the future; not on a leave day; not when that month's
+ * salary slip is final; never a second punch-in or punch-out; a punch-out needs a punch-in
+ * before it.
+ */
+export async function checkMissedPunch(
+  person,
+  { date, punchInTime, punchOutTime },
+  now = new Date(),
+) {
+  if (!punchInTime && !punchOutTime)
+    throw createAppError(400, 'Enter the punch-in or punch-out time.');
+  if (date > indiaDay(now)) throw createAppError(400, 'date: the day cannot be in the future');
+  if (date === indiaDay(now)) {
+    const latest = clockToMinutes(punchOutTime || punchInTime);
+    if (latest > indiaMinutes(now)) throw createAppError(400, 'The time cannot be later than now.');
+  }
+  const finalSlip = await Payslip.exists({
+    employeeId: person.employeeId,
+    month: date.slice(0, 7),
+    status: 'final',
+  });
+  if (finalSlip) {
+    throw createAppError(409, 'The salary slip of that month is final. HR must reopen it first.');
+  }
+  const records = await Attendance.find({ employeeId: person.employeeId, date }).lean();
+  if (records.some((record) => record.status === 'Leave')) {
+    throw createAppError(409, 'That day is a leave day.');
+  }
+  const existingIn = records.find(isPunchIn);
+  if (punchInTime && existingIn) {
+    throw createAppError(409, `There is already a punch-in on that day (${existingIn.time}).`);
+  }
+  if (punchOutTime && records.some((record) => record.status === 'Checked Out')) {
+    throw createAppError(409, 'There is already a punch-out on that day.');
+  }
+  if (punchOutTime) {
+    const inMinutes = punchInTime
+      ? clockToMinutes(punchInTime)
+      : existingIn
+        ? recordMinutes(existingIn)
+        : null;
+    if (inMinutes === null) {
+      throw createAppError(409, 'There is no punch-in on that day. Ask for both punches.');
+    }
+    if (clockToMinutes(punchOutTime) <= inMinutes) {
+      throw createAppError(400, 'The punch-out must be after the punch-in.');
+    }
+  }
+}
+
+/** Writes the approved missed punches. Safe to run twice (one punch-in and one punch-out a day). */
+export async function writeMissedPunch(person, { date, punchInTime, punchOutTime }, { note }) {
+  const write = async (clock, status, match) => {
+    const at = momentOf(date, clock);
+    await Attendance.updateOne(
+      { employeeId: person.employeeId, date, status: match },
+      {
+        $setOnInsert: {
+          employeeId: person.employeeId,
+          userId: person._id,
+          userName: person.name,
+          date,
+          time: indiaClock(at),
+          at,
+          status,
+          source: 'regularization',
+          location: 'Missed punch (added by HR)',
+          remark: note,
+        },
+      },
+      { upsert: true },
+    );
+  };
+  if (punchInTime) {
+    await write(punchInTime, punchInStatus(person, clockToMinutes(punchInTime)), {
+      $in: PUNCH_IN_STATUSES,
+    });
+  }
+  if (punchOutTime) await write(punchOutTime, 'Checked Out', 'Checked Out');
 }

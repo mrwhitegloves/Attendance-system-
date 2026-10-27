@@ -14,7 +14,7 @@ export default async function NewRequestPage({ searchParams }) {
         title="New request"
         subtitle="It goes to HR. You get a notification when it is decided."
       />
-      <RequestForm initialKind={REQUEST_KIND_KEYS.includes(kind) ? kind : 'expense'} />
+      <RequestForm initialKind={REQUEST_KIND_KEYS.includes(kind) ? kind : REQUEST_KIND_KEYS[0]} />
     </>
   );
 }

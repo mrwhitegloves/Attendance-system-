@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { REQUEST_KIND_KEYS, REQUEST_STATUSES } from '../../config/requestKinds.js';
 
-// An employee request: expense claim, salary advance, document request or grievance.
+// An employee request: missed punch, expense claim, salary advance, document request or grievance.
 // Collection `requests`. Leave keeps `leaverequests`; salary revisions keep `salary_structures`.
 // Money in paise. Files are S3 keys (the bucket is private; answers carry signed links).
 
@@ -28,6 +28,11 @@ const requestSchema = new mongoose.Schema(
     amountPaise: { type: Number, default: null, min: 0 },
     // Expense: the day the money was spent. Document: the day it is needed by.
     date: { type: String, default: null },
+    // Missed punch: the times asked ("18:40"), and the times HR approved (may differ).
+    punchInTime: { type: String, default: null },
+    punchOutTime: { type: String, default: null },
+    approvedPunchInTime: { type: String, default: null },
+    approvedPunchOutTime: { type: String, default: null },
     attachments: { type: [attachmentSchema], default: [] },
     status: { type: String, enum: REQUEST_STATUSES, default: 'pending', index: true },
     // Money requests may be approved for less than asked.

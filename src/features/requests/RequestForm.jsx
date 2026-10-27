@@ -6,7 +6,12 @@ import { Send } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { todayKey } from '@/lib/format.js';
 import { ACCEPTED_UPLOADS, readFileAsDataUrl } from '@/lib/readFile.js';
-import { REQUEST_KINDS, categoryOptions, requestKindOptions } from '@/config/requestKinds.js';
+import {
+  REQUEST_KINDS,
+  categoryOptions,
+  missedPunches,
+  requestKindOptions,
+} from '@/config/requestKinds.js';
 import { Button, ButtonLink, Card, ErrorText } from '@/components/shared/ui.jsx';
 import { Field, inputClass, Select } from '@/components/shared/form.jsx';
 
@@ -16,7 +21,9 @@ const emptyFor = (kind) => ({
   details: '',
   category: Object.keys(REQUEST_KINDS[kind].categories ?? {})[0] ?? '',
   amount: '',
-  date: kind === 'expense' ? todayKey() : '',
+  date: kind === 'expense' || REQUEST_KINDS[kind].punches ? todayKey() : '',
+  punchInTime: '',
+  punchOutTime: '',
 });
 
 /** One form for every kind of request; the fields follow the kind. */
@@ -28,13 +35,18 @@ export function RequestForm({ initialKind }) {
   const [busy, setBusy] = useState(false);
   const kind = REQUEST_KINDS[form.kind];
   const change = (key) => (event) => setForm({ ...form, [key]: event.target.value });
+  const dateRequired = form.kind === 'expense' || Boolean(kind.punches);
+  const wanted = kind.punches ? missedPunches(form.category) : {};
 
   const submit = async (event) => {
     event.preventDefault();
     setBusy(true);
     setError('');
     try {
-      const body = { kind: form.kind, subject: form.subject, details: form.details };
+      const body = { kind: form.kind, details: form.details };
+      if (!kind.punches) body.subject = form.subject;
+      if (wanted.punchIn) body.punchInTime = form.punchInTime;
+      if (wanted.punchOut) body.punchOutTime = form.punchOutTime;
       if (kind.categories) body.category = form.category;
       if (kind.money) body.amount = Number(form.amount);
       if (kind.dateLabel && form.date) body.date = form.date;
@@ -72,18 +84,20 @@ export function RequestForm({ initialKind }) {
             />
           </Field>
         )}
-        <Field label="Subject" htmlFor="request-subject">
-          <input
-            id="request-subject"
-            className={inputClass}
-            value={form.subject}
-            onChange={change('subject')}
-            required
-            minLength={3}
-            maxLength={120}
-            placeholder={form.kind === 'expense' ? 'e.g. Cab to client site, Noida' : ''}
-          />
-        </Field>
+        {!kind.punches && (
+          <Field label="Subject" htmlFor="request-subject">
+            <input
+              id="request-subject"
+              className={inputClass}
+              value={form.subject}
+              onChange={change('subject')}
+              required
+              minLength={3}
+              maxLength={120}
+              placeholder={form.kind === 'expense' ? 'e.g. Cab to client site, Noida' : ''}
+            />
+          </Field>
+        )}
         {(kind.money || kind.dateLabel) && (
           <div className="grid gap-4 sm:grid-cols-2">
             {kind.money && (
@@ -103,7 +117,7 @@ export function RequestForm({ initialKind }) {
             )}
             {kind.dateLabel && (
               <Field
-                label={form.kind === 'expense' ? kind.dateLabel : `${kind.dateLabel} (optional)`}
+                label={dateRequired ? kind.dateLabel : `${kind.dateLabel} (optional)`}
                 htmlFor="request-date"
               >
                 <input
@@ -112,14 +126,49 @@ export function RequestForm({ initialKind }) {
                   className={inputClass}
                   value={form.date}
                   onChange={change('date')}
-                  required={form.kind === 'expense'}
+                  required={dateRequired}
+                  max={kind.punches ? todayKey() : undefined}
+                />
+              </Field>
+            )}
+          </div>
+        )}
+        {kind.punches && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {wanted.punchIn && (
+              <Field label="Punch-in time" htmlFor="request-in">
+                <input
+                  id="request-in"
+                  type="time"
+                  className={inputClass}
+                  value={form.punchInTime}
+                  onChange={change('punchInTime')}
+                  required
+                />
+              </Field>
+            )}
+            {wanted.punchOut && (
+              <Field label="Punch-out time" htmlFor="request-out">
+                <input
+                  id="request-out"
+                  type="time"
+                  className={inputClass}
+                  value={form.punchOutTime}
+                  onChange={change('punchOutTime')}
+                  required
                 />
               </Field>
             )}
           </div>
         )}
         <Field
-          label={form.kind === 'advance' ? 'Why do you need it?' : 'Details'}
+          label={
+            form.kind === 'advance'
+              ? 'Why do you need it?'
+              : kind.punches
+                ? 'Why was it missed? (optional)'
+                : 'Details'
+          }
           htmlFor="request-details"
         >
           <textarea

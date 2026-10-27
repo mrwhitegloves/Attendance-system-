@@ -3,6 +3,22 @@
 // own screens; the inbox links to them.
 
 export const REQUEST_KINDS = {
+  regularization: {
+    label: 'Missed punch',
+    hint: 'You forgot to punch in or out. When HR approves, the punch is added to your attendance. A punch-in from the 6th minute after your time counts as late.',
+    // Times instead of a subject: the subject is written by the server.
+    punches: true,
+    dateLabel: 'Day',
+    categoryLabel: 'What was missed',
+    categories: {
+      punch_out: 'Punch-out',
+      punch_in: 'Punch-in',
+      both: 'Punch-in and punch-out',
+    },
+    approveLabel: 'Approve and add',
+    rejectLabel: 'Reject',
+    done: { approved: 'Approved', rejected: 'Rejected' },
+  },
   expense: {
     label: 'Expense claim',
     hint: 'Money you spent for work (travel, fuel, food with a client). Attach the bill.',
@@ -70,6 +86,12 @@ export const REQUEST_KINDS = {
 };
 
 export const REQUEST_KIND_KEYS = Object.keys(REQUEST_KINDS);
+/** Which punch times a missed-punch request carries, from what was missed. */
+export const missedPunches = (category) => ({
+  punchIn: category === 'punch_in' || category === 'both',
+  punchOut: category === 'punch_out' || category === 'both',
+});
+
 export const REQUEST_STATUSES = ['pending', 'approved', 'rejected', 'cancelled'];
 
 export const requestKindOptions = REQUEST_KIND_KEYS.map((value) => ({

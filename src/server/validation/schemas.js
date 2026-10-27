@@ -468,8 +468,11 @@ export const leaveBalanceBody = z.strictObject({
 
 export const requestBody = z.strictObject({
   kind: z.enum(REQUEST_KIND_KEYS),
-  subject: text(120).min(3, 'write a short subject'),
+  // Not sent for a missed punch (the server writes it).
+  subject: text(120).min(3, 'write a short subject').optional(),
   details: text(2000).optional(),
+  punchInTime: clock.optional(),
+  punchOutTime: clock.optional(),
   category: text(40).optional(),
   // Rupees; stored as paise.
   amount: z.coerce.number().positive('enter the amount').max(1000000).multipleOf(0.01).optional(),
@@ -482,6 +485,8 @@ export const decideRequestBody = z.strictObject({
   decision: z.enum(['approved', 'rejected']),
   note: text(500).optional(),
   approvedAmount: z.coerce.number().min(0).max(1000000).multipleOf(0.01).optional(),
+  punchInTime: clock.optional(),
+  punchOutTime: clock.optional(),
 });
 
 export const listRequestsQuery = z.object({
