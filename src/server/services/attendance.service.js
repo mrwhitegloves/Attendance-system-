@@ -14,6 +14,7 @@ import {
   monthBounds,
 } from '../lib/dates.js';
 import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
+import { decodeImageDataUrl } from '../lib/images.js';
 import { notifyPunchWatchers } from './push.service.js';
 
 // Attendance rules (CEO, 2026-10-27), enforced by the server:
@@ -87,16 +88,6 @@ export async function getMyDay(actor, now = new Date()) {
   };
 }
 
-function decodeSelfie(dataUrl) {
-  const [, type, data] = dataUrl.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/) || [];
-  const bytes = Buffer.from(data || '', 'base64');
-  if (!bytes.length) throw createAppError(400, 'Please take a photo first.');
-  if (bytes.length > 2 * 1024 * 1024) {
-    throw createAppError(413, 'The photo is too large. Please take it again.');
-  }
-  return { bytes, type: `image/${type}`, extension: type === 'jpeg' ? 'jpg' : type };
-}
-
 /** Punch in or out (decided by the server from today's records). */
 export async function punch(actor, input, now = new Date()) {
   requirePermission(actor, 'attendance.punch');
@@ -124,13 +115,13 @@ export async function punch(actor, input, now = new Date()) {
     }
   }
 
-  const photo = decodeSelfie(input.selfie);
+  const photo = decodeImageDataUrl(input.selfie);
   let selfieKey = null;
   if (isStorageConfigured()) {
     selfieKey = await putFile(
       `selfies/${today.slice(0, 7)}/${actor.employeeId}/${today}-${isOut ? 'out' : 'in'}-${now.getTime()}.${photo.extension}`,
       photo.bytes,
-      photo.type,
+      photo.contentType,
     );
   }
 

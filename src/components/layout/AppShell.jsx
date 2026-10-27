@@ -12,6 +12,7 @@ import {
   Moon,
   Plane,
   ScrollText,
+  Settings,
   Sun,
   UserRound,
   Users,
@@ -22,7 +23,16 @@ import { apiFetch } from '@/lib/apiFetch.js';
 import { Avatar } from '@/components/shared/Avatar.jsx';
 import { DeviceSetup } from '@/features/notifications/DeviceSetup.jsx';
 
-const ICONS = { Camera, CalendarCheck, LayoutDashboard, Plane, ScrollText, UserRound, Users };
+const ICONS = {
+  Camera,
+  CalendarCheck,
+  LayoutDashboard,
+  Plane,
+  ScrollText,
+  Settings,
+  UserRound,
+  Users,
+};
 
 /** The frame of every signed-in screen: black sidebar on wide screens, bottom bar on phones. */
 export function AppShell({ user, permissions, roleLabel, vapidPublicKey, children }) {

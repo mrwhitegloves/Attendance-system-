@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { STAFF_TYPES, USER_STATUSES } from '../models/user.model.js';
+import {
+  EMPLOYMENT_STATUSES,
+  EMPLOYMENT_TYPES,
+  GENDERS,
+  STAFF_TYPES,
+  USER_STATUSES,
+  WORK_MODES,
+} from '../models/user.model.js';
+import { LOOKUP_TYPES } from '../models/lookup.model.js';
 import { ROLE_KEYS } from '../permissions/roles.js';
 import { ATTENDANCE_STATUSES } from '../models/attendance.model.js';
 import { MIN_PASSWORD_LENGTH } from '../auth/password.js';
@@ -26,51 +34,97 @@ export const changePasswordBody = z.strictObject({
     .max(200),
 });
 
-const userFields = {
-  name: text(100).min(2, 'enter the full name'),
-  phone: text(20).optional().default(''),
-  email: z
-    .union([z.literal(''), z.email('enter a valid email')])
-    .optional()
-    .default(''),
-  department: text(60).optional().default(''),
-  staffType: z.enum(STAFF_TYPES).default('Office Staff'),
+const optionalDay = z.union([day, z.literal('')]);
+const email = z.union([z.literal(''), z.email('enter a valid email')]);
+
+// Fields of the employee file that HR may set. All optional; unknown fields are refused.
+const profileFields = {
+  phone: text(20),
+  email,
+  dateOfBirth: optionalDay,
+  gender: z.enum([...GENDERS, '']),
+  bloodGroup: text(5),
+  personalEmail: email,
+  currentAddress: text(300),
+  permanentAddress: text(300),
+  emergencyContact: z.strictObject({
+    name: text(100),
+    relation: text(40),
+    phone: text(20),
+  }),
+  department: text(60),
+  designation: text(60),
+  branch: text(60),
+  staffType: z.enum(STAFF_TYPES),
+  employmentType: z.enum([...EMPLOYMENT_TYPES, '']),
+  workMode: z.enum([...WORK_MODES, '']),
+  employmentStatus: z.enum([...EMPLOYMENT_STATUSES, '']),
+  joiningDate: optionalDay,
+  probationEndDate: optionalDay,
+  expectedInTime: clock,
+  expectedOutTime: clock,
+  roleKey: z.enum(ROLE_KEYS),
+  managerId: z.union([objectId, z.literal(''), z.null()]),
+};
+const optionalProfile = Object.fromEntries(
+  Object.entries(profileFields).map(([key, rule]) => [key, rule.optional()]),
+);
+const password = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH, `at least ${MIN_PASSWORD_LENGTH} characters`)
+  .max(200);
+const name = text(100).min(2, 'enter the full name');
+
+export const createUserBody = z.strictObject({
+  ...optionalProfile,
+  name,
+  password,
+  staffType: profileFields.staffType.default('Office Staff'),
   expectedInTime: clock.default('09:30'),
   expectedOutTime: clock.default('18:30'),
-  roleKey: z.enum(ROLE_KEYS).default('employee'),
-  managerId: z.union([objectId, z.literal(''), z.null()]).optional(),
-  password: z
-    .string()
-    .min(MIN_PASSWORD_LENGTH, `at least ${MIN_PASSWORD_LENGTH} characters`)
-    .max(200),
-};
-
-export const createUserBody = z.strictObject(userFields);
+  roleKey: profileFields.roleKey.default('employee'),
+});
 
 export const updateUserBody = z
   .strictObject({
-    ...userFields,
-    name: userFields.name.optional(),
-    phone: text(20).optional(),
-    email: z.union([z.literal(''), z.email('enter a valid email')]).optional(),
-    department: text(60).optional(),
-    staffType: z.enum(STAFF_TYPES).optional(),
-    expectedInTime: clock.optional(),
-    expectedOutTime: clock.optional(),
-    roleKey: z.enum(ROLE_KEYS).optional(),
-    password: userFields.password.optional(),
+    ...optionalProfile,
+    name: name.optional(),
+    password: password.optional(),
     status: z.enum(USER_STATUSES).optional(),
   })
   .refine((value) => Object.keys(value).length > 0, 'nothing to change');
+
+export const photoBody = z.strictObject({
+  photo: z
+    .string()
+    .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/, 'choose a photo')
+    .max(2_800_000, 'the photo is too large'),
+});
 
 export const listUsersQuery = z.object({
   q: text(80).optional(),
   status: z.enum([...USER_STATUSES, 'all']).default('active'),
   staffType: z.enum(STAFF_TYPES).optional(),
   roleKey: z.enum(ROLE_KEYS).optional(),
-  sort: z.enum(['name', '-name', 'employeeId', '-employeeId', '-createdAt']).default('employeeId'),
+  department: text(60).optional(),
+  file: z.enum(['incomplete', 'complete']).optional(),
+  sort: z
+    .enum(['name', '-name', 'employeeId', '-employeeId', '-createdAt', 'completeness'])
+    .default('employeeId'),
   page,
 });
+
+export const lookupTypeQuery = z.object({ type: z.enum(LOOKUP_TYPES) });
+export const addLookupBody = z.strictObject({
+  type: z.enum(LOOKUP_TYPES),
+  name: text(60).min(1, 'enter a name'),
+});
+export const updateLookupBody = z
+  .strictObject({
+    name: text(60).min(1, 'enter a name').optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, 'nothing to change');
 
 export const punchBody = z.strictObject({
   // A JPEG/PNG/WebP photo as a data URL, at most about 2 MB.

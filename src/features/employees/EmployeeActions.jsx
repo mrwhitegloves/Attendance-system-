@@ -8,7 +8,7 @@ import { Button, ButtonLink } from '@/components/shared/ui.jsx';
 import { ConfirmDialog, Dialog } from '@/components/shared/Dialog.jsx';
 
 /** Edit, switch off / on, and show password (explicit click, audited). */
-export function EmployeeActions({ employee, canManage, canSeePassword }) {
+export function EmployeeActions({ employee, canEdit, canSwitch, canSeePassword }) {
   const router = useRouter();
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -40,15 +40,15 @@ export function EmployeeActions({ employee, canManage, canSeePassword }) {
           <Eye size={15} /> Password
         </Button>
       )}
-      {canManage && (
-        <>
-          <Button variant="secondary" size="sm" onClick={() => setConfirm(true)}>
-            <Power size={15} /> {switchingOff ? 'Switch off' : 'Switch on'}
-          </Button>
-          <ButtonLink size="sm" href={`/employees/${employee._id}/edit`}>
-            <Pencil size={15} /> Edit
-          </ButtonLink>
-        </>
+      {canSwitch && (
+        <Button variant="secondary" size="sm" onClick={() => setConfirm(true)}>
+          <Power size={15} /> {switchingOff ? 'Switch off' : 'Switch on'}
+        </Button>
+      )}
+      {canEdit && (
+        <ButtonLink size="sm" href={`/employees/${employee._id}/edit`}>
+          <Pencil size={15} /> Edit
+        </ButtonLink>
       )}
       <ConfirmDialog
         open={confirm}

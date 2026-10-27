@@ -2,68 +2,236 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { Button, ButtonLink, Card, ErrorText, Spinner } from '@/components/shared/ui.jsx';
 import { Field, inputClass, Select } from '@/components/shared/form.jsx';
+import {
+  BLOOD_GROUPS,
+  EMPLOYMENT_STATUS,
+  EMPLOYMENT_TYPE,
+  GENDER,
+  WORK_MODE,
+} from '@/config/employeeOptions.js';
 
-const EMPTY = {
-  name: '',
-  phone: '',
-  email: '',
-  department: '',
+const choose = (list) => [{ value: '', label: 'Choose…' }, ...list];
+const plain = (values) => values.map((value) => ({ value, label: value }));
+
+/**
+ * The sections of the form. A field is { key, label, type, options?, required?, hint? };
+ * "emergencyContact.name" style keys are sent as one emergencyContact object.
+ */
+function sections({ editing, lists, managers, roles, staffTypes, employeeId }) {
+  const fromList = (type, current) => {
+    const names = lists[type] ?? [];
+    return choose(plain(current && !names.includes(current) ? [current, ...names] : names));
+  };
+  return [
+    {
+      title: 'Personal',
+      fields: [
+        { key: 'name', label: 'Full name', required: true },
+        { key: 'phone', label: 'Mobile', type: 'tel' },
+        { key: 'dateOfBirth', label: 'Date of birth', type: 'date' },
+        { key: 'gender', label: 'Gender', type: 'select', options: choose(GENDER.list) },
+        {
+          key: 'bloodGroup',
+          label: 'Blood group',
+          type: 'select',
+          options: choose(plain(BLOOD_GROUPS)),
+        },
+        { key: 'personalEmail', label: 'Personal email', type: 'email' },
+        { key: 'currentAddress', label: 'Current address', type: 'textarea' },
+        { key: 'permanentAddress', label: 'Permanent address', type: 'textarea' },
+      ],
+    },
+    {
+      title: 'Emergency contact',
+      fields: [
+        { key: 'emergencyContact.name', label: 'Name' },
+        { key: 'emergencyContact.relation', label: 'Relation' },
+        { key: 'emergencyContact.phone', label: 'Phone', type: 'tel' },
+      ],
+    },
+    {
+      title: 'Employment',
+      fields: [
+        { key: 'designation', label: 'Designation', type: 'list' },
+        { key: 'department', label: 'Department', type: 'list' },
+        { key: 'branch', label: 'Branch', type: 'list' },
+        {
+          key: 'managerId',
+          label: 'Reports to',
+          type: 'select',
+          options: [
+            { value: '', label: 'Nobody' },
+            ...managers
+              .filter((manager) => manager._id !== employeeId)
+              .map((manager) => ({
+                value: manager._id,
+                label: `${manager.name} (${manager.employeeId})`,
+              })),
+          ],
+        },
+        {
+          key: 'employmentType',
+          label: 'Employment type',
+          type: 'select',
+          options: choose(EMPLOYMENT_TYPE.list),
+        },
+        { key: 'workMode', label: 'Work mode', type: 'select', options: choose(WORK_MODE.list) },
+        {
+          key: 'employmentStatus',
+          label: 'Employment status',
+          type: 'select',
+          options: choose(EMPLOYMENT_STATUS.list),
+        },
+        { key: 'staffType', label: 'Staff type', type: 'select', options: plain(staffTypes) },
+        { key: 'joiningDate', label: 'Joining date', type: 'date' },
+        { key: 'probationEndDate', label: 'Probation ends', type: 'date' },
+      ],
+      fromList,
+    },
+    {
+      title: 'Work timing and access',
+      fields: [
+        {
+          key: 'expectedInTime',
+          label: 'Expected in-time',
+          type: 'time',
+          required: true,
+          hint: 'Up to 5 minutes after this is on time; later is late.',
+        },
+        { key: 'expectedOutTime', label: 'Expected out-time', type: 'time', required: true },
+        { key: 'email', label: 'Work email (optional, can sign in with it)', type: 'email' },
+        {
+          key: 'roleKey',
+          label: 'Role',
+          type: 'select',
+          options: roles,
+          hint: 'Decides what this person can see and do.',
+        },
+        {
+          key: 'password',
+          label: editing ? 'New password (leave empty to keep)' : 'Password',
+          required: !editing,
+          hint: 'At least 8 characters.',
+          autoComplete: 'new-password',
+        },
+      ],
+    },
+  ];
+}
+
+const KEYS = [
+  'name',
+  'phone',
+  'dateOfBirth',
+  'gender',
+  'bloodGroup',
+  'personalEmail',
+  'currentAddress',
+  'permanentAddress',
+  'emergencyContact.name',
+  'emergencyContact.relation',
+  'emergencyContact.phone',
+  'designation',
+  'department',
+  'branch',
+  'managerId',
+  'employmentType',
+  'workMode',
+  'employmentStatus',
+  'staffType',
+  'joiningDate',
+  'probationEndDate',
+  'expectedInTime',
+  'expectedOutTime',
+  'email',
+  'roleKey',
+  'password',
+];
+const DEFAULTS = {
   staffType: 'Office Staff',
   expectedInTime: '09:30',
   expectedOutTime: '18:30',
   roleKey: 'employee',
-  managerId: '',
-  password: '',
 };
+const read = (record, key) => key.split('.').reduce((value, part) => value?.[part], record);
 
-/** Add or edit an employee. In edit mode only changed fields are sent; password is optional. */
-export function EmployeeForm({ employee, roles, staffTypes, managers, canGiveCeo }) {
+/** The form's values for an employee (flat keys, empty strings for empty fields). */
+function initialValues(employee) {
+  return Object.fromEntries(
+    KEYS.map((key) => [
+      key,
+      key === 'password' ? '' : String((employee && read(employee, key)) ?? DEFAULTS[key] ?? ''),
+    ]),
+  );
+}
+
+/** Flat form values → the request body (only changed fields when editing). */
+function toBody(form, initial, editing) {
+  const changed = KEYS.filter((key) =>
+    key === 'password' ? form.password !== '' : !editing || form[key] !== initial[key],
+  );
+  const body = {};
+  for (const key of changed) {
+    if (key.startsWith('emergencyContact.')) continue;
+    if (key === 'password' && !form.password) continue;
+    body[key] = key === 'managerId' ? form.managerId || null : form[key];
+  }
+  if (changed.some((key) => key.startsWith('emergencyContact.'))) {
+    body.emergencyContact = {
+      name: form['emergencyContact.name'],
+      relation: form['emergencyContact.relation'],
+      phone: form['emergencyContact.phone'],
+    };
+  }
+  return body;
+}
+
+/** Add or edit an employee's file. */
+export function EmployeeForm({
+  employee,
+  roles,
+  staffTypes,
+  managers,
+  canGiveCeo,
+  lists,
+  canManageLists,
+}) {
   const router = useRouter();
   const editing = Boolean(employee);
-  const initial = editing
-    ? {
-        ...EMPTY,
-        ...Object.fromEntries(Object.keys(EMPTY).map((key) => [key, employee[key] ?? EMPTY[key]])),
-        managerId: employee.managerId ?? '',
-        password: '',
-      }
-    : EMPTY;
+  const [initial] = useState(() => initialValues(employee));
   const [form, setForm] = useState(initial);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const update = (key) => (event) => setForm({ ...form, [key]: event.target.value });
+  const roleOptions = roles.filter(
+    (role) => canGiveCeo || role.value !== 'ceo' || initial.roleKey === 'ceo',
+  );
+  const groups = sections({
+    editing,
+    lists,
+    managers,
+    roles: roleOptions,
+    staffTypes,
+    employeeId: employee?._id,
+  });
+  const fromList = groups.find((group) => group.fromList).fromList;
 
   const submit = async (event) => {
     event.preventDefault();
     setBusy(true);
     setError('');
     try {
+      const body = toBody(form, initial, editing);
       if (editing) {
-        const changes = Object.fromEntries(
-          Object.entries(form).filter(([key, value]) =>
-            key === 'password' ? value !== '' : value !== initial[key],
-          ),
-        );
-        if (!Object.keys(changes).length) {
-          router.push(`/employees/${employee._id}`);
-          return;
+        if (Object.keys(body).length) {
+          await apiFetch(`/api/users/${employee._id}`, { method: 'PATCH', body });
         }
-        await apiFetch(`/api/users/${employee._id}`, {
-          method: 'PATCH',
-          body: {
-            ...changes,
-            ...('managerId' in changes ? { managerId: changes.managerId || null } : {}),
-          },
-        });
         router.push(`/employees/${employee._id}`);
       } else {
-        const { user } = await apiFetch('/api/users', {
-          method: 'POST',
-          body: { ...form, managerId: form.managerId || null },
-        });
+        const { user } = await apiFetch('/api/users', { method: 'POST', body });
         router.push(`/employees/${user._id}`);
       }
       router.refresh();
@@ -73,147 +241,71 @@ export function EmployeeForm({ employee, roles, staffTypes, managers, canGiveCeo
     }
   };
 
-  const roleOptions = roles.filter(
-    (role) => canGiveCeo || role.value !== 'ceo' || initial.roleKey === 'ceo',
-  );
+  const control = (field) => {
+    const common = {
+      id: field.key,
+      value: form[field.key],
+      onChange: (event) => setForm({ ...form, [field.key]: event.target.value }),
+      required: field.required,
+    };
+    if (field.type === 'select') return <Select {...common} options={field.options} />;
+    if (field.type === 'list')
+      return <Select {...common} options={fromList(field.key, initial[field.key])} />;
+    if (field.type === 'textarea')
+      return (
+        <textarea {...common} rows={2} maxLength={300} className={`${inputClass} h-auto py-2`} />
+      );
+    return (
+      <input
+        {...common}
+        type={field.type ?? 'text'}
+        autoComplete={field.autoComplete}
+        className={inputClass}
+        minLength={field.key === 'password' ? 8 : undefined}
+      />
+    );
+  };
 
   return (
-    <Card className="p-4 sm:p-6">
-      <form onSubmit={submit} className="space-y-6">
-        <fieldset className="grid gap-4 sm:grid-cols-2">
-          <legend className="mb-2 text-sm font-semibold">Person</legend>
-          <Field label="Full name" htmlFor="name">
-            <input
-              id="name"
-              className={inputClass}
-              value={form.name}
-              onChange={update('name')}
-              required
-              minLength={2}
-            />
-          </Field>
-          <Field label="Phone" htmlFor="phone">
-            <input
-              id="phone"
-              type="tel"
-              className={inputClass}
-              value={form.phone}
-              onChange={update('phone')}
-            />
-          </Field>
-          <Field label="Email (optional)" htmlFor="email">
-            <input
-              id="email"
-              type="email"
-              className={inputClass}
-              value={form.email}
-              onChange={update('email')}
-            />
-          </Field>
-          <Field label="Department" htmlFor="department">
-            <input
-              id="department"
-              className={inputClass}
-              value={form.department}
-              onChange={update('department')}
-            />
-          </Field>
-        </fieldset>
-
-        <fieldset className="grid gap-4 sm:grid-cols-2">
-          <legend className="mb-2 text-sm font-semibold">Work</legend>
-          <Field label="Staff type" htmlFor="staffType">
-            <Select
-              id="staffType"
-              value={form.staffType}
-              onChange={update('staffType')}
-              options={staffTypes.map((value) => ({ value, label: value }))}
-            />
-          </Field>
-          <Field label="Reports to" htmlFor="managerId">
-            <Select
-              id="managerId"
-              value={form.managerId}
-              onChange={update('managerId')}
-              options={[
-                { value: '', label: 'Nobody' },
-                ...managers
-                  .filter((manager) => manager._id !== employee?._id)
-                  .map((manager) => ({
-                    value: manager._id,
-                    label: `${manager.name} (${manager.employeeId})`,
-                  })),
-              ]}
-            />
-          </Field>
-          <Field
-            label="Expected in-time"
-            htmlFor="in"
-            hint="Up to 5 minutes after this is on time; later is late."
-          >
-            <input
-              id="in"
-              type="time"
-              className={inputClass}
-              value={form.expectedInTime}
-              onChange={update('expectedInTime')}
-              required
-            />
-          </Field>
-          <Field label="Expected out-time" htmlFor="out">
-            <input
-              id="out"
-              type="time"
-              className={inputClass}
-              value={form.expectedOutTime}
-              onChange={update('expectedOutTime')}
-              required
-            />
-          </Field>
-        </fieldset>
-
-        <fieldset className="grid gap-4 sm:grid-cols-2">
-          <legend className="mb-2 text-sm font-semibold">Sign-in and access</legend>
-          <Field label="Role" htmlFor="roleKey" hint="Decides what this person can see and do.">
-            <Select
-              id="roleKey"
-              value={form.roleKey}
-              onChange={update('roleKey')}
-              options={roleOptions}
-            />
-          </Field>
-          <Field
-            label={editing ? 'New password (leave empty to keep)' : 'Password'}
-            htmlFor="password"
-            hint="At least 8 characters."
-          >
-            <input
-              id="password"
-              type="text"
-              autoComplete="new-password"
-              className={inputClass}
-              value={form.password}
-              onChange={update('password')}
-              required={!editing}
-              minLength={8}
-            />
-          </Field>
-        </fieldset>
-
-        <ErrorText>{error}</ErrorText>
-        <div className="flex justify-end gap-2">
-          <ButtonLink
-            variant="secondary"
-            href={editing ? `/employees/${employee._id}` : '/employees'}
-          >
-            Cancel
-          </ButtonLink>
-          <Button type="submit" disabled={busy}>
-            {busy && <Spinner />}
-            {editing ? 'Save changes' : 'Add employee'}
-          </Button>
-        </div>
-      </form>
-    </Card>
+    <form onSubmit={submit} className="space-y-4">
+      {groups.map((group) => (
+        <Card key={group.title} className="p-4 sm:p-5">
+          <fieldset className="grid gap-4 sm:grid-cols-2">
+            <legend className="mb-3 text-sm font-semibold">{group.title}</legend>
+            {group.fields.map((field) => (
+              <Field key={field.key} label={field.label} htmlFor={field.key} hint={field.hint}>
+                {control(field)}
+              </Field>
+            ))}
+            {group.fromList && (
+              <p className="text-xs text-muted sm:col-span-2">
+                Designations, departments and branches come from{' '}
+                {canManageLists ? (
+                  <Link href="/settings/lists" className="text-brand underline">
+                    Settings → Lists
+                  </Link>
+                ) : (
+                  'Settings → Lists'
+                )}
+                .
+              </p>
+            )}
+          </fieldset>
+        </Card>
+      ))}
+      <ErrorText>{error}</ErrorText>
+      <div className="flex justify-end gap-2">
+        <ButtonLink
+          variant="secondary"
+          href={editing ? `/employees/${employee._id}` : '/employees'}
+        >
+          Cancel
+        </ButtonLink>
+        <Button type="submit" disabled={busy}>
+          {busy && <Spinner />}
+          {editing ? 'Save changes' : 'Add employee'}
+        </Button>
+      </div>
+    </form>
   );
 }

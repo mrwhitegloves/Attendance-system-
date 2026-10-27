@@ -14,6 +14,7 @@ export const PERMISSIONS = {
   'notifications.punches': 'Get a notification for every punch',
   'notifications.broadcast': 'Send a notification to all employees',
   'audit.view': 'See the audit log',
+  'settings.manage': 'Change settings and lists',
 };
 
 const everything = (scope) =>

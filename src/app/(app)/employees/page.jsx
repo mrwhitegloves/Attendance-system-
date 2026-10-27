@@ -4,7 +4,8 @@ import { can } from '@/server/permissions/can.js';
 import { listUsers } from '@/server/services/users.service.js';
 import { listUsersQuery } from '@/server/validation/schemas.js';
 import { ROLES } from '@/server/permissions/roles.js';
-import { STAFF_TYPES } from '@/server/models/user.model.js';
+import { STAFF_TYPES } from '@/config/employeeOptions.js';
+import { listLookups } from '@/server/services/lookups.service.js';
 import { ButtonLink, PageHeader } from '@/components/shared/ui.jsx';
 import { EmployeeList } from '@/features/employees/EmployeeList.jsx';
 
@@ -14,7 +15,10 @@ export default async function EmployeesPage({ searchParams }) {
   const user = await requirePageUser('users.view');
   if (can(user, 'users.view') === 'own') notFound();
   const parsed = listUsersQuery.safeParse(await searchParams);
-  const result = await listUsers(user, parsed.success ? parsed.data : listUsersQuery.parse({}));
+  const [result, departments] = await Promise.all([
+    listUsers(user, parsed.success ? parsed.data : listUsersQuery.parse({})),
+    listLookups('department'),
+  ]);
   return (
     <>
       <PageHeader
@@ -28,6 +32,7 @@ export default async function EmployeesPage({ searchParams }) {
         result={toPlain(result)}
         roles={Object.entries(ROLES).map(([value, role]) => ({ value, label: role.label }))}
         staffTypes={STAFF_TYPES}
+        departments={departments.map((item) => item.name)}
       />
     </>
   );

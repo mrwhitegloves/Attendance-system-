@@ -3,7 +3,8 @@ import { requirePageUser, toPlain } from '@/server/auth/current.js';
 import { can } from '@/server/permissions/can.js';
 import { getUser } from '@/server/services/users.service.js';
 import { roleLabel } from '@/server/permissions/roles.js';
-import { Avatar } from '@/components/shared/Avatar.jsx';
+import { CompletenessBar } from '@/components/shared/Avatar.jsx';
+import { PhotoUpload } from '@/features/employees/PhotoUpload.jsx';
 import { Badge } from '@/components/shared/ui.jsx';
 import { EmployeeTabs } from '@/features/employees/EmployeeTabs.jsx';
 import { EmployeeActions } from '@/features/employees/EmployeeActions.jsx';
@@ -15,22 +16,29 @@ export default async function EmployeeLayout({ children, params }) {
   const found = await getUser(user, id).catch(() => null);
   if (!found) notFound();
   const employee = toPlain(found);
+  const canEdit = Boolean(can(user, 'users.manage'));
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Avatar name={employee.name} size="lg" />
+        <div className="flex items-center gap-4">
+          <PhotoUpload employee={employee} canEdit={canEdit} />
           <div>
             <h1 className="text-xl font-semibold">{employee.name}</h1>
-            <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
-              {employee.employeeId} · {roleLabel(employee.roleKey)}
+            <p className="text-sm text-muted">
+              {[employee.designation, employee.department].filter(Boolean).join(' · ') ||
+                roleLabel(employee.roleKey)}
+            </p>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+              {employee.employeeId}
+              <CompletenessBar percent={employee.completeness?.percent ?? 0} />
               {employee.status === 'inactive' && <Badge>Switched off</Badge>}
             </p>
           </div>
         </div>
         <EmployeeActions
           employee={employee}
-          canManage={Boolean(can(user, 'users.manage')) && employee._id !== String(user._id)}
+          canEdit={canEdit}
+          canSwitch={canEdit && employee._id !== String(user._id)}
           canSeePassword={Boolean(can(user, 'users.password'))}
         />
       </div>

@@ -25,13 +25,15 @@ export async function recordAudit(actor, entry) {
   });
 }
 
-/** Before/after of the fields that really changed: { field: { from, to } }. */
+const valueAt = (record, path) => path.split('.').reduce((value, key) => value?.[key], record);
+
+/** Before/after of the fields that really changed: { field: { from, to } }. Fields may be "a.b". */
 export function diffFields(before, after, fields) {
   const changes = {};
   for (const field of fields) {
-    if (!(field in after)) continue;
-    const from = before[field] ?? null;
-    const to = after[field] ?? null;
+    if (valueAt(after, field) === undefined) continue;
+    const from = valueAt(before, field) ?? null;
+    const to = valueAt(after, field) ?? null;
     if (String(from) !== String(to)) changes[field] = { from, to };
   }
   return changes;

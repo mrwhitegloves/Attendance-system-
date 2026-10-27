@@ -6,53 +6,24 @@ import { Bell, BellOff, LogOut } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { Button, Card, CardHeader, ErrorText } from '@/components/shared/ui.jsx';
 import { Field, inputClass } from '@/components/shared/form.jsx';
-import { Avatar } from '@/components/shared/Avatar.jsx';
 import {
   disableNotifications,
   enableNotifications,
   isPushSupported,
 } from '@/features/notifications/push.js';
 
-export function MyProfile({ user, roleLabel, vapidPublicKey }) {
+/** The signed-in person's own settings: notifications, password, sign out. */
+export function MyAccount({ vapidPublicKey }) {
   const router = useRouter();
   const signOut = async () => {
     await apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     router.replace('/login');
     router.refresh();
   };
-  const rows = [
-    ['Employee ID', user.employeeId],
-    ['Role', roleLabel],
-    ['Phone', user.phone || '—'],
-    ['Email', user.email || '—'],
-    ['Department', user.department || '—'],
-    ['Staff type', user.staffType],
-    ['Shift', `${user.expectedInTime} – ${user.expectedOutTime}`],
-  ];
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <div className="flex items-center gap-3 border-b border-border p-4">
-          <Avatar name={user.name} size="lg" />
-          <div>
-            <p className="font-semibold">{user.name}</p>
-            <p className="text-sm text-muted">{user.employeeId}</p>
-          </div>
-        </div>
-        <dl>
-          {rows.map(([label, value]) => (
-            <div
-              key={label}
-              className="flex justify-between gap-3 border-b border-border px-4 py-3 text-sm last:border-0"
-            >
-              <dt className="text-muted">{label}</dt>
-              <dd className="text-right">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      </Card>
+      <NotificationsCard vapidPublicKey={vapidPublicKey} />
       <div className="space-y-4">
-        <NotificationsCard vapidPublicKey={vapidPublicKey} />
         <PasswordCard onChanged={() => router.replace('/login')} />
         <Button variant="secondary" className="w-full" onClick={signOut}>
           <LogOut size={16} /> Sign out

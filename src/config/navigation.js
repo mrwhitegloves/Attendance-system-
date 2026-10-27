@@ -26,5 +26,6 @@ export const NAVIGATION = [
     mobile: true,
   },
   { href: '/audit-log', label: 'Audit log', icon: 'ScrollText', show: (p) => p.audit },
+  { href: '/settings', label: 'Settings', icon: 'Settings', show: (p) => p.settings },
   { href: '/me', label: 'My profile', icon: 'UserRound', show: () => true },
 ];

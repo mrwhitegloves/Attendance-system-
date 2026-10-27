@@ -1,6 +1,8 @@
 import { Migration } from '../models/system.models.js';
 import { User } from '../models/user.model.js';
 import { env } from '../config/env.js';
+import { seedLookupsFromEmployees } from '../services/lookups.service.js';
+import { computeCompleteness } from '../lib/completeness.js';
 
 // Changes to existing data, in order. Each runs once (its name is stored in `migrations`)
 // and must be safe to run again. Never edit the database by hand; add a migration here.
@@ -18,7 +20,24 @@ export const MIGRATIONS = [
       await User.updateMany({ status: { $exists: false } }, { $set: { status: 'active' } });
     },
   },
+  {
+    name: '002-lists-and-file-completeness',
+    // Fills Settings → Lists from the departments employees already have, and works out how
+    // complete every employee's file is.
+    up: async () => {
+      await seedLookupsFromEmployees();
+      await recomputeAllCompleteness();
+    },
+  },
 ];
+
+/** Recomputes every employee's file completeness (a migration runs this when the checklist grows). */
+export async function recomputeAllCompleteness() {
+  const users = await User.find({}).lean();
+  for (const user of users) {
+    await User.updateOne({ _id: user._id }, { completeness: computeCompleteness(user) });
+  }
+}
 
 export async function runMigrations() {
   const done = new Set((await Migration.find({}, 'name').lean()).map((row) => row.name));
@@ -46,7 +65,7 @@ export async function ensureCeoAccount() {
     );
     if (existing) return 'promoted';
   }
-  await User.create({
+  const created = await User.create({
     name: 'White Gloves Admin',
     employeeId: 'ADMIN-001',
     email: env.ADMIN_EMAIL || undefined,
@@ -57,5 +76,10 @@ export async function ensureCeoAccount() {
     roleKey: 'ceo',
     status: 'active',
   });
+  await User.updateOne(
+    { _id: created._id },
+    { completeness: computeCompleteness(created.toObject()) },
+  );
+  await seedLookupsFromEmployees();
   return 'created';
 }

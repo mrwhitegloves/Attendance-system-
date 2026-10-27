@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { requestLeave, decideLeave, writeLeaveDays } from '@/server/services/leaves.service.js';
 import { createUser, updateUser } from '@/server/services/users.service.js';
+import { addLookup } from '@/server/services/lookups.service.js';
 import { Attendance } from '@/server/models/attendance.model.js';
 import { Counter, AuditLog } from '@/server/models/system.models.js';
 import { GET as revealRoute } from '@/app/api/users/[id]/password/route.js';
@@ -86,6 +87,7 @@ describe('employees', () => {
   it('audits edits without the password', async () => {
     const hr = await makeUser({ roleKey: 'hr_admin' });
     const staff = await makeUser({ department: 'Sales' });
+    await addLookup(hr, { type: 'department', name: 'Operations' });
     await updateUser(hr, staff._id, { department: 'Operations', password: 'brand-new-pass' });
     const entries = await AuditLog.find({ entityId: String(staff._id) }).lean();
     expect(entries.map((entry) => entry.action).sort()).toEqual([

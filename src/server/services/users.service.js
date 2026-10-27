@@ -5,21 +5,52 @@ import { destroyUserSessions } from '../auth/session.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { runListQuery, containsRegex } from '../lib/pagination.js';
 import { recordAudit, diffFields } from './audit.service.js';
+import { checkLookupValues } from './lookups.service.js';
+import { computeCompleteness } from '../lib/completeness.js';
+import { decodeImageDataUrl } from '../lib/images.js';
+import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
 
-// Employees (login accounts). Phase 1 adds the full employee master record.
+// The employee master record (one per person, also their sign-in account).
 
 const EDITABLE = [
   'name',
   'phone',
   'email',
+  'roleKey',
+  'status',
+  'dateOfBirth',
+  'gender',
+  'bloodGroup',
+  'personalEmail',
+  'currentAddress',
+  'permanentAddress',
+  'emergencyContact.name',
+  'emergencyContact.relation',
+  'emergencyContact.phone',
   'department',
+  'designation',
+  'branch',
   'staffType',
+  'employmentType',
+  'workMode',
+  'employmentStatus',
+  'joiningDate',
+  'probationEndDate',
+  'managerId',
   'expectedInTime',
   'expectedOutTime',
-  'roleKey',
-  'managerId',
-  'status',
 ];
+
+/** Works out and saves how complete the employee's file is. */
+export async function refreshCompleteness(id) {
+  const user = await User.findById(id).lean();
+  if (user) await User.updateOne({ _id: id }, { completeness: computeCompleteness(user) });
+}
+
+/** Adds a short-lived photo link to an employee for the screens. */
+async function withPhoto(user) {
+  return { ...user, photoUrl: user.photoKey ? await signedUrl(user.photoKey) : null };
+}
 
 /** Next permanent ID: MWG-001, MWG-002 … (same counter as the first version). */
 export async function nextEmployeeId() {
@@ -37,6 +68,7 @@ const SORTS = {
   employeeId: { employeeId: 1 },
   '-employeeId': { employeeId: -1 },
   '-createdAt': { createdAt: -1 },
+  completeness: { 'completeness.percent': 1 },
 };
 
 export async function listUsers(actor, query) {
@@ -44,6 +76,9 @@ export async function listUsers(actor, query) {
   if (query.status !== 'all') filter.status = query.status;
   if (query.staffType) filter.staffType = query.staffType;
   if (query.roleKey) filter.roleKey = query.roleKey;
+  if (query.department) filter.department = query.department;
+  if (query.file === 'incomplete') filter['completeness.percent'] = { $lt: 100 };
+  if (query.file === 'complete') filter['completeness.percent'] = 100;
   if (query.q) {
     const pattern = containsRegex(query.q);
     filter.$or = [
@@ -52,15 +87,17 @@ export async function listUsers(actor, query) {
       { phone: pattern },
       { email: pattern },
       { department: pattern },
+      { designation: pattern },
     ];
   }
-  return runListQuery(User, {
+  const result = await runListQuery(User, {
     filter,
     sort: { ...SORTS[query.sort], _id: 1 },
     page: query.page,
     pageSize: 25,
     projection: PUBLIC_USER_FIELDS,
   });
+  return { ...result, items: await Promise.all(result.items.map(withPhoto)) };
 }
 
 /** Everyone in scope, short form, for pickers and filters. */
@@ -76,7 +113,19 @@ export async function getUser(actor, id) {
     .catch(() => null);
   if (!user || !(await canSeeEmployee(actor, 'users.view', user.employeeId)))
     throw notFound('Employee');
-  return user;
+  return withPhoto(user);
+}
+
+/** The signed-in person's own file (no users.view permission needed), with the manager's name. */
+export async function getOwnFile(actor) {
+  const user = await User.findById(actor._id, PUBLIC_USER_FIELDS).lean();
+  const manager = user.managerId
+    ? await User.findById(user.managerId, 'name employeeId').lean()
+    : null;
+  return {
+    user: await withPhoto(user),
+    managerName: manager ? `${manager.name} (${manager.employeeId})` : null,
+  };
 }
 
 async function checkManager(managerId, selfId) {
@@ -104,6 +153,7 @@ export async function createUser(actor, input, { ip } = {}) {
   requirePermission(actor, 'users.manage');
   checkRoleChange(actor, input.roleKey, 'employee');
   const managerId = await checkManager(input.managerId);
+  await checkLookupValues(input);
   const employeeId = await nextEmployeeId();
   const created = await User.create({
     ...input,
@@ -112,6 +162,7 @@ export async function createUser(actor, input, { ip } = {}) {
     employeeId,
     status: 'active',
   });
+  await refreshCompleteness(created._id);
   await recordAudit(actor, {
     action: 'user.created',
     entity: 'user',
@@ -136,6 +187,7 @@ export async function updateUser(actor, id, input, { ip } = {}) {
     throw createAppError(400, 'You cannot switch off or change the role of your own account.');
   }
 
+  await checkLookupValues(input, before);
   const update = { ...input };
   if ('managerId' in update) update.managerId = await checkManager(update.managerId || null, id);
   const unset = {};
@@ -148,6 +200,7 @@ export async function updateUser(actor, id, input, { ip } = {}) {
     { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) },
   );
 
+  await refreshCompleteness(id);
   const changes = diffFields(before, input, EDITABLE);
   if (input.password) changes.password = 'changed';
   if (input.password || input.status === 'inactive') await destroyUserSessions(id);
@@ -170,6 +223,32 @@ export async function updateUser(actor, id, input, { ip } = {}) {
       });
     }
   }
+  return getUser(actor, id);
+}
+
+/** Saves a new profile photo (the old one stays in S3: nothing is ever deleted there). */
+export async function setPhoto(actor, id, dataUrl, { ip } = {}) {
+  requirePermission(actor, 'users.manage');
+  const user = await User.findById(id, 'name employeeId')
+    .lean()
+    .catch(() => null);
+  if (!user) throw notFound('Employee');
+  if (!isStorageConfigured()) throw createAppError(503, 'File storage is not set up yet.');
+  const photo = decodeImageDataUrl(dataUrl);
+  const photoKey = await putFile(
+    `avatars/${user.employeeId}/${Date.now()}.${photo.extension}`,
+    photo.bytes,
+    photo.contentType,
+  );
+  await User.updateOne({ _id: id }, { photoKey });
+  await refreshCompleteness(id);
+  await recordAudit(actor, {
+    action: 'user.photo_changed',
+    entity: 'user',
+    entityId: id,
+    summary: `New photo for ${user.name}`,
+    ip,
+  });
   return getUser(actor, id);
 }
 
@@ -204,5 +283,6 @@ export function permissionsOf(user) {
     broadcast: Boolean(can(user, 'notifications.broadcast')),
     punchAlerts: Boolean(can(user, 'notifications.punches')),
     audit: Boolean(can(user, 'audit.view')),
+    settings: Boolean(can(user, 'settings.manage')),
   };
 }
