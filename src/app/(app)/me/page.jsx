@@ -2,7 +2,7 @@ import { requirePageUser, toPlain } from '@/server/auth/current.js';
 import { roleLabel } from '@/server/permissions/roles.js';
 import { getOwnFile, fileChecklist } from '@/server/services/users.service.js';
 import { env } from '@/server/config/env.js';
-import { PageHeader } from '@/components/shared/ui.jsx';
+import { Card, CardHeader, PageHeader } from '@/components/shared/ui.jsx';
 import { Avatar, CompletenessBar } from '@/components/shared/Avatar.jsx';
 import { EmployeeFile } from '@/features/employees/EmployeeFile.jsx';
 import { MyAccount } from '@/features/auth/MyAccount.jsx';
@@ -11,8 +11,11 @@ import { getKyc } from '@/server/services/kyc.service.js';
 import { getEmployeeDocuments } from '@/server/services/documents.service.js';
 import { DocumentsPanel } from '@/features/documents/DocumentsPanel.jsx';
 import { can } from '@/server/permissions/can.js';
+import { formatDay } from '@/lib/format.js';
 import { listLettersFor } from '@/server/services/letters.service.js';
 import { MyLetters } from '@/features/letters/MyLetters.jsx';
+import { salaryInForce } from '@/server/services/salary.service.js';
+import { SalaryBreakdown } from '@/features/salary/SalaryBreakdown.jsx';
 
 export const metadata = { title: 'My profile' };
 
@@ -26,6 +29,7 @@ export default async function MePage() {
   const letters = can(signedIn, 'letters.view')
     ? await listLettersFor(signedIn, signedIn._id)
     : null;
+  const salary = can(signedIn, 'salary.view') ? await salaryInForce(signedIn._id) : null;
   return (
     <>
       <PageHeader title="My profile" subtitle="To change your details, please contact HR." />
@@ -50,6 +54,17 @@ export default async function MePage() {
           canEdit={false}
         />
         {letters?.letters.length > 0 && <MyLetters letters={toPlain(letters.letters)} />}
+        {salary && (
+          <Card>
+            <CardHeader
+              title="My salary"
+              subtitle={`In force since ${formatDay(salary.effectiveFrom)}`}
+            />
+            <div className="p-4">
+              <SalaryBreakdown structure={toPlain(salary)} />
+            </div>
+          </Card>
+        )}
         {kyc && (
           <section>
             <h2 className="mb-2 text-sm font-semibold">KYC and bank</h2>

@@ -38,6 +38,10 @@ const ACTIONS = {
   'letter_template.added': 'Letter template added',
   'letter_template.updated': 'Letter template changed',
   'settings.company': 'Company details changed',
+  'salary.proposed': 'Salary proposed',
+  'salary.approved': 'Salary approved',
+  'salary.rejected': 'Salary rejected',
+  'salary.withdrawn': 'Salary proposal withdrawn',
 };
 
 function describeChanges(changes) {

@@ -282,5 +282,6 @@ export function permissionsOf(user) {
     audit: Boolean(can(user, 'audit.view')),
     settings: Boolean(can(user, 'settings.manage')),
     documents: can(user, 'documents.view'),
+    salary: can(user, 'salary.view'),
   };
 }

@@ -49,6 +49,11 @@ export const MIGRATIONS = [
     // The starting offer and appointment letter templates.
     up: () => seedLetterTemplates(),
   },
+  {
+    name: '006-file-completeness-with-salary',
+    // The file checklist now includes an approved salary structure.
+    up: () => recomputeAllCompleteness(),
+  },
 ];
 
 export async function runMigrations() {

@@ -24,6 +24,9 @@ export const PERMISSIONS = {
   'documents.verify': 'Verify or reject employee documents',
   'letters.view': 'See letters',
   'letters.manage': 'Prepare and issue letters',
+  'salary.view': 'See salary structures',
+  'salary.manage': 'Propose salary structures and revisions',
+  'salary.approve': 'Approve salary structures (never your own proposal)',
 };
 
 const everything = (scope) =>
@@ -35,7 +38,8 @@ export const ROLES = {
   ceo: { label: 'CEO', permissions: everything('all') },
   hr_admin: {
     label: 'HR Admin',
-    permissions: { ...everything('all'), 'audit.view': false },
+    // HR prepares salary changes; Finance or the CEO approves them (CEO spec, maker-checker).
+    permissions: { ...everything('all'), 'audit.view': false, 'salary.approve': false },
   },
   finance: {
     label: 'Finance',
@@ -50,6 +54,9 @@ export const ROLES = {
       'kyc.reveal': true,
       'documents.view': 'all',
       'letters.view': 'all',
+      'salary.view': 'all',
+      'salary.manage': true,
+      'salary.approve': true,
     },
   },
   manager: {
@@ -73,6 +80,7 @@ export const ROLES = {
       'kyc.view': 'own',
       'documents.view': 'own',
       'letters.view': 'own',
+      'salary.view': 'own',
     },
   },
   auditor: {
@@ -85,6 +93,7 @@ export const ROLES = {
       'kyc.view': 'all',
       'documents.view': 'all',
       'letters.view': 'all',
+      'salary.view': 'all',
     },
   },
 };

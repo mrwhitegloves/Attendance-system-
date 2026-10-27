@@ -8,7 +8,7 @@ const KYC_DONE = ['submitted', 'under_review', 'verified'];
 const filled = (value) => (typeof value === 'string' ? value.trim() !== '' : Boolean(value));
 
 /** Every item of the employee's file with its section and whether it is done. */
-export function profileChecklist(user, kyc = null, documents = null) {
+export function profileChecklist(user, kyc = null, documents = null, extras = {}) {
   const items = [
     ['personal', 'Photo', filled(user.photoKey)],
     ['personal', 'Mobile number', filled(user.phone)],
@@ -39,6 +39,10 @@ export function profileChecklist(user, kyc = null, documents = null) {
   ]) {
     items.push(['kyc', label, KYC_DONE.includes(kyc?.[item]?.status)]);
   }
+  // extras.salaryApproved: whether an approved salary structure exists (undefined: not checked).
+  if (extras.salaryApproved !== undefined) {
+    items.push(['employment', 'Salary structure (approved)', extras.salaryApproved]);
+  }
   // documents: { requiredTypes: [{ _id, name }], records: [{ typeId, status }] }
   for (const type of documents?.requiredTypes ?? []) {
     const record = documents.records.find((doc) => String(doc.typeId) === String(type._id));
@@ -48,8 +52,8 @@ export function profileChecklist(user, kyc = null, documents = null) {
 }
 
 /** { percent: 0–100, missing: [labels] } */
-export function computeCompleteness(user, kyc = null, documents = null) {
-  const items = profileChecklist(user, kyc, documents);
+export function computeCompleteness(user, kyc = null, documents = null, extras = {}) {
+  const items = profileChecklist(user, kyc, documents, extras);
   const done = items.filter((item) => item.done).length;
   return {
     percent: Math.round((done / items.length) * 100),

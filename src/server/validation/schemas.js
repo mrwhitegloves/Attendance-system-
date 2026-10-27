@@ -10,6 +10,7 @@ import {
 import { LOOKUP_TYPES } from '../models/lookup.model.js';
 import { DOCUMENT_CATEGORIES, DOCUMENT_STATUSES } from '../models/document.model.js';
 import { LETTER_KINDS } from '../models/letter.model.js';
+import { SALARY_COMPONENTS } from '../models/salary.model.js';
 import { ROLE_KEYS } from '../permissions/roles.js';
 import { ATTENDANCE_STATUSES } from '../models/attendance.model.js';
 import { MIN_PASSWORD_LENGTH } from '../auth/password.js';
@@ -330,4 +331,25 @@ export const companyBody = z.strictObject({
   phone: text(30).optional(),
   email: email.optional(),
   website: text(120).optional(),
+});
+
+// ---- Salary ----
+// Monthly amounts typed in rupees, stored in paise.
+const monthlyRupees = z.coerce
+  .number()
+  .min(0, 'cannot be negative')
+  .max(10_000_000)
+  .transform((rupees) => Math.round(rupees * 100));
+export const proposeSalaryBody = z.strictObject({
+  effectiveFrom: day,
+  reason: text(300).min(3, 'write the reason (joining, annual increment, promotion …)'),
+  components: z.strictObject(
+    Object.fromEntries(
+      Object.keys(SALARY_COMPONENTS).map((key) => [key, monthlyRupees.optional().default(0)]),
+    ),
+  ),
+});
+export const decideSalaryBody = z.strictObject({
+  decision: z.enum(['approved', 'rejected']),
+  note: text(300).optional().default(''),
 });

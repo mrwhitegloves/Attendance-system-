@@ -78,3 +78,8 @@ export function statusTone(status) {
 }
 
 export const capitalize = (text) => (text ? text[0].toUpperCase() + text.slice(1) : '');
+
+const RUPEES = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
+/** 3180000 paise → "₹31,800". */
+export const formatRupees = (paise) =>
+  paise === null || paise === undefined ? '—' : `₹${RUPEES.format(paise / 100)}`;
