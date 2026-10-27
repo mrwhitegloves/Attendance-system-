@@ -8,7 +8,7 @@ export const metadata = { title: 'Sign in' };
 
 export default async function LoginPage({ searchParams }) {
   if (await getCurrentUser()) redirect('/dashboard');
-  const { next } = await searchParams;
+  const { next, ended } = await searchParams;
   const safeNext =
     typeof next === 'string' && next.startsWith('/') && !next.startsWith('//')
       ? next
@@ -23,6 +23,11 @@ export default async function LoginPage({ searchParams }) {
             <p className="text-xs text-muted">{BRANDING.companyName}</p>
           </div>
         </div>
+        {ended && (
+          <p role="status" className="mb-4 rounded-lg bg-raised px-3 py-2 text-sm text-muted">
+            You were signed out. Please sign in again.
+          </p>
+        )}
         <LoginForm next={safeNext} />
         <p className="mt-6 text-center text-xs text-muted">
           No account or forgot your password? Please contact HR.

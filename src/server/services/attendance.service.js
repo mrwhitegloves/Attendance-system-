@@ -15,7 +15,7 @@ import {
 } from '../lib/dates.js';
 import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
 import { decodeImageDataUrl } from '../lib/images.js';
-import { notifyPunchWatchers } from './push.service.js';
+import { notifyActiveEmployees } from './push.service.js';
 import { compOffsBetween, holidaysBetween } from './leaveRules.service.js';
 
 // Attendance rules (CEO, 2026-10-27), enforced by the server:
@@ -147,12 +147,15 @@ export async function punch(actor, input, now = new Date()) {
     Late: 'punched in (late)',
     'Checked Out': 'punched out',
   }[status];
-  notifyPunchWatchers({
-    title: `${actor.name} ${verb}`,
-    body: `${record.time} · ${record.location}`,
-    icon: '/logo.png',
-    data: { url: `/attendance?date=${today}` },
-  }).catch(() => {});
+  notifyActiveEmployees(
+    {
+      title: `${actor.name} ${verb}`,
+      body: `${record.time} · ${record.location}`,
+      icon: '/logo.png',
+      data: { url: `/attendance?date=${today}` },
+    },
+    { except: actor._id },
+  ).catch(() => {});
 
   return toView(record.toObject());
 }

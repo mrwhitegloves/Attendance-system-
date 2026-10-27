@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import {
+  ACCOUNT_STATUS,
   EMPLOYMENT_STATUS,
   EMPLOYMENT_TYPE,
   GENDER,
@@ -10,7 +11,7 @@ import {
 // worker), who is also the person who signs in. Collection `users` (the same collection the
 // first version used; old fields are kept). There is no second employee collection.
 
-export const USER_STATUSES = ['active', 'inactive'];
+export const USER_STATUSES = ACCOUNT_STATUS.values;
 export { STAFF_TYPES } from '../../config/employeeOptions.js';
 export const GENDERS = GENDER.values;
 export const EMPLOYMENT_TYPES = EMPLOYMENT_TYPE.values;

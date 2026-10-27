@@ -2,6 +2,7 @@ import { User, PUBLIC_USER_FIELDS } from '../models/user.model.js';
 import { Counter } from '../models/system.models.js';
 import { can, canSeeEmployee, employeeScopeFilter, requirePermission } from '../permissions/can.js';
 import { destroyUserSessions } from '../auth/session.js';
+import { notifyUsers } from './push.service.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { runListQuery, containsRegex } from '../lib/pagination.js';
 import { recordAudit, diffFields } from './audit.service.js';
@@ -182,7 +183,8 @@ export async function updateUser(actor, id, input, { ip } = {}) {
   if (input.roleKey) checkRoleChange(actor, input.roleKey, before.roleKey);
   if (
     String(before._id) === String(actor._id) &&
-    (input.status === 'inactive' || (input.roleKey && input.roleKey !== before.roleKey))
+    ((input.status && input.status !== 'active') ||
+      (input.roleKey && input.roleKey !== before.roleKey))
   ) {
     throw createAppError(400, 'You cannot switch off or change the role of your own account.');
   }
@@ -203,7 +205,11 @@ export async function updateUser(actor, id, input, { ip } = {}) {
   await refreshCompleteness(id);
   const changes = diffFields(before, input, EDITABLE);
   if (input.password) changes.password = 'changed';
-  if (input.password || input.status === 'inactive') await destroyUserSessions(id);
+  if (input.password || (input.status && input.status !== 'active')) {
+    await destroyUserSessions(id);
+    // Open pages of this person go to the sign-in screen now (push), or at the next check.
+    notifyUsers([id], { type: 'session_ended', title: 'Signed out', body: '' }).catch(() => {});
+  }
   if (Object.keys(changes).length) {
     await recordAudit(actor, {
       action: 'user.updated',

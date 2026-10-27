@@ -3,27 +3,38 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, Pencil, Power } from 'lucide-react';
+import { ACCOUNT_STATUS } from '@/config/employeeOptions.js';
 import { apiFetch } from '@/lib/apiFetch.js';
-import { Button, ButtonLink } from '@/components/shared/ui.jsx';
-import { ConfirmDialog, Dialog } from '@/components/shared/Dialog.jsx';
+import { Button, ButtonLink, ErrorText } from '@/components/shared/ui.jsx';
+import { Dialog } from '@/components/shared/Dialog.jsx';
+import { Field, Select } from '@/components/shared/form.jsx';
 
-/** Edit, switch off / on, and show password (explicit click, audited). */
+/** Edit, change the account status, and show password (explicit click, audited). */
 export function EmployeeActions({ employee, canEdit, canSwitch, canSeePassword }) {
   const router = useRouter();
-  const [confirm, setConfirm] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [status, setStatus] = useState(employee.status);
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [password, setPassword] = useState(null);
-  const switchingOff = employee.status === 'active';
 
-  const toggleStatus = async () => {
+  const openStatus = () => {
+    setStatus(employee.status);
+    setError('');
+    setStatusOpen(true);
+  };
+  const saveStatus = async () => {
     setBusy(true);
-    await apiFetch(`/api/users/${employee._id}`, {
-      method: 'PATCH',
-      body: { status: switchingOff ? 'inactive' : 'active' },
-    }).catch(() => {});
-    setBusy(false);
-    setConfirm(false);
-    router.refresh();
+    setError('');
+    try {
+      await apiFetch(`/api/users/${employee._id}`, { method: 'PATCH', body: { status } });
+      setStatusOpen(false);
+      router.refresh();
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const showPassword = async () => {
@@ -41,8 +52,8 @@ export function EmployeeActions({ employee, canEdit, canSwitch, canSeePassword }
         </Button>
       )}
       {canSwitch && (
-        <Button variant="secondary" size="sm" onClick={() => setConfirm(true)}>
-          <Power size={15} /> {switchingOff ? 'Switch off' : 'Switch on'}
+        <Button variant="secondary" size="sm" onClick={openStatus}>
+          <Power size={15} /> Status: {ACCOUNT_STATUS.label(employee.status)}
         </Button>
       )}
       {canEdit && (
@@ -50,20 +61,41 @@ export function EmployeeActions({ employee, canEdit, canSwitch, canSeePassword }
           <Pencil size={15} /> Edit
         </ButtonLink>
       )}
-      <ConfirmDialog
-        open={confirm}
-        title={switchingOff ? `Switch off ${employee.name}?` : `Switch on ${employee.name}?`}
-        text={
-          switchingOff
-            ? 'They are signed out on every device and cannot sign in. Their records are kept.'
-            : 'They can sign in again with their password.'
+      <Dialog
+        open={statusOpen}
+        onClose={() => setStatusOpen(false)}
+        title={`Account status of ${employee.name}`}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setStatusOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant={status === 'active' ? 'primary' : 'danger'}
+              onClick={saveStatus}
+              disabled={busy || status === employee.status}
+            >
+              Save
+            </Button>
+          </>
         }
-        confirmLabel={switchingOff ? 'Switch off' : 'Switch on'}
-        danger={switchingOff}
-        busy={busy}
-        onConfirm={toggleStatus}
-        onClose={() => setConfirm(false)}
-      />
+      >
+        <Field label="Status" htmlFor="account-status">
+          <Select
+            id="account-status"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+            options={ACCOUNT_STATUS.list}
+          />
+        </Field>
+        <p className="mt-3 text-sm text-muted">
+          {status === 'active'
+            ? 'They can sign in and punch with their password.'
+            : 'They are signed out on every device at once and cannot sign in or punch. Their records are kept.'}
+        </p>
+        {error && <ErrorText>{error}</ErrorText>}
+      </Dialog>
       <Dialog
         open={password !== null}
         onClose={() => setPassword(null)}

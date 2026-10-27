@@ -8,6 +8,7 @@ import { PhotoUpload } from '@/features/employees/PhotoUpload.jsx';
 import { Badge } from '@/components/shared/ui.jsx';
 import { EmployeeTabs } from '@/features/employees/EmployeeTabs.jsx';
 import { EmployeeActions } from '@/features/employees/EmployeeActions.jsx';
+import { ACCOUNT_STATUS, ACCOUNT_STATUS_TONE } from '@/config/employeeOptions.js';
 
 // Header and tabs of one employee; each tab is its own address under /employees/:id.
 export default async function EmployeeLayout({ children, params }) {
@@ -31,7 +32,11 @@ export default async function EmployeeLayout({ children, params }) {
             <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
               {employee.employeeId}
               <CompletenessBar percent={employee.completeness?.percent ?? 0} />
-              {employee.status === 'inactive' && <Badge>Switched off</Badge>}
+              {employee.status !== 'active' && (
+                <Badge tone={ACCOUNT_STATUS_TONE[employee.status]}>
+                  {ACCOUNT_STATUS.label(employee.status)}
+                </Badge>
+              )}
             </p>
           </div>
         </div>

@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useListParams } from '@/lib/useListParams.js';
-import { statusTone } from '@/lib/format.js';
 import { Badge, Button, Card } from '@/components/shared/ui.jsx';
 import { DataTable, Pagination } from '@/components/shared/DataTable.jsx';
 import { CompletenessBar, PersonCell } from '@/components/shared/Avatar.jsx';
 import { compactInputClass, Select } from '@/components/shared/form.jsx';
-import { EMPLOYMENT_STATUS } from '@/config/employeeOptions.js';
+import {
+  ACCOUNT_STATUS,
+  ACCOUNT_STATUS_TONE,
+  EMPLOYMENT_STATUS,
+} from '@/config/employeeOptions.js';
 
 const FILTER_KEYS = ['q', 'status', 'department', 'staffType', 'roleKey', 'file'];
 
@@ -52,11 +55,7 @@ export function EmployeeList({ result, roles, staffTypes, departments }) {
           onChange={(event) =>
             set({ status: event.target.value === 'active' ? '' : event.target.value })
           }
-          options={[
-            { value: 'active', label: 'Active' },
-            { value: 'inactive', label: 'Switched off' },
-            { value: 'all', label: 'Everyone' },
-          ]}
+          options={[...ACCOUNT_STATUS.list, { value: 'all', label: 'Everyone' }]}
           aria-label="Sign-in status"
         />
         {filter(
@@ -130,8 +129,8 @@ export function EmployeeList({ result, roles, staffTypes, departments }) {
             key: 'status',
             label: 'Sign-in',
             render: (row) => (
-              <Badge tone={statusTone(row.status)}>
-                {row.status === 'inactive' ? 'Switched off' : 'Active'}
+              <Badge tone={ACCOUNT_STATUS_TONE[row.status]}>
+                {ACCOUNT_STATUS.label(row.status)}
               </Badge>
             ),
           },

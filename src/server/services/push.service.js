@@ -42,6 +42,18 @@ export async function notifyPunchWatchers(payload) {
   return notifyUsers(await usersWithPermission('notifications.punches'), payload);
 }
 
+/** Punch alerts (founder, 2026-10-27): every active employee except the person who punched. */
+export async function notifyActiveEmployees(payload, { except } = {}) {
+  const users = await User.find(
+    { status: 'active', ...(except ? { _id: { $ne: except } } : {}) },
+    '_id',
+  ).lean();
+  return notifyUsers(
+    users.map((user) => user._id),
+    payload,
+  );
+}
+
 /** A message from HR to every active employee. */
 export async function broadcastToEmployees({ title, body }) {
   const users = await User.find({ status: 'active' }, '_id').lean();

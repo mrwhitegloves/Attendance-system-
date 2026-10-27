@@ -197,6 +197,21 @@ self.addEventListener('push', (event) => {
     console.error('[SW] Push parse error:', e);
   }
 
+  // The account was switched off or the password changed: send every open page to sign-in.
+  if (data.type === 'session_ended') {
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        clients.forEach((client) => client.postMessage({ type: 'SESSION_ENDED' }));
+        return self.registration.showNotification('Signed out', {
+          body: 'Please sign in again.',
+          icon: '/logo.png',
+          tag: 'mwg-session-ended',
+        });
+      }),
+    );
+    return;
+  }
+
   const options = {
     body: data.body,
     icon: data.icon || '/logo.png',

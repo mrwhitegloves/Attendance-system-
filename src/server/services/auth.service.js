@@ -5,6 +5,7 @@ import { createAppError } from '../lib/errors.js';
 import { recordAudit } from './audit.service.js';
 import { notifyPunchWatchers } from './push.service.js';
 import { can } from '../permissions/can.js';
+import { ACCOUNT_STATUS } from '../../config/employeeOptions.js';
 
 // Signing in and out, and the person's own password.
 
@@ -19,7 +20,11 @@ export async function signIn({ identifier, password }, { userAgent, ip } = {}) {
     throw createAppError(401, 'Wrong employee ID or password.', 'wrong_credentials');
   }
   if (user.status !== 'active') {
-    throw createAppError(403, 'This account is switched off. Please contact HR.', 'inactive');
+    throw createAppError(
+      403,
+      `This account is ${ACCOUNT_STATUS.label(user.status).toLowerCase()}. Please contact HR.`,
+      'inactive',
+    );
   }
   const token = await createSession(user._id, userAgent);
   await User.updateOne({ _id: user._id }, { lastLoginAt: new Date() });

@@ -25,6 +25,7 @@ import { BRANDING } from '@/config/branding.js';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { Avatar } from '@/components/shared/Avatar.jsx';
 import { DeviceSetup } from '@/features/notifications/DeviceSetup.jsx';
+import { SessionWatch } from '@/features/auth/SessionWatch.jsx';
 
 const ICONS = {
   Camera,
@@ -125,6 +126,7 @@ export function AppShell({ user, permissions, roleLabel, vapidPublicKey, childre
       </nav>
 
       <DeviceSetup user={user} canPunch={permissions.punch} vapidPublicKey={vapidPublicKey} />
+      <SessionWatch />
     </div>
   );
 }

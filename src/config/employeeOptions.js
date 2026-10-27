@@ -34,3 +34,19 @@ export const EMPLOYMENT_STATUS = options({
 export const STAFF_TYPES = ['Office Staff', 'Field Staff', 'Management', 'Intern'];
 
 export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+// Account status decides sign-in (founder, 2026-10-27): only "active" may sign in and punch.
+// Any other status signs the person out everywhere at once. Separate from employment status.
+export const ACCOUNT_STATUS = options({
+  active: 'Active',
+  inactive: 'Inactive',
+  suspended: 'Suspended',
+  deactivated: 'Deactivated',
+});
+
+export const ACCOUNT_STATUS_TONE = {
+  active: 'success',
+  inactive: 'neutral',
+  suspended: 'warning',
+  deactivated: 'danger',
+};
