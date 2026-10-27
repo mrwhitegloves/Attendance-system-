@@ -7,6 +7,8 @@ import { MyDayCard } from '@/features/dashboard/MyDayCard.jsx';
 import { TeamToday } from '@/features/dashboard/TeamToday.jsx';
 import { BroadcastButton } from '@/features/notifications/BroadcastButton.jsx';
 import { InstallBanner } from '@/features/notifications/InstallBanner.jsx';
+import { getControlCenter } from '@/server/services/dashboard.service.js';
+import { ControlCenter } from '@/features/dashboard/ControlCenter.jsx';
 
 export const metadata = { title: 'Dashboard' };
 
@@ -24,10 +26,11 @@ function greeting() {
 export default async function DashboardPage() {
   const user = await requirePageUser();
   const scope = can(user, 'attendance.view');
-  const [myDay, sheet, pending] = await Promise.all([
+  const [myDay, sheet, pending, control] = await Promise.all([
     can(user, 'attendance.punch') ? getMyDay(user) : null,
     scope && scope !== 'own' ? getDailySheet(user) : null,
     countPendingLeaves(user),
+    getControlCenter(user),
   ]);
   return (
     <>
@@ -44,7 +47,9 @@ export default async function DashboardPage() {
       />
       <div className="space-y-5">
         <InstallBanner />
+        {control && <ControlCenter data={toPlain(control)} />}
         {myDay && <MyDayCard day={toPlain(myDay)} />}
+        {control && sheet && <h2 className="pt-2 text-sm font-semibold">Attendance today</h2>}
         {sheet && <TeamToday sheet={toPlain(sheet)} pendingLeaves={pending} />}
       </div>
     </>
