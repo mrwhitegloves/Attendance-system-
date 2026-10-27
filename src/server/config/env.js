@@ -29,6 +29,9 @@ export const env = {
   AWS_S3_IAM_SECRET_ACCESS_KEY: read('AWS_S3_IAM_SECRET_ACCESS_KEY'),
   S3_BUCKET: isProduction ? read('S3_PROD_BUCKET') : read('S3_DEV_BUCKET'),
 
+  // 32-byte key (base64) that seals PAN and bank account numbers. Required for KYC numbers.
+  DATA_ENCRYPTION_KEY: read('DATA_ENCRYPTION_KEY'),
+
   // Web push.
   VAPID_PUBLIC_KEY: read('NEXT_PUBLIC_VAPID_PUBLIC_KEY'),
   VAPID_PRIVATE_KEY: read('VAPID_PRIVATE_KEY'),

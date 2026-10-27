@@ -28,24 +28,36 @@ const FULL = {
   managerId: '6adf4550aa4e903dfd7bf772',
 };
 
+// KYC items count once submitted or verified.
+const KYC_DONE = {
+  pan: { status: 'verified' },
+  aadhaar: { status: 'submitted' },
+  bank: { status: 'under_review' },
+};
+
 describe('file completeness', () => {
   it('is 100% only when every item is filled', () => {
-    expect(computeCompleteness({ ...FULL, roleKey: 'employee' })).toEqual({
+    expect(computeCompleteness({ ...FULL, roleKey: 'employee' }, KYC_DONE)).toEqual({
       percent: 100,
       missing: [],
     });
-    const partial = computeCompleteness({
-      ...FULL,
-      roleKey: 'employee',
-      dateOfBirth: '',
-      emergencyContact: { name: 'A', phone: '' },
-    });
-    expect(partial.missing).toEqual(['Date of birth', 'Emergency contact']);
+    const partial = computeCompleteness(
+      {
+        ...FULL,
+        roleKey: 'employee',
+        dateOfBirth: '',
+        emergencyContact: { name: 'A', phone: '' },
+      },
+      { ...KYC_DONE, bank: { status: 'rejected' } },
+    );
+    expect(partial.missing).toEqual(['Date of birth', 'Emergency contact', 'Bank account']);
     expect(partial.percent).toBeLessThan(100);
   });
 
   it('does not ask a manager for the CEO', () => {
-    expect(computeCompleteness({ ...FULL, managerId: null, roleKey: 'ceo' }).percent).toBe(100);
+    expect(
+      computeCompleteness({ ...FULL, managerId: null, roleKey: 'ceo' }, KYC_DONE).percent,
+    ).toBe(100);
   });
 
   it('is saved on create and on every edit', async () => {

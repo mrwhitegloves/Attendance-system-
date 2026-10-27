@@ -37,7 +37,7 @@ export function withApi(options, handler) {
   };
 }
 
-function parse(schema, value) {
+export function parse(schema, value) {
   const result = schema.safeParse(value);
   if (result.success) return result.data;
   const issue = result.error.issues[0];
@@ -48,7 +48,7 @@ function parse(schema, value) {
   );
 }
 
-async function readJson(request) {
+export async function readJson(request) {
   try {
     return await request.json();
   } catch {

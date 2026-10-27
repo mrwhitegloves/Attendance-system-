@@ -1,9 +1,8 @@
 import { requirePageUser, toPlain } from '@/server/auth/current.js';
 import { can } from '@/server/permissions/can.js';
-import { getUser } from '@/server/services/users.service.js';
+import { getUser, fileChecklist } from '@/server/services/users.service.js';
 import { User } from '@/server/models/user.model.js';
 import { roleLabel } from '@/server/permissions/roles.js';
-import { profileChecklist } from '@/server/lib/completeness.js';
 import { EmployeeFile } from '@/features/employees/EmployeeFile.jsx';
 
 export const metadata = { title: 'Employee' };
@@ -20,7 +19,7 @@ export default async function EmployeeProfilePage({ params }) {
       employee={toPlain(employee)}
       managerName={manager ? `${manager.name} (${manager.employeeId})` : null}
       roleName={roleLabel(employee.roleKey)}
-      checklist={profileChecklist(employee)}
+      checklist={await fileChecklist(employee)}
       canEdit={Boolean(can(user, 'users.manage'))}
     />
   );

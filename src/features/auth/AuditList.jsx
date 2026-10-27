@@ -15,6 +15,16 @@ const ACTIONS = {
   'leave.approved': 'Leave approved',
   'leave.rejected': 'Leave rejected',
   'push.broadcast': 'Notification sent',
+  'user.photo_changed': 'Photo changed',
+  'lookup.added': 'List item added',
+  'lookup.renamed': 'List item renamed',
+  'lookup.activated': 'List item switched on',
+  'lookup.deactivated': 'List item switched off',
+  'kyc.updated': 'KYC details entered',
+  'kyc.proof_added': 'KYC proof uploaded',
+  'kyc.verified': 'KYC verified',
+  'kyc.rejected': 'KYC rejected',
+  'kyc.revealed': 'Full KYC number viewed',
 };
 
 function describeChanges(changes) {

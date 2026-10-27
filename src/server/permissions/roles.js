@@ -15,6 +15,10 @@ export const PERMISSIONS = {
   'notifications.broadcast': 'Send a notification to all employees',
   'audit.view': 'See the audit log',
   'settings.manage': 'Change settings and lists',
+  'kyc.view': 'See KYC and bank status (numbers masked)',
+  'kyc.manage': 'Enter KYC and bank details and upload proofs',
+  'kyc.verify': 'Verify or reject KYC and bank details',
+  'kyc.reveal': 'See full PAN and bank account numbers',
 };
 
 const everything = (scope) =>
@@ -36,6 +40,9 @@ export const ROLES = {
       'leave.request': true,
       'leave.view': 'all',
       'users.view': 'all',
+      'kyc.view': 'all',
+      'kyc.verify': true,
+      'kyc.reveal': true,
     },
   },
   manager: {
@@ -56,6 +63,7 @@ export const ROLES = {
       'attendance.view': 'own',
       'leave.request': true,
       'leave.view': 'own',
+      'kyc.view': 'own',
     },
   },
   auditor: {
@@ -65,6 +73,7 @@ export const ROLES = {
       'leave.view': 'all',
       'users.view': 'all',
       'audit.view': 'all',
+      'kyc.view': 'all',
     },
   },
 };

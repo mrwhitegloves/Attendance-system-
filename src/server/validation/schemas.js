@@ -189,3 +189,48 @@ export const auditQuery = z.object({
   entityId: text(40).optional(),
   page,
 });
+
+// ---- KYC and bank ----
+export const kycItemParam = z.enum(['pan', 'aadhaar', 'bank']);
+export const kycDetailsBody = {
+  pan: z.strictObject({
+    number: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, 'a PAN looks like ABCDE1234F'),
+    nameOnPan: text(100).min(2, 'enter the name printed on the PAN'),
+  }),
+  aadhaar: z.strictObject({
+    last4: z
+      .string()
+      .trim()
+      .regex(/^\d{4}$/, 'enter only the last 4 digits'),
+  }),
+  bank: z.strictObject({
+    accountHolderName: text(100).min(2, 'enter the account holder name'),
+    bankName: text(100).min(2, 'enter the bank name'),
+    ifsc: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'an IFSC looks like SBIN0001234'),
+    accountNumber: z
+      .union([
+        z
+          .string()
+          .trim()
+          .regex(/^\d{9,18}$/, '9 to 18 digits'),
+        z.literal(''),
+      ])
+      .optional(),
+  }),
+};
+export const fileBody = z.strictObject({
+  file: z.string().max(7_200_000, 'the file is larger than 5 MB'),
+  fileName: text(120).optional().default(''),
+});
+export const kycReviewBody = z.strictObject({
+  decision: z.enum(['verified', 'rejected']),
+  reason: text(300).optional().default(''),
+});
