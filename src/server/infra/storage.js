@@ -3,6 +3,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../config/env.js';
 
 // The ONLY file that talks to S3. The bucket is private: files are read through short signed links.
+// Nothing is ever deleted from S3 (CEO rule): there is deliberately no delete function here.
 
 let client = null;
 

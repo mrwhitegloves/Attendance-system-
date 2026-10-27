@@ -11,9 +11,7 @@ export function MyDayCard({ day }) {
         ? 'You are on approved leave today.'
         : day.next === 'out'
           ? `You punched in at ${day.punchIn.time}.`
-          : day.punchInClosed
-            ? 'Punch-in is closed for today.'
-            : `Your shift starts at ${day.expectedInTime}.`;
+          : `Your shift starts at ${day.expectedInTime} (late after ${day.graceMinutes} minutes).`;
   return (
     <Card className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
       <div className="flex items-center gap-3">
@@ -36,7 +34,7 @@ export function MyDayCard({ day }) {
           </p>
         </div>
       </div>
-      {day.next !== 'done' && !(day.next === 'in' && day.punchInClosed) && (
+      {day.next !== 'done' && (
         <ButtonLink href="/attendance/punch" size="lg">
           <Camera size={18} /> {day.next === 'in' ? 'Punch in' : 'Punch out'}
         </ButtonLink>

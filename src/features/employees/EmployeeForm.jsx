@@ -146,7 +146,11 @@ export function EmployeeForm({ employee, roles, staffTypes, managers, canGiveCeo
               ]}
             />
           </Field>
-          <Field label="Expected in-time" htmlFor="in" hint="A punch-in after this minute is late.">
+          <Field
+            label="Expected in-time"
+            htmlFor="in"
+            hint="Up to 5 minutes after this is on time; later is late."
+          >
             <input
               id="in"
               type="time"

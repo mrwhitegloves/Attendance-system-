@@ -146,10 +146,6 @@ export function PunchScreen({ day }) {
           <p className="rounded-lg bg-raised px-4 py-8 text-center text-sm text-muted">
             Your day is complete. See you tomorrow.
           </p>
-        ) : day.punchInClosed ? (
-          <p className="rounded-lg bg-raised px-4 py-8 text-center text-sm text-muted">
-            The shift is over. Punch-in closes at 7:30 PM.
-          </p>
         ) : (
           <div className="space-y-4">
             <div className="relative mx-auto aspect-[4/3] w-full max-w-md overflow-hidden rounded-xl bg-raised">

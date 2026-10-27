@@ -17,15 +17,14 @@ import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
 import { deleteImageKitFile, isImageKitConfigured } from '../infra/imagekit.js';
 import { notifyPunchWatchers } from './push.service.js';
 
-// Attendance rules (same as the first version, now enforced by the server):
-// - one punch-in and one punch-out a day; the time is the server's, in India time;
-// - "Late" when the punch-in is after the person's expected in-time (09:30 → 09:31 is late);
-// - no punch-in after 7:30 PM;
-// - after 2 late days in a month the person is warned, and must confirm a further late punch;
-// - a punch-in without punch-out on an earlier day becomes "Absent" (daily job).
+// Attendance rules (CEO, 2026-10-27), enforced by the server:
+// - one punch-in and one punch-out a day, at any hour; the time is the server's, in India time;
+// - 5 minutes of grace: expected 10:00 → up to 10:05:59 is on time, from 10:06 it is "Late";
+// - after 3 late days in a month the person is warned, and must confirm a further late punch;
+// - a missed punch-out is never turned into "Absent" automatically.
 
-export const LAST_PUNCH_IN_MINUTES = 19 * 60 + 30;
-export const MONTHLY_LATE_LIMIT = 2;
+export const LATE_GRACE_MINUTES = 5;
+export const MONTHLY_LATE_LIMIT = 3;
 
 const isPunchIn = (record) => PUNCH_IN_STATUSES.includes(record.status);
 
@@ -85,7 +84,7 @@ export async function getMyDay(actor, now = new Date()) {
     next: punchOut ? 'done' : punchIn ? 'out' : 'in',
     lateDaysThisMonth: await lateDaysThisMonth(actor.employeeId, today),
     lateLimit: MONTHLY_LATE_LIMIT,
-    punchInClosed: !punchIn && indiaMinutes(now) >= LAST_PUNCH_IN_MINUTES,
+    graceMinutes: LATE_GRACE_MINUTES,
   };
 }
 
@@ -112,15 +111,8 @@ export async function punch(actor, input, now = new Date()) {
 
   let status = 'Checked Out';
   if (!isOut) {
-    if (minutes >= LAST_PUNCH_IN_MINUTES) {
-      throw createAppError(
-        409,
-        'The shift is over. Punch-in closes at 7:30 PM.',
-        'punch_in_closed',
-      );
-    }
     const expected = clockToMinutes(actor.expectedInTime) ?? clockToMinutes('09:30');
-    status = minutes > expected ? 'Late' : 'Checked In';
+    status = minutes > expected + LATE_GRACE_MINUTES ? 'Late' : 'Checked In';
     if (status === 'Late' && !input.confirmLate) {
       const lateDays = await lateDaysThisMonth(actor.employeeId, today);
       if (lateDays >= MONTHLY_LATE_LIMIT) {
@@ -220,7 +212,6 @@ function dayStatus(records, pendingLeave) {
 /** One day for everyone in scope: who came, when, from where. */
 export async function getDailySheet(actor, date = indiaDay()) {
   const scope = await employeeScopeFilter(actor, 'attendance.view');
-  queueMissedPunchOutCheck();
   const [people, records, pending] = await Promise.all([
     User.find(
       { ...scope, status: 'active' },
@@ -328,48 +319,7 @@ export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0
 
 // ---- Daily jobs ----
 
-/** Marks earlier days with a punch-in but no punch-out as "Absent" (safe to run twice). */
-export async function markMissedPunchOuts(now = new Date()) {
-  const today = indiaDay(now);
-  const open = await Attendance.find(
-    { date: { $lt: today }, status: { $in: PUNCH_IN_STATUSES } },
-    'employeeId userId userName date time',
-  ).lean();
-  let marked = 0;
-  for (const record of open) {
-    const closed = await Attendance.exists({
-      employeeId: record.employeeId,
-      date: record.date,
-      status: { $in: ['Checked Out', 'Absent'] },
-    });
-    if (closed) continue;
-    await Attendance.create({
-      employeeId: record.employeeId,
-      userId: record.userId,
-      userName: record.userName,
-      date: record.date,
-      time: '12:00 AM',
-      status: 'Absent',
-      source: 'system',
-      location: 'System Generated',
-      remark: `Marked Absent: punched in at ${record.time} but did not punch out by the end of the day. Please contact HR if this is wrong.`,
-    });
-    marked += 1;
-  }
-  return { marked };
-}
-
-let lastCheck = 0;
-/** Runs the missed punch-out check at most every 10 minutes, without waiting for it. */
-function queueMissedPunchOutCheck() {
-  if (Date.now() - lastCheck < 10 * 60 * 1000) return;
-  lastCheck = Date.now();
-  markMissedPunchOuts().catch((error) =>
-    console.error('[attendance] missed punch-out check', error),
-  );
-}
-
-/** Deletes old ImageKit selfies after 30 days (new S3 selfies expire through a bucket rule). */
+/** Deletes old ImageKit selfies after 30 days (first-version photos only; S3 files are never deleted). */
 export async function cleanupOldImageKitSelfies(now = new Date()) {
   if (!isImageKitConfigured()) return { deleted: 0 };
   const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
