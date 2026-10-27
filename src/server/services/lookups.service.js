@@ -1,16 +1,20 @@
-import { Lookup, LOOKUP_TYPES } from '../models/lookup.model.js';
+import { EMPLOYEE_LIST_TYPES, Lookup } from '../models/lookup.model.js';
 import { User } from '../models/user.model.js';
 import { requirePermission } from '../permissions/can.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { recordAudit } from './audit.service.js';
 
-// Managed lists: departments, designations, branches (Settings → Lists).
+// Managed lists (Settings → Lists): departments, designations, branches, and checklist tasks.
 
 export const LOOKUP_LABELS = {
   department: 'Department',
   designation: 'Designation',
   branch: 'Branch',
+  onboarding_task: 'Onboarding task',
+  exit_task: 'Exit task',
 };
+
+const isEmployeeList = (type) => EMPLOYEE_LIST_TYPES.includes(type);
 
 /** Items of one list (active only unless asked), sorted by name, with how many employees use each. */
 export async function listLookups(type, { includeInactive = false, withCounts = false } = {}) {
@@ -18,7 +22,7 @@ export async function listLookups(type, { includeInactive = false, withCounts = 
     .collation({ locale: 'en', strength: 2 })
     .sort({ name: 1 })
     .lean();
-  if (!withCounts) return items;
+  if (!withCounts || !isEmployeeList(type)) return items;
   const counts = await User.aggregate([
     { $match: { [type]: { $in: items.map((item) => item.name) } } },
     { $group: { _id: `$${type}`, count: { $sum: 1 } } },
@@ -27,10 +31,13 @@ export async function listLookups(type, { includeInactive = false, withCounts = 
   return items.map((item) => ({ ...item, employees: byName[item.name] ?? 0 }));
 }
 
-/** All three lists at once (for the employee form). */
+/** The three employee lists at once (for the employee form). */
 export async function allLookups() {
   const entries = await Promise.all(
-    LOOKUP_TYPES.map(async (type) => [type, (await listLookups(type)).map((item) => item.name)]),
+    EMPLOYEE_LIST_TYPES.map(async (type) => [
+      type,
+      (await listLookups(type)).map((item) => item.name),
+    ]),
   );
   return Object.fromEntries(entries);
 }
@@ -65,12 +72,14 @@ export async function updateLookup(actor, id, { name, active }, { ip } = {}) {
       .lean();
     if (clash) throw createAppError(409, `${LOOKUP_LABELS[item.type]} "${name}" already exists.`);
     await Lookup.updateOne({ _id: id }, { name });
-    const moved = await User.updateMany({ [item.type]: item.name }, { [item.type]: name });
+    const moved = isEmployeeList(item.type)
+      ? await User.updateMany({ [item.type]: item.name }, { [item.type]: name })
+      : { modifiedCount: 0 };
     await recordAudit(actor, {
       action: 'lookup.renamed',
       entity: 'lookup',
       entityId: id,
-      summary: `${LOOKUP_LABELS[item.type]} "${item.name}" renamed to "${name}" (${moved.modifiedCount} employees)`,
+      summary: `${LOOKUP_LABELS[item.type]} "${item.name}" renamed to "${name}"${isEmployeeList(item.type) ? ` (${moved.modifiedCount} employees)` : ''}`,
       ip,
     });
   }
@@ -92,7 +101,7 @@ export async function updateLookup(actor, id, { name, active }, { ip } = {}) {
  * not changing is accepted even if its list item was switched off later.
  */
 export async function checkLookupValues(input, before = {}) {
-  for (const type of LOOKUP_TYPES) {
+  for (const type of EMPLOYEE_LIST_TYPES) {
     const value = input[type];
     if (!value || value === before[type]) continue;
     const exists = await Lookup.exists({ type, name: value, active: true });
@@ -106,7 +115,7 @@ export async function checkLookupValues(input, before = {}) {
 
 /** Fills the lists from the values employees already have (used once by a migration). */
 export async function seedLookupsFromEmployees() {
-  for (const type of LOOKUP_TYPES) {
+  for (const type of EMPLOYEE_LIST_TYPES) {
     const names = (await User.distinct(type)).map((name) => String(name).trim()).filter(Boolean);
     for (const name of names) {
       await Lookup.updateOne(
@@ -115,5 +124,30 @@ export async function seedLookupsFromEmployees() {
         { upsert: true },
       );
     }
+  }
+}
+
+/** The starting onboarding and exit tasks (a migration adds them once; HR edits them after). */
+export const DEFAULT_CHECKLIST_TASKS = {
+  onboarding_task: [
+    'Welcome and induction done',
+    'ID card given',
+    'Email and system access given',
+    'Policies explained (code of conduct, leave, IT and assets)',
+    'Introduced to the team and manager',
+  ],
+  exit_task: [
+    'Work handed over',
+    'Email and system access removed',
+    'Exit interview done',
+    'Relieving letter issued',
+    'Experience letter issued',
+  ],
+};
+
+export async function seedChecklistTasks() {
+  for (const [type, names] of Object.entries(DEFAULT_CHECKLIST_TASKS)) {
+    if (await Lookup.exists({ type })) continue;
+    await Lookup.insertMany(names.map((name) => ({ type, name })));
   }
 }

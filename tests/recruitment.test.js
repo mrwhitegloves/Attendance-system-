@@ -9,6 +9,7 @@ import { POST as letterAction } from '@/app/api/letters/[id]/[action]/route.js';
 import { Lookup } from '@/server/models/lookup.model.js';
 import { Letter } from '@/server/models/letter.model.js';
 import { User } from '@/server/models/user.model.js';
+import { Onboarding } from '@/server/models/onboarding.model.js';
 import { seedLetterTemplates, listTemplates } from '@/server/services/letters.service.js';
 import { updateCompany } from '@/server/services/settings.service.js';
 import { call, makeUser } from './helpers.js';
@@ -123,6 +124,7 @@ describe('hiring', () => {
     expect(String(letter.userId)).toBe(String(employee._id));
     expect(letter.employeeId).toBe(employee.employeeId);
 
+    expect(await Onboarding.exists({ userId: employee._id })).toBeTruthy();
     // Twice never makes two employees.
     expect((await join()).status).toBe(409);
     expect(await User.countDocuments({ name: 'Kiran Rao' })).toBe(1);

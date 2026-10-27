@@ -5,6 +5,7 @@ import { listCandidates } from '@/server/services/recruitment.service.js';
 import { listCandidatesQuery } from '@/server/validation/schemas.js';
 import { ButtonLink, PageHeader } from '@/components/shared/ui.jsx';
 import { CandidateList } from '@/features/recruitment/CandidateList.jsx';
+import { LifecycleTabs, lifecycleShow } from '@/features/recruitment/LifecycleTabs.jsx';
 
 export const metadata = { title: 'Hiring' };
 
@@ -26,6 +27,7 @@ export default async function RecruitmentPage({ searchParams }) {
           )
         }
       />
+      <LifecycleTabs active="recruitment" show={lifecycleShow(can, user)} />
       <CandidateList result={toPlain(result)} />
     </>
   );

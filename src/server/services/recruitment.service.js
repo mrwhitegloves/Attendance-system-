@@ -9,12 +9,13 @@ import { DROP_REASONS } from '../../config/recruitmentOptions.js';
 import { recordAudit, diffFields } from './audit.service.js';
 import { checkLookupValues } from './lookups.service.js';
 import { createUser } from './users.service.js';
+import { startOnboarding } from './onboarding.service.js';
 
 // Candidates and their offers (CEO spec section 4). Rules:
 // - a candidate is not an employee: no employee ID, no sign-in, nothing in attendance or payroll;
 // - offer letters are drafted, issued and replied to like every letter (letters.service);
 // - a candidate joins only after an offer letter was accepted; joining makes the employee
-//   (new employee ID) and moves the candidate's letters to them; nothing is copied twice;
+//   (new employee ID), moves the candidate's letters to them and starts their onboarding;
 // - a candidate who will not join is kept with the reason, never deleted.
 
 const EDITABLE = [
@@ -235,6 +236,7 @@ export async function joinCandidate(actor, id, { joiningDate, password, email },
     { candidateId: candidate._id },
     { userId: employee._id, employeeId: employee.employeeId },
   );
+  await startOnboarding(actor, employee._id, { ip });
   await recordAudit(actor, {
     action: 'candidate.joined',
     entity: 'candidate',

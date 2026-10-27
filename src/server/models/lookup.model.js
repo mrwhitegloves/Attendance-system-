@@ -1,9 +1,12 @@
 import mongoose from 'mongoose';
 
-// Managed lists edited in Settings → Lists: departments, designations, branches.
-// Employees store the name; renaming a list item renames it on every employee.
+// Managed lists edited in Settings → Lists: departments, designations, branches (employees
+// store the name; renaming a list item renames it on every employee), and the tasks of the
+// onboarding and exit checklists (copied into each checklist when it starts).
 
-export const LOOKUP_TYPES = ['department', 'designation', 'branch'];
+export const EMPLOYEE_LIST_TYPES = ['department', 'designation', 'branch'];
+export const CHECKLIST_TYPES = ['onboarding_task', 'exit_task'];
+export const LOOKUP_TYPES = [...EMPLOYEE_LIST_TYPES, ...CHECKLIST_TYPES];
 
 const lookupSchema = new mongoose.Schema(
   {

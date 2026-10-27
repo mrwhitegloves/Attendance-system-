@@ -4,7 +4,7 @@ import { createUser, updateUser, getUser } from '@/server/services/users.service
 import { addLookup, updateLookup } from '@/server/services/lookups.service.js';
 import { runMigrations } from '@/server/migrations/index.js';
 import { User } from '@/server/models/user.model.js';
-import { Lookup } from '@/server/models/lookup.model.js';
+import { EMPLOYEE_LIST_TYPES, Lookup } from '@/server/models/lookup.model.js';
 import { AuditLog } from '@/server/models/system.models.js';
 import { POST as photoRoute } from '@/app/api/users/[id]/photo/route.js';
 import { GET as lookupsRoute, POST as addLookupRoute } from '@/app/api/lookups/route.js';
@@ -126,7 +126,10 @@ describe('managed lists', () => {
     await makeUser({ department: 'Sales' });
     await makeUser({ department: 'Operations', designation: 'Supervisor' });
     await runMigrations();
-    const names = (await Lookup.find({}).lean()).map((item) => `${item.type}:${item.name}`).sort();
+    // The employee lists only (the migrations also add the onboarding and exit tasks).
+    const names = (await Lookup.find({ type: { $in: EMPLOYEE_LIST_TYPES } }).lean())
+      .map((item) => `${item.type}:${item.name}`)
+      .sort();
     expect(names).toEqual(['department:Operations', 'department:Sales', 'designation:Supervisor']);
     const sales = await User.findOne({ department: 'Sales' }).lean();
     expect(sales.completeness.missing.length).toBeGreaterThan(0);

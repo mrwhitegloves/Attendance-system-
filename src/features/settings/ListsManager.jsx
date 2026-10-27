@@ -107,9 +107,11 @@ export function ListsManager({ type, label, items }) {
               ) : (
                 <span className="flex items-center gap-2">
                   <span className={item.active ? '' : 'text-muted line-through'}>{item.name}</span>
-                  <span className="text-xs text-muted">
-                    {item.employees} {item.employees === 1 ? 'employee' : 'employees'}
-                  </span>
+                  {item.employees !== undefined && (
+                    <span className="text-xs text-muted">
+                      {item.employees} {item.employees === 1 ? 'employee' : 'employees'}
+                    </span>
+                  )}
                   {!item.active && <Badge>Switched off</Badge>}
                 </span>
               )}

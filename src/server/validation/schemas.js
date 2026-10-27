@@ -597,3 +597,15 @@ export const listCandidatesQuery = z.object({
   q: text(80).optional(),
   page,
 });
+
+// ---- Onboarding ----
+
+export const onboardingTaskBody = z.strictObject({
+  done: z.boolean(),
+  note: text(300).optional(),
+});
+
+export const listOnboardingsQuery = z.object({
+  status: z.enum(['in_progress', 'completed', 'all']).default('in_progress'),
+  page,
+});

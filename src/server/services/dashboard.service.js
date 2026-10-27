@@ -10,6 +10,7 @@ import { salaryOverview } from './salary.service.js';
 import { queueExpiryCheck } from './documents.service.js';
 import { countRequestsToDecide } from './requests.service.js';
 import { recruitmentCounts } from './recruitment.service.js';
+import { countOpenOnboardings } from './onboarding.service.js';
 
 // The CEO dashboard (CEO spec section 1, "MWG People & Finance Control"): headcount, verified %,
 // payroll exposure, open items and a priority queue. Everything is worked out live from the
@@ -236,10 +237,24 @@ export async function getControlCenter(actor) {
       });
   }
 
+  // ---- Joining checklists still open ----
+  if (can(actor, 'users.manage')) {
+    const onboarding = await countOpenOnboardings(actor);
+    if (onboarding)
+      queue.push({
+        key: 'onboarding',
+        label: 'Onboarding not finished',
+        count: onboarding,
+        href: '/onboarding',
+        tone: 'warning',
+      });
+  }
+
   const order = [
     'salary',
     'requests',
     'to-join',
+    'onboarding',
     'expired',
     'kyc',
     'documents',

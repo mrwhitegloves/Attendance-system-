@@ -14,6 +14,7 @@ const SECTIONS = [
   { id: 'attendance', label: 'Attendance', path: '/attendance' },
   { id: 'leave', label: 'Leave', path: '/leave', permission: 'leave' },
   { id: 'assets', label: 'Assets', path: '/assets', permission: 'assets' },
+  { id: 'onboarding', label: 'Onboarding', path: '/onboarding', permission: 'onboarding' },
 ];
 
 export function EmployeeTabs({ id, show }) {

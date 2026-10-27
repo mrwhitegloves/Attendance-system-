@@ -17,7 +17,7 @@ export default async function ListsPage({ searchParams }) {
     <>
       <PageHeader
         title="Settings"
-        subtitle="The choices HR picks from on an employee's file. Renaming updates every employee; items are switched off, never deleted."
+        subtitle="The choices HR picks from on an employee's file, and the onboarding and exit tasks. Renaming updates every employee; items are switched off, never deleted."
       />
       <SettingsTabs active="lists" />
       <LinkTabs

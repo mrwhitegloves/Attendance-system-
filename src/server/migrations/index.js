@@ -1,7 +1,7 @@
 import { Migration } from '../models/system.models.js';
 import { User } from '../models/user.model.js';
 import { env } from '../config/env.js';
-import { seedLookupsFromEmployees } from '../services/lookups.service.js';
+import { seedChecklistTasks, seedLookupsFromEmployees } from '../services/lookups.service.js';
 import { seedDocumentTypes } from '../services/documents.service.js';
 import { seedLetterTemplates } from '../services/letters.service.js';
 import { addMissingDefaultPermissions, seedRoles } from '../services/roles.service.js';
@@ -80,6 +80,11 @@ export const MIGRATIONS = [
     name: '011-recruitment-permissions',
     // Candidates and offer letters: the new permissions reach roles already in the database.
     up: () => addMissingDefaultPermissions(['recruitment.view', 'recruitment.manage']),
+  },
+  {
+    name: '012-checklist-tasks',
+    // The starting onboarding and exit tasks in Settings → Lists.
+    up: () => seedChecklistTasks(),
   },
 ];
 
