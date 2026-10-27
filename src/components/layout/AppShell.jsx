@@ -19,6 +19,7 @@ import {
   ScrollText,
   Settings,
   Sun,
+  UserPlus,
   UserRound,
   Users,
 } from 'lucide-react';
@@ -41,6 +42,7 @@ const ICONS = {
   ReceiptText,
   ScrollText,
   Settings,
+  UserPlus,
   UserRound,
   Users,
 };

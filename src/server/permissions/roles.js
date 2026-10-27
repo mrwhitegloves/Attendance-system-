@@ -33,6 +33,8 @@ export const PERMISSIONS = {
   'requests.create': 'Send requests (expense, advance, document, grievance)',
   'requests.view': 'See requests (a team never includes grievances)',
   'requests.decide': 'Decide requests (never your own; grievances need everyone)',
+  'recruitment.view': 'See candidates and their offer letters',
+  'recruitment.manage': 'Add candidates, record offers and mark them joined',
   'assets.view': 'See company assets and who has them',
   'assets.manage': 'Add assets, hand them over and take them back',
   'notifications.punches': 'Get a notification for every punch',

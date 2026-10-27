@@ -11,8 +11,15 @@ import { Dialog } from '@/components/shared/Dialog.jsx';
 import { Field, inputClass, Select } from '@/components/shared/form.jsx';
 import { LETTER_KIND_LABELS, LETTER_STATUS, letterTitle } from './labels.js';
 
-/** One employee's letters, newest first, and the button to start a new one. */
-export function EmployeeLetters({ data, templates }) {
+/**
+ * One person's letters, newest first, and the button to start a new one. A candidate's
+ * letters pass their own address to create letters at.
+ */
+export function EmployeeLetters({
+  data,
+  templates,
+  createUrl = `/api/users/${data.user._id}/letters`,
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   return (
@@ -66,7 +73,7 @@ export function EmployeeLetters({ data, templates }) {
       </Card>
       {open && (
         <NewLetterDialog
-          userId={data.user._id}
+          createUrl={createUrl}
           templates={templates}
           onClose={() => setOpen(false)}
         />
@@ -75,7 +82,7 @@ export function EmployeeLetters({ data, templates }) {
   );
 }
 
-function NewLetterDialog({ userId, templates, onClose }) {
+function NewLetterDialog({ createUrl, templates, onClose }) {
   const router = useRouter();
   const [form, setForm] = useState({
     templateId: templates[0]._id,
@@ -97,7 +104,7 @@ function NewLetterDialog({ userId, templates, onClose }) {
         .map((key) => [key, form[key]]),
     );
     try {
-      const { letter } = await apiFetch(`/api/users/${userId}/letters`, {
+      const { letter } = await apiFetch(createUrl, {
         method: 'POST',
         body: { templateId: form.templateId, fields },
       });

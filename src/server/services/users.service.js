@@ -298,5 +298,6 @@ export function permissionsOf(user) {
     requests: can(user, 'requests.view'),
     requestDecide: can(user, 'requests.decide'),
     assets: can(user, 'assets.view'),
+    recruitment: Boolean(can(user, 'recruitment.view')),
   };
 }

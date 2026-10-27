@@ -76,6 +76,11 @@ export const MIGRATIONS = [
     // Company assets: the new permissions reach roles already in the database.
     up: () => addMissingDefaultPermissions(['assets.view', 'assets.manage']),
   },
+  {
+    name: '011-recruitment-permissions',
+    // Candidates and offer letters: the new permissions reach roles already in the database.
+    up: () => addMissingDefaultPermissions(['recruitment.view', 'recruitment.manage']),
+  },
 ];
 
 export async function runMigrations() {

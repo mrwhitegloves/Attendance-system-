@@ -22,6 +22,7 @@ import {
   IDLE_STATUSES,
   RETURN_STATUSES,
 } from '../../config/assetOptions.js';
+import { CANDIDATE_STATUSES, DROP_REASONS } from '../../config/recruitmentOptions.js';
 
 // Input rules of every endpoint. Strict objects: unknown fields are refused.
 
@@ -540,5 +541,59 @@ export const listAssetsQuery = z.object({
   category: z.enum(Object.keys(ASSET_CATEGORIES)).optional().catch(undefined),
   status: z.enum(Object.keys(ASSET_STATUSES)).optional().catch(undefined),
   employeeId: text(20).optional(),
+  page,
+});
+
+// ---- Candidates (offer letters for new people) ----
+
+const candidateFields = {
+  name,
+  email: profileFields.email,
+  phone: profileFields.phone,
+  designation: profileFields.designation,
+  department: profileFields.department,
+  branch: profileFields.branch,
+  staffType: profileFields.staffType,
+  employmentType: profileFields.employmentType,
+  workMode: profileFields.workMode,
+  managerId: profileFields.managerId,
+  roleKey: profileFields.roleKey,
+  expectedJoiningDate: optionalDay,
+  source: text(80),
+  note: text(1000),
+};
+
+export const candidateBody = z.strictObject({
+  ...Object.fromEntries(
+    Object.entries(candidateFields).map(([key, rule]) => [
+      key,
+      key === 'name' ? rule : rule.optional(),
+    ]),
+  ),
+});
+
+export const candidateUpdateBody = z
+  .strictObject(
+    Object.fromEntries(
+      Object.entries(candidateFields).map(([key, rule]) => [key, rule.optional()]),
+    ),
+  )
+  .refine((value) => Object.keys(value).length > 0, 'nothing to change');
+
+export const dropCandidateBody = z.strictObject({
+  reason: z.enum(Object.keys(DROP_REASONS)),
+  note: text(1000).optional(),
+});
+
+export const joinCandidateBody = z.strictObject({
+  joiningDate: day,
+  password,
+  // Work email to sign in with (optional; the employee ID always works).
+  email: z.union([profileFields.email, z.literal('')]).optional(),
+});
+
+export const listCandidatesQuery = z.object({
+  status: z.enum([...CANDIDATE_STATUSES, 'all']).default('open'),
+  q: text(80).optional(),
   page,
 });

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 // Letters (CEO spec section 4: offer letter lifecycle). `letter_templates` are edited in
-// Settings → Letter templates; `letters` are the letters issued to employees. A letter keeps the
+// Settings → Letter templates; `letters` are the letters issued to employees and candidates. A letter keeps the
 // exact text it was issued with; re-issuing makes a new version and supersedes the old one.
 
 export const LETTER_KINDS = {
@@ -31,8 +31,15 @@ export const LetterTemplate =
 
 const letterSchema = new mongoose.Schema(
   {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    employeeId: { type: String, required: true, index: true },
+    // The employee; empty for a candidate's offer letter until the candidate joins.
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    employeeId: { type: String, default: '', index: true },
+    candidateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Candidate',
+      default: null,
+      index: true,
+    },
     templateId: { type: mongoose.Schema.Types.ObjectId, ref: 'LetterTemplate', default: null },
     kind: { type: String, enum: Object.keys(LETTER_KINDS), required: true },
     version: { type: Number, default: 1 },

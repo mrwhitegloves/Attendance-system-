@@ -50,6 +50,12 @@ export const NAVIGATION = [
     icon: 'ReceiptText',
     show: (p) => p.payslips && p.payslips !== 'own',
   },
+  {
+    href: '/recruitment',
+    label: 'Hiring',
+    icon: 'UserPlus',
+    show: (p) => p.recruitment,
+  },
   { href: '/assets', label: 'Assets', icon: 'Laptop', show: (p) => p.assets },
   { href: '/audit-log', label: 'Audit log', icon: 'ScrollText', show: (p) => p.audit },
   { href: '/settings', label: 'Settings', icon: 'Settings', show: (p) => p.settings },

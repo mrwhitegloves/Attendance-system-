@@ -9,6 +9,7 @@ import { indiaDay } from '../lib/dates.js';
 import { salaryOverview } from './salary.service.js';
 import { queueExpiryCheck } from './documents.service.js';
 import { countRequestsToDecide } from './requests.service.js';
+import { recruitmentCounts } from './recruitment.service.js';
 
 // The CEO dashboard (CEO spec section 1, "MWG People & Finance Control"): headcount, verified %,
 // payroll exposure, open items and a priority queue. Everything is worked out live from the
@@ -214,14 +215,37 @@ export async function getControlCenter(actor) {
       tone: 'brand',
     });
 
+  // ---- Hiring: offers waiting for a reply, accepted offers waiting to join ----
+  if (can(actor, 'recruitment.view')) {
+    const hiring = await recruitmentCounts();
+    if (hiring.toJoin)
+      queue.push({
+        key: 'to-join',
+        label: 'Accepted offers waiting to join',
+        count: hiring.toJoin,
+        href: '/recruitment',
+        tone: 'brand',
+      });
+    if (hiring.offersWaiting)
+      queue.push({
+        key: 'offers',
+        label: 'Offers waiting for a reply',
+        count: hiring.offersWaiting,
+        href: '/recruitment',
+        tone: 'info',
+      });
+  }
+
   const order = [
     'salary',
     'requests',
+    'to-join',
     'expired',
     'kyc',
     'documents',
     'leave',
     'letters',
+    'offers',
     'expiring',
     'no-salary',
     'files',

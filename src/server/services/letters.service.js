@@ -1,6 +1,7 @@
 import { LETTER_KINDS, Letter, LetterTemplate } from '../models/letter.model.js';
 import { DocumentType } from '../models/document.model.js';
 import { User } from '../models/user.model.js';
+import { Candidate } from '../models/candidate.model.js';
 import { can, canSeeEmployee, requirePermission } from '../permissions/can.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { indiaDay } from '../lib/dates.js';
@@ -20,7 +21,9 @@ import { notifyUsers } from './push.service.js';
 // - issuing fills every placeholder (refused while any is empty) and freezes the text;
 // - a new version of the same kind supersedes the older letters (they are kept);
 // - the employee accepts or declines in the app, or HR records it (a signed copy counts as acceptance);
-// - a signed copy is stored once, as the matching employee document.
+// - a signed copy is stored once, as the matching employee document;
+// - a candidate's offer letter is seen by recruitment people only; HR records the reply; it
+//   moves to the employee when the candidate joins (recruitment.service).
 
 const SIGNED_COPY_TYPE = {
   offer: 'Offer letter (signed)',
@@ -90,8 +93,11 @@ async function loadLetter(actor, id) {
   const letter = await Letter.findById(id)
     .lean()
     .catch(() => null);
-  if (!letter || !(await canSeeEmployee(actor, 'letters.view', letter.employeeId)))
-    throw notFound('Letter');
+  if (!letter) throw notFound('Letter');
+  const visible = letter.userId
+    ? await canSeeEmployee(actor, 'letters.view', letter.employeeId)
+    : Boolean(can(actor, 'recruitment.view'));
+  if (!visible) throw notFound('Letter');
   // A draft is HR's work in progress: only people who prepare letters see it.
   if (letter.status === 'draft' && !can(actor, 'letters.manage')) throw notFound('Letter');
   return letter;
@@ -107,6 +113,26 @@ async function render(letter, employee) {
   );
 }
 
+/** The person a letter is for: the employee, or the candidate in the same shape. */
+async function letterPerson(letter) {
+  if (letter.userId) return User.findById(letter.userId).lean();
+  const candidate = await Candidate.findById(letter.candidateId).lean();
+  return {
+    _id: null,
+    candidateId: candidate._id,
+    name: candidate.name,
+    employeeId: '',
+    designation: candidate.designation,
+    department: candidate.department,
+    branch: candidate.branch,
+    joiningDate: candidate.expectedJoiningDate,
+  };
+}
+
+/** Which letters are "the same person's" (for versions and superseding). */
+const sameOwner = (letter) =>
+  letter.userId ? { userId: letter.userId } : { candidateId: letter.candidateId };
+
 export async function listLettersFor(actor, userId) {
   const user = await loadEmployee(actor, userId, 'letters.view');
   const filter = { userId: user._id };
@@ -121,9 +147,9 @@ export async function listLettersFor(actor, userId) {
 
 export async function getLetter(actor, id) {
   const letter = await loadLetter(actor, id);
-  const employee = await User.findById(letter.userId).lean();
+  const employee = await letterPerson(letter);
   const rendered = await render(letter, employee);
-  const isOwner = String(letter.userId) === String(actor._id);
+  const isOwner = Boolean(letter.userId) && String(letter.userId) === String(actor._id);
   const manage = Boolean(can(actor, 'letters.manage'));
   return {
     letter,
@@ -131,6 +157,7 @@ export async function getLetter(actor, id) {
     company: await getCompany(),
     employee: {
       _id: employee._id,
+      candidateId: employee.candidateId ?? null,
       name: employee.name,
       employeeId: employee.employeeId,
       designation: employee.designation,
@@ -143,25 +170,49 @@ export async function getLetter(actor, id) {
       reissue: manage && ['issued', 'accepted', 'declined'].includes(letter.status),
       signedCopy:
         manage &&
+        Boolean(letter.userId) &&
         ['issued', 'accepted'].includes(letter.status) &&
         Boolean(SIGNED_COPY_TYPE[letter.kind]),
     },
   };
 }
 
-export async function createLetter(actor, userId, { templateId, fields }, { ip } = {}) {
+export async function createLetter(actor, userId, input, { ip } = {}) {
   requirePermission(actor, 'letters.manage');
   const user = await loadEmployee(actor, userId, 'letters.view');
+  return draftLetter(
+    actor,
+    { userId: user._id, employeeId: user.employeeId },
+    `${user.name} (${user.employeeId})`,
+    input,
+    { ip },
+  );
+}
+
+/** An offer (or other) letter for a candidate, before they are an employee. */
+export async function createCandidateLetter(actor, candidateId, input, { ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  requirePermission(actor, 'recruitment.manage');
+  const candidate = await Candidate.findById(candidateId)
+    .lean()
+    .catch(() => null);
+  if (!candidate) throw notFound('Candidate');
+  if (candidate.status !== 'open') throw createAppError(409, 'This candidate is not open.');
+  return draftLetter(actor, { candidateId: candidate._id }, `candidate ${candidate.name}`, input, {
+    ip,
+  });
+}
+
+async function draftLetter(actor, owner, ownerLabel, { templateId, fields }, { ip }) {
   const template = await LetterTemplate.findOne({ _id: templateId, active: true })
     .lean()
     .catch(() => null);
   if (!template) throw createAppError(400, 'Choose a letter template.');
-  const last = await Letter.findOne({ userId: user._id, kind: template.kind }, 'version')
+  const last = await Letter.findOne({ ...owner, kind: template.kind }, 'version')
     .sort({ version: -1 })
     .lean();
   const letter = await Letter.create({
-    userId: user._id,
-    employeeId: user.employeeId,
+    ...owner,
     templateId: template._id,
     kind: template.kind,
     version: (last?.version ?? 0) + 1,
@@ -174,7 +225,7 @@ export async function createLetter(actor, userId, { templateId, fields }, { ip }
     action: 'letter.drafted',
     entity: 'letter',
     entityId: letter._id,
-    summary: `${LETTER_KINDS[template.kind]} v${letter.version} drafted for ${user.name} (${user.employeeId})`,
+    summary: `${LETTER_KINDS[template.kind]} v${letter.version} drafted for ${ownerLabel}`,
     ip,
   });
   return letter.toObject();
@@ -205,7 +256,7 @@ export async function issueLetter(actor, id, { ip } = {}) {
   requirePermission(actor, 'letters.manage');
   const letter = await loadLetter(actor, id);
   if (letter.status !== 'draft') throw createAppError(409, 'This letter is already issued.');
-  const employee = await User.findById(letter.userId).lean();
+  const employee = await letterPerson(letter);
   const { text, missing } = await render(letter, employee);
   if (missing.length) {
     throw createAppError(
@@ -222,7 +273,7 @@ export async function issueLetter(actor, id, { ip } = {}) {
   if (!issued) throw createAppError(409, 'This letter was just issued by someone else.');
   await Letter.updateMany(
     {
-      userId: letter.userId,
+      ...sameOwner(letter),
       kind: letter.kind,
       _id: { $ne: letter._id },
       status: { $in: ['issued', 'accepted', 'declined'] },
@@ -233,15 +284,16 @@ export async function issueLetter(actor, id, { ip } = {}) {
     action: 'letter.issued',
     entity: 'letter',
     entityId: id,
-    summary: `${LETTER_KINDS[letter.kind]} v${letter.version} issued to ${employee.name} (${employee.employeeId})`,
+    summary: `${LETTER_KINDS[letter.kind]} v${letter.version} issued to ${employee.name}${employee.employeeId ? ` (${employee.employeeId})` : ' (candidate)'}`,
     ip,
   });
-  notifyUsers([employee._id], {
-    title: `${LETTER_KINDS[letter.kind]} for you`,
-    body: 'Open it to read and accept.',
-    icon: '/logo.png',
-    data: { url: `/letters/${id}` },
-  }).catch(() => {});
+  if (letter.userId)
+    notifyUsers([employee._id], {
+      title: `${LETTER_KINDS[letter.kind]} for you`,
+      body: 'Open it to read and accept.',
+      icon: '/logo.png',
+      data: { url: `/letters/${id}` },
+    }).catch(() => {});
   return getLetter(actor, id);
 }
 
@@ -328,10 +380,8 @@ export async function reissueLetter(actor, id, { ip } = {}) {
     : null;
   if (!template?.active)
     throw createAppError(400, 'The template of this letter is switched off. Start a new letter.');
-  return createLetter(
-    actor,
-    letter.userId,
-    { templateId: String(template._id), fields: letter.fields },
-    { ip },
-  );
+  const input = { templateId: String(template._id), fields: letter.fields };
+  return letter.userId
+    ? createLetter(actor, letter.userId, input, { ip })
+    : createCandidateLetter(actor, letter.candidateId, input, { ip });
 }
