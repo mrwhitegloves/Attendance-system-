@@ -15,6 +15,7 @@ import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
 
 const EDITABLE = [
   'name',
+  'employeeCode',
   'phone',
   'email',
   'roleKey',
@@ -285,6 +286,7 @@ export function permissionsOf(user) {
     settings: Boolean(can(user, 'settings.manage')),
     documents: can(user, 'documents.view'),
     salary: can(user, 'salary.view'),
+    payslips: can(user, 'payslips.view'),
     roles: Boolean(can(user, 'roles.manage')),
   };
 }

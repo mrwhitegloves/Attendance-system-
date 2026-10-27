@@ -12,10 +12,10 @@ export default async function CompanyPage() {
     <>
       <PageHeader
         title="Settings"
-        subtitle="These details are printed at the top and bottom of every letter."
+        subtitle="These details are printed on letters and salary slips."
       />
       <SettingsTabs active="company" />
-      <CompanyForm company={await getCompany()} />
+      <CompanyForm company={await getCompany({ withStamp: true })} />
     </>
   );
 }

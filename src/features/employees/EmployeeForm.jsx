@@ -56,6 +56,11 @@ function sections({ editing, lists, managers, roles, staffTypes, employeeId }) {
     {
       title: 'Employment',
       fields: [
+        {
+          key: 'employeeCode',
+          label: 'Employee code (on slips and letters)',
+          hint: 'Example: MWG-FSD-25-001. Empty: the employee ID is used.',
+        },
         { key: 'designation', label: 'Designation', type: 'list' },
         { key: 'department', label: 'Department', type: 'list' },
         { key: 'branch', label: 'Branch', type: 'list' },
@@ -135,6 +140,7 @@ const KEYS = [
   'emergencyContact.name',
   'emergencyContact.relation',
   'emergencyContact.phone',
+  'employeeCode',
   'designation',
   'department',
   'branch',

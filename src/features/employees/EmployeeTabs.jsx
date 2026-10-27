@@ -9,6 +9,7 @@ const SECTIONS = [
   { id: 'kyc', label: 'KYC & bank', path: '/kyc', permission: 'kyc' },
   { id: 'documents', label: 'Documents', path: '/documents', permission: 'documents' },
   { id: 'salary', label: 'Salary', path: '/salary', permission: 'salary' },
+  { id: 'payslips', label: 'Payslips', path: '/payslips', permission: 'payslips' },
   { id: 'letters', label: 'Letters', path: '/letters', permission: 'letters' },
   { id: 'attendance', label: 'Attendance', path: '/attendance' },
   { id: 'leave', label: 'Leave', path: '/leave', permission: 'leave' },

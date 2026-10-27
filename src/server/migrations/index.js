@@ -4,7 +4,7 @@ import { env } from '../config/env.js';
 import { seedLookupsFromEmployees } from '../services/lookups.service.js';
 import { seedDocumentTypes } from '../services/documents.service.js';
 import { seedLetterTemplates } from '../services/letters.service.js';
-import { seedRoles } from '../services/roles.service.js';
+import { addMissingDefaultPermissions, seedRoles } from '../services/roles.service.js';
 import { recomputeAllCompleteness, refreshCompleteness } from '../services/completeness.service.js';
 
 // Changes to existing data, in order. Each runs once (its name is stored in `migrations`)
@@ -59,6 +59,12 @@ export const MIGRATIONS = [
     name: '007-roles-in-database',
     // Roles move from code into the `roles` collection (Settings → Roles, CEO only).
     up: () => seedRoles(),
+  },
+  {
+    name: '008-payslip-permissions',
+    // Salary slips: the new permissions reach roles already in the database.
+    up: () =>
+      addMissingDefaultPermissions(['payslips.view', 'payslips.manage', 'payslips.finalise']),
   },
 ];
 

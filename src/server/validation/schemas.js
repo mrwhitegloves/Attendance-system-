@@ -11,6 +11,7 @@ import { LOOKUP_TYPES } from '../models/lookup.model.js';
 import { DOCUMENT_CATEGORIES, DOCUMENT_STATUSES } from '../models/document.model.js';
 import { LETTER_KINDS } from '../models/letter.model.js';
 import { SALARY_COMPONENTS } from '../models/salary.model.js';
+import { ATTENDANCE_SUMMARY, DEDUCTIONS, EARNINGS } from '../../config/payslipFields.js';
 import { ATTENDANCE_STATUSES } from '../models/attendance.model.js';
 import { MIN_PASSWORD_LENGTH } from '../auth/password.js';
 
@@ -41,6 +42,7 @@ const email = z.union([z.literal(''), z.email('enter a valid email')]);
 
 // Fields of the employee file that HR may set. All optional; unknown fields are refused.
 const profileFields = {
+  employeeCode: text(30),
   phone: text(20),
   email,
   dateOfBirth: optionalDay,
@@ -325,6 +327,18 @@ export const updateTemplateBody = z
   .refine((value) => Object.keys(value).length > 0, 'nothing to change');
 export const companyBody = z.strictObject({
   name: text(120).optional(),
+  brandName: text(80).optional(),
+  tagline: text(80).optional(),
+  gstNumber: z
+    .union([
+      z.literal(''),
+      z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^[0-9A-Z]{15}$/, 'a GST number has 15 letters and digits'),
+    ])
+    .optional(),
   address: text(400).optional(),
   signatoryName: text(100).optional(),
   signatoryTitle: text(100).optional(),
@@ -364,4 +378,61 @@ export const updateRoleBody = z
 export const addRoleBody = z.strictObject({
   label: text(60).min(2, 'enter a name'),
   copyFrom: text(40).optional(),
+});
+
+// ---- Salary slips ----
+const lineAmounts = (lines) =>
+  z.strictObject(Object.fromEntries(lines.map((line) => [line.key, monthlyRupees.optional()])));
+const dayCount = z.coerce.number().min(0).max(62).multipleOf(0.5, 'use whole or half days');
+export const createPayslipBody = z.strictObject({ month });
+export const updatePayslipBody = z
+  .strictObject({
+    employee: z
+      .strictObject({
+        name: text(100).min(2).optional(),
+        code: text(30).optional(),
+        designation: text(60).optional(),
+        department: text(60).optional(),
+        joiningDate: optionalDay.optional(),
+        bankName: text(100).optional(),
+        pan: z
+          .union([
+            z.literal(''),
+            z
+              .string()
+              .trim()
+              .toUpperCase()
+              .regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, 'a PAN looks like ABCDE1234F'),
+          ])
+          .optional(),
+        accountNumber: z
+          .union([
+            z.literal(''),
+            z
+              .string()
+              .trim()
+              .regex(/^\d{9,18}$/, '9 to 18 digits'),
+          ])
+          .optional(),
+      })
+      .optional(),
+    attendance: z
+      .strictObject(
+        Object.fromEntries(ATTENDANCE_SUMMARY.map((line) => [line.key, dayCount.optional()])),
+      )
+      .optional(),
+    earnings: lineAmounts(EARNINGS).optional(),
+    deductions: lineAmounts(DEDUCTIONS).optional(),
+    notes: text(500).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, 'nothing to change');
+export const reopenPayslipBody = z.strictObject({
+  reason: text(300).min(3, 'write why it is re-opened'),
+});
+export const listPayslipsQuery = z.object({
+  month: month.optional(),
+  status: z.enum(['draft', 'final']).optional(),
+  userId: objectId.optional(),
+  q: text(80).optional(),
+  page,
 });

@@ -44,6 +44,13 @@ const ACTIONS = {
   'salary.withdrawn': 'Salary proposal withdrawn',
   'role.updated': 'Role changed',
   'role.added': 'Role added',
+  'payslip.created': 'Salary slip started',
+  'payslip.edited': 'Salary slip changed',
+  'payslip.prefilled': 'Salary slip filled again',
+  'payslip.finalised': 'Salary slip made final',
+  'payslip.reopened': 'Salary slip re-opened',
+  'payslip.viewed_full': 'Salary slip opened with full numbers',
+  'settings.stamp': 'Signatory stamp changed',
 };
 
 function describeChanges(changes) {

@@ -17,9 +17,9 @@ const paise = (rupees) => rupees * 100;
 const STRUCTURE = {
   basic: paise(15000),
   hra: paise(6000),
-  specialAllowance: paise(9000),
+  dearnessAllowance: paise(9000),
   employerPf: paise(1800),
-  employeePf: paise(1800),
+  pf: paise(1800),
   professionalTax: paise(200),
 };
 

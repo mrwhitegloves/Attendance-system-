@@ -1,22 +1,28 @@
 import mongoose from 'mongoose';
+import { DEDUCTIONS, EARNINGS, EMPLOYER_CONTRIBUTIONS } from '../../config/payslipFields.js';
 
 // Versioned salary structures (CEO spec section 5A). Every change is a new version; an approved
 // version is never edited. Money is stored in paise (integers). Collection `salary_structures`.
 
-// Monthly components, in the order shown on screens.
+// Monthly components, in the order shown on screens: the fixed lines of the salary slip
+// (config/payslipFields.js), an incentive target, and the company's own contributions.
 export const SALARY_COMPONENTS = {
-  basic: { label: 'Basic', kind: 'earning' },
-  hra: { label: 'HRA', kind: 'earning' },
-  specialAllowance: { label: 'Special allowance', kind: 'earning' },
-  conveyance: { label: 'Conveyance', kind: 'earning' },
-  otherAllowances: { label: 'Other allowances', kind: 'earning' },
-  variablePay: { label: 'Variable pay / incentive target', kind: 'variable' },
-  employerPf: { label: 'Company PF', kind: 'employer' },
-  employerEsi: { label: 'Company ESI', kind: 'employer' },
-  employeePf: { label: 'Employee PF', kind: 'deduction' },
-  employeeEsi: { label: 'Employee ESI', kind: 'deduction' },
-  professionalTax: { label: 'Professional tax', kind: 'deduction' },
-  tds: { label: 'Income tax (TDS) estimate', kind: 'deduction' },
+  ...Object.fromEntries(
+    EARNINGS.filter((line) => line.fixed).map((line) => [
+      line.key,
+      { label: line.label, kind: 'earning' },
+    ]),
+  ),
+  incentiveTarget: { label: 'Incentive target (monthly)', kind: 'variable' },
+  ...Object.fromEntries(
+    EMPLOYER_CONTRIBUTIONS.map((line) => [line.key, { label: line.label, kind: 'employer' }]),
+  ),
+  ...Object.fromEntries(
+    DEDUCTIONS.filter((line) => line.fixed).map((line) => [
+      line.key,
+      { label: line.label, kind: 'deduction' },
+    ]),
+  ),
 };
 export const SALARY_STATUSES = ['pending_approval', 'approved', 'rejected', 'withdrawn'];
 

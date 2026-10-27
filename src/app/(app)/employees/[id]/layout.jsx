@@ -49,6 +49,7 @@ export default async function EmployeeLayout({ children, params }) {
           documents: Boolean(can(user, 'documents.view')),
           letters: Boolean(can(user, 'letters.view')),
           salary: Boolean(can(user, 'salary.view')),
+          payslips: Boolean(can(user, 'payslips.view')),
           leave: Boolean(can(user, 'leave.view')),
         }}
       />

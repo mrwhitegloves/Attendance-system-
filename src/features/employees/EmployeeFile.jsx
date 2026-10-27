@@ -37,6 +37,7 @@ export function EmployeeFile({ employee, managerName, roleName, checklist, canEd
       title: 'Employment',
       rows: [
         ['Employee ID', employee.employeeId],
+        ['Employee code', orDash(employee.employeeCode)],
         ['Designation', orDash(employee.designation)],
         ['Department', orDash(employee.department)],
         ['Branch', orDash(employee.branch)],

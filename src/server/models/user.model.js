@@ -25,6 +25,8 @@ const userSchema = new mongoose.Schema(
     // Permanent ID "MWG-001", given once, never changed or reused.
     employeeId: { type: String, required: true, unique: true },
     mwgId: { type: String, unique: true, sparse: true },
+    // The code printed on salary slips and letters ("MWG-FSD-25-001"); the ID above when empty.
+    employeeCode: { type: String, default: '', trim: true },
     // Work email, also usable to sign in.
     email: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
     // Sign-in name for accounts without an email (the first admin account).
@@ -87,7 +89,7 @@ export const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 /** Fields any API answer may show. Never the password. */
 export const PUBLIC_USER_FIELDS = [
-  '_id name phone employeeId email username roleKey status lastLoginAt createdAt updatedAt',
+  '_id name phone employeeId employeeCode email username roleKey status lastLoginAt createdAt updatedAt',
   'photoKey dateOfBirth gender bloodGroup personalEmail currentAddress permanentAddress emergencyContact',
   'department designation branch staffType employmentType workMode employmentStatus joiningDate',
   'probationEndDate managerId expectedInTime expectedOutTime completeness',

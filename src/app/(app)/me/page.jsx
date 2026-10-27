@@ -14,6 +14,8 @@ import { can } from '@/server/permissions/can.js';
 import { formatDay } from '@/lib/format.js';
 import { listLettersFor } from '@/server/services/letters.service.js';
 import { MyLetters } from '@/features/letters/MyLetters.jsx';
+import { listPayslips } from '@/server/services/payslips.service.js';
+import { PayslipList } from '@/features/payslips/PayslipList.jsx';
 import { salaryInForce } from '@/server/services/salary.service.js';
 import { SalaryBreakdown } from '@/features/salary/SalaryBreakdown.jsx';
 
@@ -30,6 +32,9 @@ export default async function MePage() {
     ? await listLettersFor(signedIn, signedIn._id)
     : null;
   const salary = can(signedIn, 'salary.view') ? await salaryInForce(signedIn._id) : null;
+  const payslips = can(signedIn, 'payslips.view')
+    ? await listPayslips(signedIn, { userId: String(signedIn._id), status: 'final', page: 1 })
+    : null;
   return (
     <>
       <PageHeader title="My profile" subtitle="To change your details, please contact HR." />
@@ -54,6 +59,12 @@ export default async function MePage() {
           canEdit={false}
         />
         {letters?.letters.length > 0 && <MyLetters letters={toPlain(letters.letters)} />}
+        {payslips?.items.length > 0 && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold">My salary slips</h2>
+            <PayslipList result={toPlain(payslips)} showFilters={false} showPerson={false} />
+          </section>
+        )}
         {salary && (
           <Card>
             <CardHeader

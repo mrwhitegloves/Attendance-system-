@@ -27,6 +27,26 @@ export async function seedRoles() {
   resetRolesCache();
 }
 
+/**
+ * New permissions reach roles that already live in the database: each default role gets the
+ * default value of the given permissions, unless the CEO already set that permission.
+ */
+export async function addMissingDefaultPermissions(keys) {
+  for (const [key, role] of Object.entries(DEFAULT_ROLES)) {
+    if (role.locked) continue;
+    const row = await Role.findOne({ key }).lean();
+    if (!row) continue;
+    const permissions = { ...(row.permissions ?? {}) };
+    for (const permission of keys) {
+      if (permissions[permission] === undefined && role.permissions[permission]) {
+        permissions[permission] = role.permissions[permission];
+      }
+    }
+    await Role.updateOne({ key }, { $set: { permissions } });
+  }
+  resetRolesCache();
+}
+
 /** Every role with its permissions and how many active people have it. */
 export async function listRoles(actor) {
   requirePermission(actor, 'roles.manage');

@@ -27,6 +27,9 @@ export const PERMISSIONS = {
   'salary.view': 'See salary structures',
   'salary.manage': 'Propose salary structures and revisions',
   'salary.approve': 'Approve salary structures (never your own proposal)',
+  'payslips.view': 'See salary slips',
+  'payslips.manage': 'Prepare and change draft salary slips',
+  'payslips.finalise': 'Make salary slips final (never one you last changed)',
   'notifications.punches': 'Get a notification for every punch',
   'notifications.broadcast': 'Send a notification to all employees',
   'settings.manage': 'Change settings, lists, document types and templates',
@@ -54,6 +57,7 @@ export const DEFAULT_ROLES = {
       ...everything('all'),
       'audit.view': false,
       'salary.approve': false,
+      'payslips.finalise': false,
       'roles.manage': false,
     },
   },
@@ -73,6 +77,9 @@ export const DEFAULT_ROLES = {
       'salary.view': 'all',
       'salary.manage': true,
       'salary.approve': true,
+      'payslips.view': 'all',
+      'payslips.manage': true,
+      'payslips.finalise': true,
     },
   },
   manager: {
@@ -97,6 +104,7 @@ export const DEFAULT_ROLES = {
       'documents.view': 'own',
       'letters.view': 'own',
       'salary.view': 'own',
+      'payslips.view': 'own',
     },
   },
   auditor: {
@@ -110,6 +118,7 @@ export const DEFAULT_ROLES = {
       'documents.view': 'all',
       'letters.view': 'all',
       'salary.view': 'all',
+      'payslips.view': 'all',
     },
   },
 };
