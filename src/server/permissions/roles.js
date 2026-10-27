@@ -35,6 +35,8 @@ export const PERMISSIONS = {
   'requests.decide': 'Decide requests (never your own; grievances need everyone)',
   'recruitment.view': 'See candidates and their offer letters',
   'recruitment.manage': 'Add candidates, record offers and mark them joined',
+  'exits.view': 'See exits (resignations, notice periods)',
+  'exits.manage': 'Record exits, tick exit tasks and close them',
   'assets.view': 'See company assets and who has them',
   'assets.manage': 'Add assets, hand them over and take them back',
   'notifications.punches': 'Get a notification for every punch',
@@ -91,6 +93,7 @@ export const DEFAULT_ROLES = {
       'requests.view': 'all',
       'requests.decide': 'all',
       'assets.view': 'all',
+      'exits.view': 'all',
     },
   },
   manager: {
@@ -105,6 +108,7 @@ export const DEFAULT_ROLES = {
       'requests.create': true,
       'requests.view': 'team',
       'assets.view': 'team',
+      'exits.view': 'team',
     },
   },
   employee: {
@@ -138,6 +142,7 @@ export const DEFAULT_ROLES = {
       'payslips.view': 'all',
       'requests.view': 'all',
       'assets.view': 'all',
+      'exits.view': 'all',
     },
   },
 };

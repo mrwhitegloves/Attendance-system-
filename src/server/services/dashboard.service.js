@@ -11,6 +11,7 @@ import { queueExpiryCheck } from './documents.service.js';
 import { countRequestsToDecide } from './requests.service.js';
 import { recruitmentCounts } from './recruitment.service.js';
 import { countOpenOnboardings } from './onboarding.service.js';
+import { exitCounts } from './exits.service.js';
 
 // The CEO dashboard (CEO spec section 1, "MWG People & Finance Control"): headcount, verified %,
 // payroll exposure, open items and a priority queue. Everything is worked out live from the
@@ -250,7 +251,29 @@ export async function getControlCenter(actor) {
       });
   }
 
+  // ---- Exits: notice periods, and those past the last working day ----
+  if (can(actor, 'exits.view')) {
+    const exits = await exitCounts(actor);
+    if (exits?.overdue)
+      queue.push({
+        key: 'exits-overdue',
+        label: 'Exits past the last working day',
+        count: exits.overdue,
+        href: '/exits',
+        tone: 'danger',
+      });
+    if (exits && exits.open - exits.overdue > 0)
+      queue.push({
+        key: 'exits',
+        label: 'Employees in notice period',
+        count: exits.open - exits.overdue,
+        href: '/exits',
+        tone: 'info',
+      });
+  }
+
   const order = [
+    'exits-overdue',
     'salary',
     'requests',
     'to-join',
@@ -261,6 +284,7 @@ export async function getControlCenter(actor) {
     'leave',
     'letters',
     'offers',
+    'exits',
     'expiring',
     'no-salary',
     'files',

@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, Circle, CircleCheckBig, Play } from 'lucide-react';
+import { CircleCheckBig, Play } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { formatDateTime } from '@/lib/format.js';
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorText } from '@/components/shared/ui.jsx';
+import { AutomaticChecks, TaskList } from './Checklist.jsx';
 
 /** The joining checklist of one employee: tasks HR ticks, and the automatic checks. */
 export function OnboardingPanel({ userId, onboarding, canManage }) {
@@ -79,55 +80,16 @@ export function OnboardingPanel({ userId, onboarding, canManage }) {
             )
           }
         />
-        <ul className="divide-y divide-border text-sm">
-          {onboarding.tasks.map((task) => (
-            <li key={task._id} className="flex items-start gap-3 px-4 py-2.5">
-              <button
-                type="button"
-                className={task.done ? 'text-success' : 'text-muted'}
-                disabled={!editable || busy}
-                aria-label={
-                  task.done ? `Mark "${task.label}" not done` : `Mark "${task.label}" done`
-                }
-                onClick={() =>
-                  run(`${base}/tasks/${task._id}`, { method: 'PATCH', body: { done: !task.done } })
-                }
-              >
-                {task.done ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-              </button>
-              <span className="flex-1">
-                <span className={task.done ? 'text-muted line-through' : ''}>{task.label}</span>
-                {task.done && (
-                  <span className="block text-xs text-muted">
-                    {task.doneByName} · {formatDateTime(task.doneAt)}
-                  </span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Card>
-      <Card>
-        <CardHeader
-          title="Checked automatically"
-          subtitle="These tick themselves from the employee file."
+        <TaskList
+          tasks={onboarding.tasks}
+          editable={editable}
+          busy={busy}
+          onToggle={(task) =>
+            run(`${base}/tasks/${task._id}`, { method: 'PATCH', body: { done: !task.done } })
+          }
         />
-        <ul className="divide-y divide-border text-sm">
-          {onboarding.checks.map((check) => (
-            <li key={check.key} className="flex items-start gap-3 px-4 py-2.5">
-              <span className={check.done ? 'text-success' : 'text-muted'}>
-                {check.done ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-              </span>
-              <span>
-                {check.label}
-                {!check.done && check.detail && (
-                  <span className="block text-xs text-muted">{check.detail}</span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
       </Card>
+      <AutomaticChecks checks={onboarding.checks} />
       {error && <ErrorText>{error}</ErrorText>}
     </div>
   );

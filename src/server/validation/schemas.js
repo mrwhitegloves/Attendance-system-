@@ -23,6 +23,7 @@ import {
   RETURN_STATUSES,
 } from '../../config/assetOptions.js';
 import { CANDIDATE_STATUSES, DROP_REASONS } from '../../config/recruitmentOptions.js';
+import { EXIT_STATUSES, EXIT_TYPES } from '../../config/exitOptions.js';
 
 // Input rules of every endpoint. Strict objects: unknown fields are refused.
 
@@ -607,5 +608,25 @@ export const onboardingTaskBody = z.strictObject({
 
 export const listOnboardingsQuery = z.object({
   status: z.enum(['in_progress', 'completed', 'all']).default('in_progress'),
+  page,
+});
+
+// ---- Exits ----
+
+export const exitBody = z.strictObject({
+  type: z.enum(Object.keys(EXIT_TYPES)),
+  noticeDate: day,
+  lastWorkingDay: day,
+  reason: text(1000).optional(),
+});
+
+export const exitUpdateBody = z
+  .strictObject({ lastWorkingDay: day.optional(), reason: text(1000).optional() })
+  .refine((value) => Object.keys(value).length > 0, 'nothing to change');
+
+export const exitCloseBody = z.strictObject({ note: text(1000).optional() });
+
+export const listExitsQuery = z.object({
+  status: z.enum([...EXIT_STATUSES, 'all']).default('notice'),
   page,
 });

@@ -86,6 +86,11 @@ export const MIGRATIONS = [
     // The starting onboarding and exit tasks in Settings → Lists.
     up: () => seedChecklistTasks(),
   },
+  {
+    name: '013-exit-permissions',
+    // Exits: the new permissions reach roles already in the database.
+    up: () => addMissingDefaultPermissions(['exits.view', 'exits.manage']),
+  },
 ];
 
 export async function runMigrations() {
