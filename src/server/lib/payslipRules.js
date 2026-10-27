@@ -4,7 +4,8 @@
 // - A punch-in more than 5 minutes after the expected time (from minute 6) is a half day;
 //   an earlier punch-in is a full day.
 // - The first 3 half days of a month are free; each further half day costs half a day's salary.
-// - Paid leave costs nothing; unpaid leave costs a full day's salary.
+// - Paid leave, holidays and comp-off days (a day off for a Sunday worked) cost nothing;
+//   unpaid leave costs a full day's salary.
 // - A working day with no punch and no leave is an absence and costs a full day's salary.
 // - One day's salary = monthly gross ÷ calendar days of the month (30 days: 27,000 → 900;
 //   31 days: 27,000 → 870.97).
@@ -20,7 +21,10 @@ export const DAY_COUNTS = {
   unpaidLeave: 'Unpaid leave',
   unmarkedLeave: 'Leave (not marked paid or unpaid: counted as paid)',
   absent: 'Absent (no punch, no leave)',
+  holiday: 'Holiday (paid)',
+  compOff: 'Comp-off (paid, for a Sunday worked)',
   sunday: 'Sunday (off)',
+  sundayWorked: 'Sunday worked',
   future: 'Not yet',
 };
 
@@ -30,7 +34,9 @@ export const DAY_COUNTS = {
  */
 export function calculateMonth({ days, monthlyGrossPaise, calendarDays }) {
   const count = (kind) => days.filter((day) => day.countedAs === kind).length;
-  const workingDays = days.filter((day) => day.countedAs !== 'sunday').length;
+  const workingDays = days.filter(
+    (day) => !['sunday', 'sundayWorked'].includes(day.countedAs),
+  ).length;
   const halfDays = count('half');
   const chargedHalfDays = Math.max(0, halfDays - FREE_HALF_DAYS);
   const unpaidLeaveDays = count('unpaidLeave');
@@ -45,6 +51,9 @@ export function calculateMonth({ days, monthlyGrossPaise, calendarDays }) {
     chargedHalfDays,
     paidLeaveDays: count('paidLeave') + count('unmarkedLeave'),
     unmarkedLeaveDays: count('unmarkedLeave'),
+    holidayDays: count('holiday'),
+    compOffDays: count('compOff'),
+    sundaysWorked: count('sundayWorked'),
     unpaidLeaveDays,
     absentDays,
     notYetDays: count('future'),

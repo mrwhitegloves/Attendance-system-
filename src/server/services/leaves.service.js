@@ -7,6 +7,7 @@ import { runListQuery } from '../lib/pagination.js';
 import { daysBetween } from '../lib/dates.js';
 import { recordAudit } from './audit.service.js';
 import { notifyUsers, notifyPunchWatchers } from './push.service.js';
+import { takeFromBalance } from './leaveRules.service.js';
 
 // Leave requests. Approving writes one "Leave" attendance row per day (never twice).
 // Nobody decides their own leave.
@@ -81,7 +82,12 @@ async function loadLeave(actor, id, permission) {
   return leave;
 }
 
-export async function decideLeave(actor, id, { decision, note, paid }, { ip } = {}) {
+export async function decideLeave(
+  actor,
+  id,
+  { decision, note, paid, useBalance = false, balanceMonth },
+  { ip } = {},
+) {
   requirePermission(actor, 'leave.decide');
   const leave = await loadLeave(actor, id, 'leave.decide');
   if (leave.employeeId === actor.employeeId) {
@@ -107,6 +113,9 @@ export async function decideLeave(actor, id, { decision, note, paid }, { ip } = 
   if (!updated) throw createAppError(409, 'This request was just decided by someone else.');
 
   if (decision === 'approved') await writeLeaveDays(updated, actor, note);
+  if (decision === 'approved' && paid && useBalance) {
+    await takeFromBalance(actor, updated, balanceMonth || updated.startDate.slice(0, 7));
+  }
   await recordAudit(actor, {
     action: `leave.${decision}`,
     entity: 'leave',

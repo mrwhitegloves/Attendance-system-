@@ -16,6 +16,7 @@ import {
 import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
 import { decodeImageDataUrl } from '../lib/images.js';
 import { notifyPunchWatchers } from './push.service.js';
+import { compOffsBetween, holidaysBetween } from './leaveRules.service.js';
 
 // Attendance rules (CEO, 2026-10-27), enforced by the server:
 // - one punch-in and one punch-out a day, at any hour; the time is the server's, in India time;
@@ -310,9 +311,13 @@ export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0
 // ---- One month, day by day, as the salary slip counts it ----
 
 /** How a day counts for the salary slip (rules in lib/payslipRules.js). */
-function countDay(date, own, today) {
+function countDay(date, own, today, { holiday, compOff }) {
   if (date > today) return 'future';
-  if (new Date(`${date}T00:00:00Z`).getUTCDay() === 0) return 'sunday';
+  if (new Date(`${date}T00:00:00Z`).getUTCDay() === 0) {
+    return own.some(isPunchIn) ? 'sundayWorked' : 'sunday';
+  }
+  if (holiday) return 'holiday';
+  if (compOff) return 'compOff';
   const leave = own.find((record) => record.status === 'Leave');
   if (leave)
     return leave.paidLeave === false
@@ -339,6 +344,13 @@ export async function buildMonthDays(person, month, now = new Date()) {
     .lean();
   const byDay = Map.groupBy(records, (record) => record.date);
   const today = indiaDay(now);
+  const [holidays, compOffs] = await Promise.all([
+    holidaysBetween(first, last),
+    compOffsBetween(person.employeeId, first, last),
+  ]);
+  const holidayOn = new Map(holidays.map((holiday) => [holiday.date, holiday]));
+  const compOffOn = new Map(compOffs.map((compOff) => [compOff.offOn, compOff]));
+  const workedFor = new Map(compOffs.map((compOff) => [compOff.workedOn, compOff]));
   return Promise.all(
     daysBetween(first, last).map(async (date) => {
       const own = byDay.get(date) ?? [];
@@ -347,7 +359,13 @@ export async function buildMonthDays(person, month, now = new Date()) {
       const leave = own.find((record) => record.status === 'Leave');
       return {
         date,
-        countedAs: countDay(date, own, today),
+        countedAs: countDay(date, own, today, {
+          holiday: holidayOn.get(date),
+          compOff: compOffOn.get(date),
+        }),
+        holiday: holidayOn.get(date)?.name ?? null,
+        compOffFor: compOffOn.get(date)?.workedOn ?? null,
+        compOffOn: workedFor.get(date)?.offOn ?? null,
         punchIn: firstIn ? await toView(firstIn) : null,
         punchOut: lastOut ? await toView(lastOut) : null,
         minutesWorked: hoursBetween(firstIn, lastOut),

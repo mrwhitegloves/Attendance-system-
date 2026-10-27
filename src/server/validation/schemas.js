@@ -10,6 +10,7 @@ import {
 import { LOOKUP_TYPES } from '../models/lookup.model.js';
 import { DOCUMENT_CATEGORIES, DOCUMENT_STATUSES } from '../models/document.model.js';
 import { LETTER_KINDS } from '../models/letter.model.js';
+import { HOLIDAY_KINDS } from '../models/leaveRules.model.js';
 import { SALARY_COMPONENTS } from '../models/salary.model.js';
 import { ATTENDANCE_SUMMARY, DEDUCTIONS, EARNINGS } from '../../config/payslipFields.js';
 import { ATTENDANCE_STATUSES } from '../models/attendance.model.js';
@@ -171,6 +172,9 @@ export const decideLeaveBody = z.strictObject({
   note: text(500).optional().default(''),
   // Required when approving: paid leave costs no salary, unpaid leave costs a full day.
   paid: z.boolean().optional(),
+  // With paid leave: take the days from the paid leave balance, for this month.
+  useBalance: z.boolean().optional().default(false),
+  balanceMonth: month.optional(),
 });
 
 export const listLeavesQuery = z.object({
@@ -437,4 +441,24 @@ export const listPayslipsQuery = z.object({
   userId: objectId.optional(),
   q: text(80).optional(),
   page,
+});
+
+// ---- Holidays, comp-offs, paid leave balance ----
+export const holidaysQuery = z.object({
+  year: z.coerce.number().int().min(2020).max(2100).optional(),
+});
+export const holidayBody = z.strictObject({
+  date: day,
+  name: text(80).min(2, 'enter the name of the holiday'),
+  kind: z.enum(Object.keys(HOLIDAY_KINDS)).default('festival'),
+});
+export const compOffBody = z.strictObject({
+  workedOn: day,
+  offOn: day,
+  note: text(200).optional().default(''),
+});
+export const leaveBalanceBody = z.strictObject({
+  days: z.coerce.number().min(-60).max(60).multipleOf(0.5, 'use whole or half days'),
+  month,
+  reason: text(200).min(3, 'write the reason'),
 });

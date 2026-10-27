@@ -150,6 +150,7 @@ export function LeaveScreen({
         onDone={() => router.refresh()}
       />
       <DecideDialog
+        key={deciding ? `${deciding.leave._id}-${deciding.decision}` : 'none'}
         value={deciding}
         onClose={() => setDeciding(null)}
         onDone={() => router.refresh()}
@@ -243,10 +244,26 @@ function DecideDialog({ value, onClose, onDone }) {
   const [note, setNote] = useState('');
   // Paid leave costs no salary; unpaid leave costs a full day (founder's rule).
   const [paid, setPaid] = useState(null);
+  // With paid leave: the employee's balance, and whether to take the days from it for a month.
+  const [balance, setBalance] = useState(null);
+  const [useBalance, setUseBalance] = useState(false);
+  const [balanceMonth, setBalanceMonth] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   if (!value) return <Dialog open={false} onClose={onClose} title="" />;
   const approve = value.decision === 'approved';
+  const choose = async (choice) => {
+    setPaid(choice);
+    if (!choice || balance !== null || !value.leave.userId) return;
+    setBalanceMonth(value.leave.startDate.slice(0, 7));
+    try {
+      const data = await apiFetch(`/api/users/${value.leave.userId}/leave-balance`);
+      setBalance(data.balance);
+      setUseBalance(data.balance > 0);
+    } catch {
+      setBalance(null);
+    }
+  };
   const submit = async () => {
     setBusy(true);
     setError('');
@@ -257,10 +274,15 @@ function DecideDialog({ value, onClose, onDone }) {
           decision: value.decision,
           note,
           ...(value.decision === 'approved' ? { paid } : {}),
+          ...(value.decision === 'approved' && paid && useBalance
+            ? { useBalance: true, balanceMonth }
+            : {}),
         },
       });
       setNote('');
       setPaid(null);
+      setBalance(null);
+      setUseBalance(false);
       onClose();
       onDone();
     } catch (failure) {
@@ -312,7 +334,7 @@ function DecideDialog({ value, onClose, onDone }) {
                   name="leave-paid"
                   className="mt-1"
                   checked={paid === value}
-                  onChange={() => setPaid(value)}
+                  onChange={() => choose(value)}
                 />
                 <span>
                   <span className="block font-medium">{label}</span>
@@ -321,6 +343,35 @@ function DecideDialog({ value, onClose, onDone }) {
               </label>
             ))}
           </fieldset>
+        )}
+        {approve && paid && balance !== null && (
+          <div className="space-y-2 rounded-lg bg-raised p-3">
+            <p>
+              Paid leave balance:{' '}
+              <strong className={balance <= 0 ? 'text-danger' : ''}>
+                {balance} {Math.abs(balance) === 1 ? 'day' : 'days'}
+              </strong>
+            </p>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={useBalance}
+                onChange={(event) => setUseBalance(event.target.checked)}
+              />
+              Take these days from the balance (Sundays and holidays are not taken)
+            </label>
+            {useBalance && (
+              <Field label="Taken for month" htmlFor="balance-month-choice">
+                <input
+                  id="balance-month-choice"
+                  type="month"
+                  className={inputClass}
+                  value={balanceMonth}
+                  onChange={(event) => setBalanceMonth(event.target.value)}
+                />
+              </Field>
+            )}
+          </div>
         )}
         <Field label="Note (optional)" htmlFor="decide-note">
           <input

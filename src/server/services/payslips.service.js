@@ -12,6 +12,7 @@ import { containsRegex } from '../lib/pagination.js';
 import { recordAudit } from './audit.service.js';
 import { salaryInForce } from './salary.service.js';
 import { buildMonthDays } from './attendance.service.js';
+import { leaveBalanceOf } from './leaveRules.service.js';
 import { calculateMonth } from '../lib/payslipRules.js';
 import { getCompany } from './settings.service.js';
 import { notifyUsers } from './push.service.js';
@@ -59,10 +60,11 @@ async function loadSlip(actor, id) {
 /** First values for a month: employee file, KYC, salary structure in force, attendance counts. */
 async function prefill(user, month, now = new Date()) {
   const { last } = monthBounds(month);
-  const [kyc, structure, days] = await Promise.all([
+  const [kyc, structure, days, balance] = await Promise.all([
     Kyc.findOne({ userId: user._id }).lean(),
     salaryInForce(user._id, last),
     buildMonthDays(user, month, now),
+    leaveBalanceOf(user._id, month),
   ]);
   const fixed = (lines) =>
     Object.fromEntries(
@@ -95,8 +97,8 @@ async function prefill(user, month, now = new Date()) {
       fullDays: calculation.fullDays,
       halfDays: calculation.halfDays,
       leavesTaken: calculation.paidLeaveDays + calculation.unpaidLeaveDays,
-      // No rule yet: typed by HR.
-      balanceLeaves: 0,
+      // Paid leave balance at the end of the month (never shown below zero on the slip).
+      balanceLeaves: Math.max(0, balance),
     },
     earnings,
     deductions: { ...fixed(DEDUCTIONS), lossOfPay: calculation.lossOfPayPaise },

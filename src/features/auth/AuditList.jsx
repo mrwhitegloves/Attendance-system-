@@ -51,6 +51,11 @@ const ACTIONS = {
   'payslip.reopened': 'Salary slip re-opened',
   'payslip.viewed_full': 'Salary slip opened with full numbers',
   'settings.stamp': 'Signatory stamp changed',
+  'holiday.added': 'Holiday added',
+  'holiday.removed': 'Holiday removed',
+  'compoff.added': 'Comp-off recorded',
+  'compoff.removed': 'Comp-off removed',
+  'leave_balance.adjusted': 'Paid leave balance changed',
 };
 
 function describeChanges(changes) {

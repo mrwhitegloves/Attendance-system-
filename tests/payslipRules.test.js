@@ -106,7 +106,8 @@ describe('how each day of a month is counted', () => {
     expect(on('2026-09-03')).toBe('paidLeave');
     expect(on('2026-09-04')).toBe('unpaidLeave');
     expect(on('2026-09-05')).toBe('absent');
-    expect(on('2026-09-06')).toBe('sunday');
+    // A punch on a Sunday is shown as Sunday worked (HR can give a comp-off for it).
+    expect(on('2026-09-06')).toBe('sundayWorked');
     expect(month.find((day) => day.date === '2026-09-01').punchIn.time).toBe('09:20 AM');
   });
 });

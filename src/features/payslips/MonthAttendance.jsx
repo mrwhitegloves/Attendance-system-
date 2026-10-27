@@ -14,9 +14,20 @@ const COUNTED = {
   unpaidLeave: { label: 'Unpaid leave', tone: 'danger' },
   unmarkedLeave: { label: 'Leave (counted as paid)', tone: 'info' },
   absent: { label: 'Absent', tone: 'danger' },
+  holiday: { label: 'Holiday (paid)', tone: 'info' },
+  compOff: { label: 'Comp-off (paid)', tone: 'info' },
   sunday: { label: 'Sunday', tone: 'neutral' },
+  sundayWorked: { label: 'Sunday worked', tone: 'brand' },
   future: { label: 'Not yet', tone: 'neutral' },
 };
+
+/** The last column: holiday name, comp-off link, or place and remark. */
+function placeText(day) {
+  if (day.holiday) return day.holiday;
+  if (day.compOffFor) return `Day off for Sunday ${formatDayName(day.compOffFor)}`;
+  if (day.compOffOn) return `Comp-off on ${formatDayName(day.compOffOn)}`;
+  return day.punchIn?.location || day.remark || '—';
+}
 
 const STORAGE_KEY = 'payslip-attendance-open';
 const noSubscribe = () => () => {};
@@ -59,6 +70,9 @@ export function MonthAttendance({ data, slipAttendance, expectedInTime }) {
       `${calculation.halfDays} (${calculation.chargedHalfDays} charged)`,
     ],
     ['Paid leave', calculation.paidLeaveDays],
+    ['Holidays (paid)', calculation.holidayDays ?? 0],
+    ['Comp-off days (paid)', calculation.compOffDays ?? 0],
+    ['Sundays worked', calculation.sundaysWorked ?? 0],
     ['Unpaid leave', calculation.unpaidLeaveDays],
     ['Absent', calculation.absentDays],
     ['One day of salary', formatRupees(calculation.perDayPaise)],
@@ -123,9 +137,7 @@ export function MonthAttendance({ data, slipAttendance, expectedInTime }) {
                       </td>
                       <td className="px-2 py-2 tabular-nums">{formatMinutes(day.minutesWorked)}</td>
                       <td className="max-w-xs px-2 py-2 text-xs text-muted">
-                        <span className="line-clamp-2">
-                          {day.punchIn?.location || day.remark || '—'}
-                        </span>
+                        <span className="line-clamp-2">{placeText(day)}</span>
                       </td>
                     </tr>
                   );
