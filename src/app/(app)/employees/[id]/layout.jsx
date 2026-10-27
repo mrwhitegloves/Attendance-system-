@@ -59,6 +59,7 @@ export default async function EmployeeLayout({ children, params }) {
           assets: Boolean(can(user, 'assets.view')),
           onboarding: can(user, 'users.view') !== 'own',
           exit: Boolean(can(user, 'exits.view')),
+          performance: Boolean(can(user, 'performance.view')),
         }}
       />
       {children}

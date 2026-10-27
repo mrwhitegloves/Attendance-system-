@@ -300,5 +300,7 @@ export function permissionsOf(user) {
     assets: can(user, 'assets.view'),
     recruitment: Boolean(can(user, 'recruitment.view')),
     exits: can(user, 'exits.view'),
+    performance: can(user, 'performance.view'),
+    performanceManage: can(user, 'performance.manage'),
   };
 }

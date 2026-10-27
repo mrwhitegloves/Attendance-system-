@@ -57,6 +57,7 @@ export const NAVIGATION = [
     show: (p) => p.recruitment,
     // Onboarding and exits are tabs on the same screen.
   },
+  { href: '/performance', label: 'Performance', icon: 'TrendingUp', show: (p) => p.performance },
   { href: '/assets', label: 'Assets', icon: 'Laptop', show: (p) => p.assets },
   { href: '/audit-log', label: 'Audit log', icon: 'ScrollText', show: (p) => p.audit },
   { href: '/settings', label: 'Settings', icon: 'Settings', show: (p) => p.settings },

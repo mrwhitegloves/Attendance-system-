@@ -24,6 +24,7 @@ import {
 } from '../../config/assetOptions.js';
 import { CANDIDATE_STATUSES, DROP_REASONS } from '../../config/recruitmentOptions.js';
 import { EXIT_STATUSES, EXIT_TYPES } from '../../config/exitOptions.js';
+import { PLAN_OUTCOMES, REVIEW_KINDS, REVIEW_STATUSES } from '../../config/performanceOptions.js';
 
 // Input rules of every endpoint. Strict objects: unknown fields are refused.
 
@@ -628,5 +629,54 @@ export const exitCloseBody = z.strictObject({ note: text(1000).optional() });
 
 export const listExitsQuery = z.object({
   status: z.enum([...EXIT_STATUSES, 'all']).default('notice'),
+  page,
+});
+
+// ---- Performance ----
+
+const rating = z.coerce.number().int().min(1).max(5);
+const reviewFields = {
+  kind: z.enum(Object.keys(REVIEW_KINDS)),
+  periodStart: day,
+  periodEnd: day,
+  goals: z
+    .array(
+      z.strictObject({
+        title: text(200).min(2, 'write the goal'),
+        target: text(200).optional().default(''),
+        achieved: text(200).optional().default(''),
+        rating: rating.nullable().optional().default(null),
+      }),
+    )
+    .max(20),
+  rating: rating.nullable(),
+  strengths: text(2000),
+  improvements: text(2000),
+  training: text(1000),
+};
+
+export const reviewBody = z.strictObject({
+  ...Object.fromEntries(Object.entries(reviewFields).map(([key, rule]) => [key, rule.optional()])),
+  kind: reviewFields.kind.default('review'),
+  periodStart: day,
+  periodEnd: day,
+});
+
+export const reviewUpdateBody = z
+  .strictObject({
+    ...Object.fromEntries(
+      Object.entries(reviewFields).map(([key, rule]) => [key, rule.optional()]),
+    ),
+    outcome: z.enum([...Object.keys(PLAN_OUTCOMES), '']).optional(),
+    outcomeNote: text(1000).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, 'nothing to change');
+
+export const acknowledgeReviewBody = z.strictObject({ comment: text(2000).optional() });
+
+export const listReviewsQuery = z.object({
+  employeeId: text(20).optional(),
+  kind: z.enum(Object.keys(REVIEW_KINDS)).optional().catch(undefined),
+  status: z.enum(REVIEW_STATUSES).optional().catch(undefined),
   page,
 });

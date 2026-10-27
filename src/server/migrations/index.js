@@ -91,6 +91,11 @@ export const MIGRATIONS = [
     // Exits: the new permissions reach roles already in the database.
     up: () => addMissingDefaultPermissions(['exits.view', 'exits.manage']),
   },
+  {
+    name: '014-performance-permissions',
+    // Performance reviews: the new permissions reach roles already in the database.
+    up: () => addMissingDefaultPermissions(['performance.view', 'performance.manage']),
+  },
 ];
 
 export async function runMigrations() {

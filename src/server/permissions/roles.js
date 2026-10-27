@@ -37,6 +37,8 @@ export const PERMISSIONS = {
   'recruitment.manage': 'Add candidates, record offers and mark them joined',
   'exits.view': 'See exits (resignations, notice periods)',
   'exits.manage': 'Record exits, tick exit tasks and close them',
+  'performance.view': 'See performance reviews and improvement plans',
+  'performance.manage': 'Write reviews and improvement plans (never your own)',
   'assets.view': 'See company assets and who has them',
   'assets.manage': 'Add assets, hand them over and take them back',
   'notifications.punches': 'Get a notification for every punch',
@@ -48,8 +50,8 @@ export const PERMISSIONS = {
 
 export const SCOPES = ['own', 'team', 'all'];
 // Permissions that apply to some people only (own / team / all): every ".view", and deciding
-// leave or requests (a manager decides for their team).
-const SCOPED_ACTIONS = new Set(['leave.decide', 'requests.decide']);
+// leave or requests, writing reviews (a manager does it for their team).
+const SCOPED_ACTIONS = new Set(['leave.decide', 'requests.decide', 'performance.manage']);
 export const isScoped = (permission) =>
   permission.endsWith('.view') || SCOPED_ACTIONS.has(permission);
 
@@ -109,6 +111,8 @@ export const DEFAULT_ROLES = {
       'requests.view': 'team',
       'assets.view': 'team',
       'exits.view': 'team',
+      'performance.view': 'team',
+      'performance.manage': 'team',
     },
   },
   employee: {
@@ -126,6 +130,7 @@ export const DEFAULT_ROLES = {
       'requests.create': true,
       'requests.view': 'own',
       'assets.view': 'own',
+      'performance.view': 'own',
     },
   },
   auditor: {
@@ -143,6 +148,7 @@ export const DEFAULT_ROLES = {
       'requests.view': 'all',
       'assets.view': 'all',
       'exits.view': 'all',
+      'performance.view': 'all',
     },
   },
 };
