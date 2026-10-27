@@ -297,5 +297,6 @@ export function permissionsOf(user) {
     requestCreate: Boolean(can(user, 'requests.create')),
     requests: can(user, 'requests.view'),
     requestDecide: can(user, 'requests.decide'),
+    assets: can(user, 'assets.view'),
   };
 }

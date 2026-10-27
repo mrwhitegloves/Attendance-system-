@@ -33,6 +33,8 @@ export const PERMISSIONS = {
   'requests.create': 'Send requests (expense, advance, document, grievance)',
   'requests.view': 'See requests (a team never includes grievances)',
   'requests.decide': 'Decide requests (never your own; grievances need everyone)',
+  'assets.view': 'See company assets and who has them',
+  'assets.manage': 'Add assets, hand them over and take them back',
   'notifications.punches': 'Get a notification for every punch',
   'notifications.broadcast': 'Send a notification to all employees',
   'settings.manage': 'Change settings, lists, document types and templates',
@@ -86,6 +88,7 @@ export const DEFAULT_ROLES = {
       'requests.create': true,
       'requests.view': 'all',
       'requests.decide': 'all',
+      'assets.view': 'all',
     },
   },
   manager: {
@@ -99,6 +102,7 @@ export const DEFAULT_ROLES = {
       'users.view': 'team',
       'requests.create': true,
       'requests.view': 'team',
+      'assets.view': 'team',
     },
   },
   employee: {
@@ -115,6 +119,7 @@ export const DEFAULT_ROLES = {
       'payslips.view': 'own',
       'requests.create': true,
       'requests.view': 'own',
+      'assets.view': 'own',
     },
   },
   auditor: {
@@ -130,6 +135,7 @@ export const DEFAULT_ROLES = {
       'salary.view': 'all',
       'payslips.view': 'all',
       'requests.view': 'all',
+      'assets.view': 'all',
     },
   },
 };

@@ -16,6 +16,12 @@ import { ATTENDANCE_SUMMARY, DEDUCTIONS, EARNINGS } from '../../config/payslipFi
 import { ATTENDANCE_STATUSES } from '../models/attendance.model.js';
 import { MIN_PASSWORD_LENGTH } from '../auth/password.js';
 import { REQUEST_KIND_KEYS, REQUEST_STATUSES } from '../../config/requestKinds.js';
+import {
+  ASSET_CATEGORIES,
+  ASSET_STATUSES,
+  IDLE_STATUSES,
+  RETURN_STATUSES,
+} from '../../config/assetOptions.js';
 
 // Input rules of every endpoint. Strict objects: unknown fields are refused.
 
@@ -494,5 +500,45 @@ export const listRequestsQuery = z.object({
   kind: z.enum(REQUEST_KIND_KEYS).optional().catch(undefined),
   status: z.enum([...REQUEST_STATUSES, 'all']).default('all'),
   q: text(80).optional(),
+  page,
+});
+
+// ---- Company assets ----
+
+const assetDetails = {
+  name: text(120).min(2, 'enter the asset name'),
+  category: z.enum(Object.keys(ASSET_CATEGORIES)),
+  serialNumber: text(80).optional(),
+  // Rupees; stored as paise.
+  value: z.coerce.number().min(0).max(100000000).multipleOf(0.01).nullable().optional(),
+  purchasedOn: z.union([day, z.literal('')]).optional(),
+  note: text(500).optional(),
+};
+
+export const assetBody = z.strictObject(assetDetails);
+
+export const assetUpdateBody = z.strictObject({
+  ...Object.fromEntries(Object.entries(assetDetails).map(([key, rule]) => [key, rule.optional()])),
+  status: z.enum(IDLE_STATUSES).optional(),
+  statusNote: text(300).optional(),
+});
+
+export const assignAssetBody = z.strictObject({
+  userId: objectId,
+  condition: text(200).optional(),
+  note: text(300).optional(),
+});
+
+export const returnAssetBody = z.strictObject({
+  status: z.enum(RETURN_STATUSES),
+  condition: text(200).optional(),
+  note: text(300).optional(),
+});
+
+export const listAssetsQuery = z.object({
+  q: text(80).optional(),
+  category: z.enum(Object.keys(ASSET_CATEGORIES)).optional().catch(undefined),
+  status: z.enum(Object.keys(ASSET_STATUSES)).optional().catch(undefined),
+  employeeId: text(20).optional(),
   page,
 });

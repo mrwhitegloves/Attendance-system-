@@ -13,6 +13,7 @@ const SECTIONS = [
   { id: 'letters', label: 'Letters', path: '/letters', permission: 'letters' },
   { id: 'attendance', label: 'Attendance', path: '/attendance' },
   { id: 'leave', label: 'Leave', path: '/leave', permission: 'leave' },
+  { id: 'assets', label: 'Assets', path: '/assets', permission: 'assets' },
 ];
 
 export function EmployeeTabs({ id, show }) {
