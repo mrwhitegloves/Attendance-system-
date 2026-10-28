@@ -358,7 +358,7 @@ function DecideDialog({ value, onClose, onDone }) {
                 checked={useBalance}
                 onChange={(event) => setUseBalance(event.target.checked)}
               />
-              Take these days from the balance (Sundays and holidays are not taken)
+              Take these days from the balance (weekly offs and holidays are not taken)
             </label>
             {useBalance && (
               <Field label="Taken for month" htmlFor="balance-month-choice">

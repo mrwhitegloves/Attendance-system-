@@ -5,6 +5,7 @@ import { Payslip } from '../models/payslip.model.js';
 import { canSeeEmployee, employeeScopeFilter, requirePermission } from '../permissions/can.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { runListQuery } from '../lib/pagination.js';
+import { isWeeklyOff } from '../../config/employeeOptions.js';
 import {
   indiaDay,
   indiaClock,
@@ -198,6 +199,42 @@ function hoursBetween(first, last) {
   return end - start;
 }
 
+/** Minutes a person is expected to work a day (expected out-time minus in-time). */
+function expectedMinutes(person) {
+  const start = clockToMinutes(person.expectedInTime) ?? clockToMinutes('09:30');
+  const end = clockToMinutes(person.expectedOutTime) ?? clockToMinutes('18:30');
+  return Math.max(0, end - start);
+}
+
+/** Minutes worked beyond the expected day (0 when not more, or no punch-out). */
+const overtimeOf = (person, minutesWorked) =>
+  minutesWorked ? Math.max(0, minutesWorked - expectedMinutes(person)) : 0;
+
+/**
+ * Overtime of each person from the 1st of the month up to a day (founder, 2026-10-28: it is not
+ * paid and not on the salary slip; the attendance screens show it). → Map employeeId → minutes.
+ */
+async function overtimeThisMonth(people, upTo) {
+  const records = await Attendance.find({
+    employeeId: { $in: people.map((person) => person.employeeId) },
+    date: { $gte: `${upTo.slice(0, 7)}-01`, $lte: upTo },
+    status: { $in: [...PUNCH_IN_STATUSES, 'Checked Out'] },
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+  const byPersonDay = Map.groupBy(records, (record) => `${record.employeeId}|${record.date}`);
+  const personOf = new Map(people.map((person) => [person.employeeId, person]));
+  const totals = new Map();
+  for (const [key, own] of byPersonDay) {
+    const person = personOf.get(key.split('|')[0]);
+    const first = own.find(isPunchIn) ?? null;
+    const last = own.findLast((record) => record.status === 'Checked Out') ?? null;
+    const extra = overtimeOf(person, hoursBetween(first, last));
+    totals.set(person.employeeId, (totals.get(person.employeeId) ?? 0) + extra);
+  }
+  return totals;
+}
+
 /** Status of one person on one day, from that day's records. */
 function dayStatus(records, pendingLeave) {
   if (records.some((record) => record.status === 'Leave')) return 'Leave';
@@ -215,7 +252,7 @@ export async function getDailySheet(actor, date = indiaDay()) {
   const [people, records, pending] = await Promise.all([
     User.find(
       { ...scope, status: 'active' },
-      '_id name employeeId department staffType expectedInTime',
+      '_id name employeeId department staffType expectedInTime expectedOutTime',
     )
       .sort({ name: 1 })
       .lean(),
@@ -229,6 +266,7 @@ export async function getDailySheet(actor, date = indiaDay()) {
   ]);
   const byEmployee = Map.groupBy(records, (record) => record.employeeId);
   const pendingIds = new Set(pending.map((leave) => leave.employeeId));
+  const overtime = await overtimeThisMonth(people, date);
 
   const rows = await Promise.all(
     people.map(async (person) => {
@@ -241,6 +279,7 @@ export async function getDailySheet(actor, date = indiaDay()) {
         punchIn: first ? await toView(first) : null,
         punchOut: last ? await toView(last) : null,
         minutesWorked: hoursBetween(first, last),
+        overtimeThisMonth: overtime.get(person.employeeId) ?? 0,
         remark:
           own.find((record) => record.status === 'Absent' || record.status === 'Leave')?.remark ??
           '',
@@ -266,7 +305,10 @@ export async function getDailySheet(actor, date = indiaDay()) {
 
 /** One person's month as a calendar, with totals. */
 export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0, 7)) {
-  const person = await User.findById(userId, '_id name employeeId expectedInTime createdAt')
+  const person = await User.findById(
+    userId,
+    '_id name employeeId expectedInTime expectedOutTime weeklyOffs createdAt',
+  )
     .lean()
     .catch(() => null);
   if (!person || !(await canSeeEmployee(actor, 'attendance.view', person.employeeId)))
@@ -299,6 +341,8 @@ export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0
         punchIn: firstIn ? await toView(firstIn) : null,
         punchOut: lastOut ? await toView(lastOut) : null,
         minutesWorked: hoursBetween(firstIn, lastOut),
+        overtimeMinutes: overtimeOf(person, hoursBetween(firstIn, lastOut)),
+        weeklyOff: isWeeklyOff(person, date),
         remark: own.find((record) => record.remark && record.status !== 'Checked In')?.remark ?? '',
       };
     }),
@@ -313,6 +357,7 @@ export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0
       late: count('Late'),
       leave: count('Leave'),
       absent: count('Absent'),
+      overtimeMinutes: days.reduce((total, day) => total + day.overtimeMinutes, 0),
     },
   };
 }
@@ -320,10 +365,10 @@ export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0
 // ---- One month, day by day, as the salary slip counts it ----
 
 /** How a day counts for the salary slip (rules in lib/payslipRules.js). */
-function countDay(date, own, today, { holiday, compOff }) {
+function countDay(date, own, today, { holiday, compOff, person }) {
   if (date > today) return 'future';
-  if (new Date(`${date}T00:00:00Z`).getUTCDay() === 0) {
-    return own.some(isPunchIn) ? 'sundayWorked' : 'sunday';
+  if (isWeeklyOff(person, date)) {
+    return own.some(isPunchIn) ? 'weeklyOffWorked' : 'weeklyOff';
   }
   if (holiday) return 'holiday';
   if (compOff) return 'compOff';
@@ -369,6 +414,7 @@ export async function buildMonthDays(person, month, now = new Date()) {
       return {
         date,
         countedAs: countDay(date, own, today, {
+          person,
           holiday: holidayOn.get(date),
           compOff: compOffOn.get(date),
         }),

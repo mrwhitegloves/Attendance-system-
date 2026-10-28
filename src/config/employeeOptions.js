@@ -18,9 +18,9 @@ export const EMPLOYMENT_TYPE = options({
 });
 
 export const WORK_MODE = options({
-  office: 'Office',
+  office: 'Work from office',
   field: 'Field',
-  remote: 'Remote',
+  remote: 'Work from home',
   hybrid: 'Hybrid',
 });
 
@@ -50,3 +50,22 @@ export const ACCOUNT_STATUS_TONE = {
   suspended: 'warning',
   deactivated: 'danger',
 };
+
+// Weekly days off (founder, 2026-10-28): any day, one or two per employee, 0 = Sunday … 6 =
+// Saturday. Old records have none: Sunday.
+export const WEEKDAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+export const weeklyOffsOf = (person) => (person?.weeklyOffs?.length ? person.weeklyOffs : [0]);
+export const isWeeklyOff = (person, day) =>
+  weeklyOffsOf(person).includes(new Date(`${day}T00:00:00Z`).getUTCDay());
+export const weeklyOffWords = (person) =>
+  weeklyOffsOf(person)
+    .map((day) => WEEKDAY_NAMES[day])
+    .join(' and ');

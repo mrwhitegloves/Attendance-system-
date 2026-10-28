@@ -25,6 +25,8 @@ const payslipSchema = new mongoose.Schema(
       department: { type: String, default: '' },
       joiningDate: { type: String, default: '' },
       bankName: { type: String, default: '' },
+      // Mr. White Gloves or EngenX: the logo and header line of the slip.
+      brandKey: { type: String, default: 'mwg' },
       // Sealed full numbers (lib/secretBox.js) and their last 4 digits for screens.
       panSealed: { type: String, default: null },
       panLast4: { type: String, default: '' },

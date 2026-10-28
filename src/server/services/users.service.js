@@ -42,6 +42,8 @@ const EDITABLE = [
   'managerId',
   'expectedInTime',
   'expectedOutTime',
+  'brandKey',
+  'weeklyOffs',
 ];
 
 // Completeness lives in completeness.service.js; re-exported for the pages that import it here.

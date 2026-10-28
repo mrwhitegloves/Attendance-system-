@@ -13,7 +13,9 @@ import {
   GENDER,
   WORK_MODE,
 } from '@/config/employeeOptions.js';
+import { brandOptions } from '@/config/brands.js';
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const choose = (list) => [{ value: '', label: 'Choose…' }, ...list];
 const plain = (values) => values.map((value) => ({ value, label: value }));
 
@@ -92,6 +94,12 @@ function sections({ editing, lists, managers, roles, staffTypes, employeeId }) {
           options: choose(EMPLOYMENT_STATUS.list),
         },
         { key: 'staffType', label: 'Staff type', type: 'select', options: plain(staffTypes) },
+        {
+          key: 'brandKey',
+          label: 'Company (letter and slip format)',
+          type: 'select',
+          options: brandOptions,
+        },
         { key: 'joiningDate', label: 'Joining date', type: 'date' },
         { key: 'probationEndDate', label: 'Probation ends', type: 'date' },
       ],
@@ -108,6 +116,12 @@ function sections({ editing, lists, managers, roles, staffTypes, employeeId }) {
           hint: 'Up to 5 minutes after this is on time; later is late.',
         },
         { key: 'expectedOutTime', label: 'Expected out-time', type: 'time', required: true },
+        {
+          key: 'weeklyOffs',
+          label: 'Weekly off',
+          type: 'weekdays',
+          hint: 'One or two days. Not a working day on the salary slip.',
+        },
         { key: 'email', label: 'Work email (optional, can sign in with it)', type: 'email' },
         {
           key: 'roleKey',
@@ -153,6 +167,8 @@ const KEYS = [
   'probationEndDate',
   'expectedInTime',
   'expectedOutTime',
+  'weeklyOffs',
+  'brandKey',
   'email',
   'roleKey',
   'password',
@@ -162,6 +178,9 @@ const DEFAULTS = {
   expectedInTime: '09:30',
   expectedOutTime: '18:30',
   roleKey: 'employee',
+  brandKey: 'mwg',
+  // Sunday, until HR chooses (old records have none).
+  weeklyOffs: '0',
 };
 const read = (record, key) => key.split('.').reduce((value, part) => value?.[part], record);
 
@@ -170,7 +189,11 @@ function initialValues(employee) {
   return Object.fromEntries(
     KEYS.map((key) => [
       key,
-      key === 'password' ? '' : String((employee && read(employee, key)) ?? DEFAULTS[key] ?? ''),
+      key === 'password'
+        ? ''
+        : key === 'weeklyOffs'
+          ? (employee?.weeklyOffs ?? [0]).join(',')
+          : String((employee && read(employee, key)) ?? DEFAULTS[key] ?? ''),
     ]),
   );
 }
@@ -184,7 +207,12 @@ function toBody(form, initial, editing) {
   for (const key of changed) {
     if (key.startsWith('emergencyContact.')) continue;
     if (key === 'password' && !form.password) continue;
-    body[key] = key === 'managerId' ? form.managerId || null : form[key];
+    body[key] =
+      key === 'managerId'
+        ? form.managerId || null
+        : key === 'weeklyOffs'
+          ? form.weeklyOffs.split(',').filter(Boolean).map(Number)
+          : form[key];
   }
   if (changed.some((key) => key.startsWith('emergencyContact.'))) {
     body.emergencyContact = {
@@ -255,6 +283,30 @@ export function EmployeeForm({
       required: field.required,
     };
     if (field.type === 'select') return <Select {...common} options={field.options} />;
+    if (field.type === 'weekdays') {
+      const chosen = form.weeklyOffs.split(',').filter(Boolean).map(Number);
+      const toggle = (day) => {
+        const next = chosen.includes(day)
+          ? chosen.filter((item) => item !== day)
+          : [...chosen, day].slice(-2);
+        setForm({ ...form, weeklyOffs: next.sort().join(',') });
+      };
+      return (
+        <div id={field.key} className="flex flex-wrap gap-1.5">
+          {WEEKDAYS.map((name, day) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => toggle(day)}
+              aria-pressed={chosen.includes(day)}
+              className={`rounded-lg border px-2.5 py-1.5 text-sm ${chosen.includes(day) ? 'border-brand bg-brand text-white' : 'border-border bg-surface'}`}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      );
+    }
     if (field.type === 'list')
       return <Select {...common} options={fromList(field.key, initial[field.key])} />;
     if (field.type === 'textarea')

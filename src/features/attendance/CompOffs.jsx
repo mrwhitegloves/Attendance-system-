@@ -9,7 +9,7 @@ import { Button, Card, CardHeader, EmptyState, ErrorText } from '@/components/sh
 import { ConfirmDialog } from '@/components/shared/Dialog.jsx';
 import { Field, inputClass } from '@/components/shared/form.jsx';
 
-/** Sundays this employee worked and the paid day off taken for each (recorded by HR). */
+/** Weekly offs this employee worked and the paid day off taken for each (recorded by HR). */
 export function CompOffs({ userId, items, canManage }) {
   const router = useRouter();
   const [form, setForm] = useState({ workedOn: '', offOn: '', note: '' });
@@ -44,15 +44,15 @@ export function CompOffs({ userId, items, canManage }) {
   return (
     <Card>
       <CardHeader
-        title="Sunday worked and comp-off"
-        subtitle="The day off taken for a Sunday worked is a paid day on the salary slip."
+        title="Weekly off worked and comp-off"
+        subtitle="The day off taken for a weekly off worked is a paid day on the salary slip."
       />
       {canManage && (
         <form
           onSubmit={add}
           className="grid gap-3 border-b border-border p-4 sm:grid-cols-[1fr_1fr_2fr_auto] sm:items-end"
         >
-          <Field label="Sunday worked" htmlFor="comp-worked">
+          <Field label="Weekly off worked" htmlFor="comp-worked">
             <input
               id="comp-worked"
               type="date"
@@ -92,7 +92,7 @@ export function CompOffs({ userId, items, canManage }) {
         </form>
       )}
       {items.length === 0 ? (
-        <EmptyState title="No Sunday work recorded" />
+        <EmptyState title="No weekly off work recorded" />
       ) : (
         <ul className="divide-y divide-border">
           {items.map((item) => (

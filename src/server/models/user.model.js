@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { BRAND_KEYS } from '../../config/brands.js';
 import {
   ACCOUNT_STATUS,
   EMPLOYMENT_STATUS,
@@ -73,6 +74,11 @@ const userSchema = new mongoose.Schema(
     joiningDate: { type: String, default: '' },
     probationEndDate: { type: String, default: '' },
     managerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    // Mr. White Gloves or EngenX (config/brands.js); old records have none: the parent brand.
+    brandKey: { type: String, enum: [...BRAND_KEYS, ''], default: 'mwg' },
+    // Weekly days off, 0 = Sunday … 6 = Saturday (founder, 2026-10-28: any day, one or two).
+    // Old records have none: Sunday.
+    weeklyOffs: { type: [Number], default: undefined },
     expectedInTime: { type: String, default: '09:30' },
     expectedOutTime: { type: String, default: '18:30' },
 
@@ -93,5 +99,5 @@ export const PUBLIC_USER_FIELDS = [
   '_id name phone employeeId employeeCode email username roleKey status lastLoginAt createdAt updatedAt',
   'photoKey dateOfBirth gender bloodGroup personalEmail currentAddress permanentAddress emergencyContact',
   'department designation branch staffType employmentType workMode employmentStatus joiningDate',
-  'probationEndDate managerId expectedInTime expectedOutTime completeness',
+  'probationEndDate managerId expectedInTime expectedOutTime completeness brandKey weeklyOffs',
 ].join(' ');

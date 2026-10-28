@@ -135,6 +135,11 @@ export function DaySheet({ sheet, today }) {
               render: (row) => <PunchCell record={row.punchOut} />,
             },
             { key: 'hours', label: 'Worked', render: (row) => formatMinutes(row.minutesWorked) },
+            {
+              key: 'overtime',
+              label: 'Overtime this month',
+              render: (row) => (row.overtimeThisMonth ? formatMinutes(row.overtimeThisMonth) : '—'),
+            },
           ]}
         />
       </Card>

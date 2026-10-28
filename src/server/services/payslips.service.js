@@ -16,6 +16,7 @@ import { leaveBalanceOf } from './leaveRules.service.js';
 import { calculateMonth } from '../lib/payslipRules.js';
 import { getCompany } from './settings.service.js';
 import { notifyUsers } from './push.service.js';
+import { brandKeyOf } from '../../config/brands.js';
 
 // Salary slips. Rules:
 // - one slip per employee and month; it starts as a draft filled from the employee file, KYC,
@@ -87,6 +88,7 @@ async function prefill(user, month, now = new Date()) {
       department: user.department ?? '',
       joiningDate: user.joiningDate ?? '',
       bankName: kyc?.bank?.bankName ?? '',
+      brandKey: brandKeyOf(user),
       panSealed: kyc?.pan?.sealed ?? null,
       panLast4: kyc?.pan?.last4 ?? '',
       accountSealed: kyc?.bank?.accountSealed ?? null,

@@ -75,7 +75,7 @@ describe('salary slips', () => {
       panLast4: '354P',
       accountLast4: '6261',
     });
-    // September 2026: 30 days, 4 Sundays → 26 working days. 1 full, 1 half (free), 1 leave
+    // September 2026: 30 days, 4 Sundays (the default weekly off) → 26 working days. 1 full, 1 half (free), 1 leave
     // (not marked: counted as paid); the other 23 working days have no punch → absent.
     expect(slip.attendance).toMatchObject({
       totalWorkingDays: 26,

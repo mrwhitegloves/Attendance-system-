@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 // What decides a paid day besides approved leave (founder, 2026-10-27):
 // - holidays: occasions, festivals and national holidays saved in advance (Settings → Holidays);
-// - comp-offs: an employee worked on a Sunday and takes another day off in exchange (HR records it);
+// - comp-offs: an employee worked on their weekly off and takes another day off in exchange (HR);
 // - the paid leave balance: days HR gives an employee, and days taken from it, per month.
 
 export const HOLIDAY_KINDS = {
@@ -26,7 +26,7 @@ const compOffSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     employeeId: { type: String, required: true, index: true },
-    workedOn: { type: String, required: true }, // the Sunday worked
+    workedOn: { type: String, required: true }, // the weekly off worked
     offOn: { type: String, required: true }, // the day off taken in exchange (paid)
     note: { type: String, default: '' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

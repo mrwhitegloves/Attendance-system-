@@ -108,14 +108,16 @@ export function CandidateDetail({ data, templates, roleName, canManage, canLette
           <h2 className="mb-2 text-sm font-semibold">Offer letters</h2>
           {open && !hasAcceptedOffer && (
             <p className="mb-3 text-sm text-muted">
-              Draft the offer from the template, issue it, then record the candidate&apos;s reply on
-              the letter. &quot;Joined&quot; opens once an offer is accepted.
+              Make the offer letter (company format, PDF), issue it, then record the
+              candidate&apos;s reply on the letter. &quot;Joined&quot; opens once an offer is
+              accepted.
             </p>
           )}
           <EmployeeLetters
             data={{ letters, canManage: canLetters && open, user: { _id: candidate._id } }}
             templates={templates}
             createUrl={`/api/candidates/${candidate._id}/letters`}
+            offerUrl={`/api/candidates/${candidate._id}/offer-letters`}
           />
         </div>
       </div>

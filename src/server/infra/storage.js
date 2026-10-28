@@ -48,3 +48,10 @@ export async function signedUrl(key, seconds = 15 * 60) {
     expiresIn: seconds,
   });
 }
+
+/** The bytes of a stored file (for pictures drawn into PDFs), or null when storage is off. */
+export async function getFileBytes(key) {
+  if (!key || !isStorageConfigured()) return null;
+  const result = await s3().send(new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
+  return Buffer.from(await result.Body.transformToByteArray());
+}

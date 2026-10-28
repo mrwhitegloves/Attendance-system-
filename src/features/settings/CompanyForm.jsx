@@ -6,17 +6,24 @@ import { Upload } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { Button, Card, CardHeader, ErrorText } from '@/components/shared/ui.jsx';
 import { Field, inputClass } from '@/components/shared/form.jsx';
+import { BRANDS } from '@/config/brands.js';
 
 const FIELDS = [
-  ['name', 'Legal company name', 'White Gloves Technology Pvt. Ltd.'],
-  ['brandName', 'Brand name (slip header)', 'MR. WHITE GLOVES'],
-  ['tagline', 'Tagline', 'WE RENEW YOUR CAR'],
+  ['name', 'Legal company name (full)', 'White Gloves Technology Private Limited'],
+  ['shortName', 'Short legal name (in letter sentences)', 'White Gloves Technology Pvt. Ltd.'],
+  ['cin', 'CIN', 'U50400JH2021PTC017561'],
   ['gstNumber', 'GST registration number', '20AADCW1091R1Z3'],
-  ['signatoryName', 'Who signs letters (name)', ''],
-  ['signatoryTitle', 'Their designation', ''],
+  ['signatoryName', 'Who signs offer letters (name)', 'Muskan'],
+  ['signatoryTitle', 'Their designation', 'Human Resources, White Gloves Technology Pvt. Ltd.'],
   ['phone', 'Phone', ''],
   ['email', 'Email', ''],
-  ['website', 'Website', 'www.mrwhitegloves.com'],
+];
+
+const BRAND_FIELDS = [
+  ['name', 'Name (letter header and slip)'],
+  ['website', 'Website'],
+  ['email', 'Email (letter footer)'],
+  ['tagline', 'Tagline (salary slip)'],
 ];
 
 /** Shrinks a stamp picture to at most 600 px, keeping it a PNG (transparent background stays). */
@@ -53,6 +60,14 @@ export function CompanyForm({ company }) {
     try {
       const body = Object.fromEntries(
         [...FIELDS.map(([key]) => key), 'address'].map((key) => [key, form[key] ?? '']),
+      );
+      body.brands = Object.fromEntries(
+        Object.keys(BRANDS).map((key) => [
+          key,
+          Object.fromEntries(
+            BRAND_FIELDS.map(([field]) => [field, form.brands?.[key]?.[field] ?? '']),
+          ),
+        ]),
       );
       await apiFetch('/api/settings/company', { method: 'PATCH', body });
       setMessage('Saved.');
@@ -109,6 +124,36 @@ export function CompanyForm({ company }) {
               />
             </Field>
           </div>
+          {Object.entries(BRANDS).map(([key, brand]) => (
+            <fieldset
+              key={key}
+              className="grid gap-3 rounded-lg border border-border p-3 sm:col-span-2 sm:grid-cols-2"
+            >
+              <legend className="flex items-center gap-2 px-1 text-sm font-semibold">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={brand.letterLogo} alt="" className="h-5 w-auto" />
+                {brand.label}
+              </legend>
+              {BRAND_FIELDS.map(([field, label]) => (
+                <Field key={field} label={label} htmlFor={`brand-${key}-${field}`}>
+                  <input
+                    id={`brand-${key}-${field}`}
+                    className={inputClass}
+                    value={form.brands?.[key]?.[field] ?? ''}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        brands: {
+                          ...form.brands,
+                          [key]: { ...form.brands?.[key], [field]: event.target.value },
+                        },
+                      })
+                    }
+                  />
+                </Field>
+              ))}
+            </fieldset>
+          ))}
           <div className="flex items-center justify-end gap-3 sm:col-span-2">
             {message && <span className="text-sm text-success">{message}</span>}
             <ErrorText>{error}</ErrorText>
@@ -121,7 +166,7 @@ export function CompanyForm({ company }) {
       <Card className="h-fit">
         <CardHeader
           title="Signatory stamp"
-          subtitle="Printed above “Authorised Signatory” on salary slips."
+          subtitle="Printed on salary slips and offer letters (round stamp with signature)."
         />
         <div className="space-y-3 p-4">
           {company.stampUrl ? (

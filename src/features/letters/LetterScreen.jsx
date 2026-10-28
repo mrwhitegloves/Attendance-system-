@@ -2,7 +2,17 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, CopyPlus, Pencil, Printer, Send, Upload, X } from 'lucide-react';
+import {
+  Check,
+  CopyPlus,
+  Download,
+  FileText,
+  Pencil,
+  Printer,
+  Send,
+  Upload,
+  X,
+} from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { formatDateTime } from '@/lib/format.js';
 import { ACCEPTED_UPLOADS, readFileAsDataUrl } from '@/lib/readFile.js';
@@ -74,24 +84,50 @@ export function LetterScreen({ data, isOwn }) {
           subtitle={letter.subject}
           action={<Badge tone={status.tone}>{status.label}</Badge>}
         />
-        <div className="p-5 text-sm sm:p-8">
-          {rendered.missing.length > 0 && (
-            <p className="mb-4 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-              Still empty: the marked values. Fill them in with “Edit draft” (or on the employee’s
-              file) before issuing.
-            </p>
-          )}
-          <LetterBody text={rendered.text} highlightMissing={letter.status === 'draft'} />
-        </div>
+        {permissions.pdf ? (
+          // The offer letter in the founder's format: the real PDF file.
+          <iframe
+            key={letter.updatedAt}
+            src={`${base}/pdf`}
+            title={letterTitle(letter)}
+            className="h-[80vh] w-full rounded-b-xl border-0 bg-white"
+          />
+        ) : (
+          <div className="p-5 text-sm sm:p-8">
+            {rendered.missing.length > 0 && (
+              <p className="mb-4 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+                Still empty: the marked values. Fill them in with “Edit draft” (or on the employee’s
+                file) before issuing.
+              </p>
+            )}
+            <LetterBody text={rendered.text} highlightMissing={letter.status === 'draft'} />
+          </div>
+        )}
       </Card>
       <div className="space-y-4">
         <Card>
           <CardHeader title="Actions" />
           <div className="flex flex-col gap-2 p-4">
-            <ButtonLink variant="secondary" href={`/print/letters/${letter._id}`} target="_blank">
-              <Printer size={16} /> Print or save as PDF
-            </ButtonLink>
-            {permissions.edit && (
+            {permissions.pdf ? (
+              <>
+                <ButtonLink variant="secondary" href={`${base}/pdf`} target="_blank">
+                  <FileText size={16} /> Open PDF
+                </ButtonLink>
+                <ButtonLink variant="secondary" href={`${base}/pdf?download=1`}>
+                  <Download size={16} /> Download PDF
+                </ButtonLink>
+              </>
+            ) : (
+              <ButtonLink variant="secondary" href={`/print/letters/${letter._id}`} target="_blank">
+                <Printer size={16} /> Print or save as PDF
+              </ButtonLink>
+            )}
+            {permissions.edit && permissions.pdf && (
+              <ButtonLink variant="secondary" href={`/letters/${letter._id}/build`}>
+                <Pencil size={16} /> Edit draft
+              </ButtonLink>
+            )}
+            {permissions.edit && !permissions.pdf && (
               <Button variant="secondary" onClick={() => setDialog('edit')}>
                 <Pencil size={16} /> Edit draft
               </Button>

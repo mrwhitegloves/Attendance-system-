@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Printer, RefreshCcw, RotateCcw, Save } from 'lucide-react';
+import { Check, Download, FileText, RefreshCcw, RotateCcw, Save } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { formatDateTime, formatMonth, formatRupees } from '@/lib/format.js';
 import { ATTENDANCE_SUMMARY, DEDUCTIONS, EARNINGS } from '@/config/payslipFields.js';
@@ -140,8 +140,11 @@ export function PayslipEditor({ slip }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <ButtonLink variant="secondary" href={`/print/payslips/${slip._id}`} target="_blank">
-              <Printer size={16} /> Print / PDF
+            <ButtonLink variant="secondary" href={`/api/payslips/${slip._id}/pdf`} target="_blank">
+              <FileText size={16} /> Open PDF
+            </ButtonLink>
+            <ButtonLink variant="secondary" href={`/api/payslips/${slip._id}/pdf?download=1`}>
+              <Download size={16} /> Download PDF
             </ButtonLink>
             {editable && (
               <>

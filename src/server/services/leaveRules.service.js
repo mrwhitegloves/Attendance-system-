@@ -4,14 +4,13 @@ import { canSeeEmployee, requirePermission } from '../permissions/can.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { daysBetween } from '../lib/dates.js';
 import { recordAudit } from './audit.service.js';
+import { isWeeklyOff, weeklyOffWords } from '../../config/employeeOptions.js';
 
 // Holidays, comp-offs and the paid leave balance (founder, 2026-10-27).
 // - A holiday on a working day is a paid day for everyone.
-// - A comp-off: the employee worked on a Sunday; the day off taken in exchange is paid.
+// - A comp-off: the employee worked on their weekly off; the day off taken in exchange is paid.
 // - The paid leave balance: HR gives days at any time; an approved paid leave can be taken from it
 //   for a chosen month. The balance may go below zero (HR decides); screens show it in red.
-
-const isSunday = (day) => new Date(`${day}T00:00:00Z`).getUTCDay() === 0;
 
 // ---- Holidays (Settings → Holidays) ----
 
@@ -56,10 +55,10 @@ export async function removeHoliday(actor, id, { ip } = {}) {
   return { ok: true };
 }
 
-// ---- Comp-offs (worked a Sunday, a day off in exchange) ----
+// ---- Comp-offs (worked a weekly off, a day off in exchange) ----
 
 async function loadEmployee(actor, userId, permission) {
-  const user = await User.findById(userId, '_id name employeeId')
+  const user = await User.findById(userId, '_id name employeeId weeklyOffs')
     .lean()
     .catch(() => null);
   if (!user || !(await canSeeEmployee(actor, permission, user.employeeId)))
@@ -82,12 +81,19 @@ export async function listCompOffs(actor, userId) {
 export async function addCompOff(actor, userId, { workedOn, offOn, note }, { ip } = {}) {
   requirePermission(actor, 'leave.decide');
   const user = await loadEmployee(actor, userId, 'leave.decide');
-  if (!isSunday(workedOn)) throw createAppError(400, 'workedOn: choose the Sunday that was worked');
-  if (isSunday(offOn)) throw createAppError(400, 'offOn: the day off cannot be a Sunday');
+  if (!isWeeklyOff(user, workedOn)) {
+    throw createAppError(
+      400,
+      `workedOn: choose a weekly off day (${weeklyOffWords(user)}) that was worked`,
+    );
+  }
+  if (isWeeklyOff(user, offOn)) {
+    throw createAppError(400, 'offOn: the day off cannot be a weekly off');
+  }
   if (await Holiday.exists({ date: offOn }))
     throw createAppError(400, 'offOn: that day is already a holiday');
   if (await CompOff.exists({ userId: user._id, workedOn }))
-    throw createAppError(409, `A comp-off for the Sunday ${workedOn} already exists.`);
+    throw createAppError(409, `A comp-off for the day off ${workedOn} already exists.`);
   if (await CompOff.exists({ userId: user._id, offOn }))
     throw createAppError(409, `${offOn} is already a comp-off day.`);
   const compOff = await CompOff.create({
@@ -102,7 +108,7 @@ export async function addCompOff(actor, userId, { workedOn, offOn, note }, { ip 
     action: 'compoff.added',
     entity: 'compoff',
     entityId: user._id,
-    summary: `${user.name}: worked Sunday ${workedOn}, day off ${offOn}${note ? ` (${note})` : ''}`,
+    summary: `${user.name}: worked weekly off ${workedOn}, day off ${offOn}${note ? ` (${note})` : ''}`,
     ip,
   });
   return compOff.toObject();
@@ -120,7 +126,7 @@ export async function removeCompOff(actor, id, { ip } = {}) {
     action: 'compoff.removed',
     entity: 'compoff',
     entityId: compOff.userId,
-    summary: `Comp-off removed: Sunday ${compOff.workedOn}, day off ${compOff.offOn}`,
+    summary: `Comp-off removed: worked ${compOff.workedOn}, day off ${compOff.offOn}`,
     ip,
   });
   return { ok: true };
@@ -177,18 +183,20 @@ export async function adjustLeaveBalance(actor, userId, { days, month, reason },
   return getLeaveBalance(actor, userId);
 }
 
-/** Working days of a leave (Sundays and holidays are not taken from the balance). */
-export async function leaveWorkingDays(startDate, endDate) {
+/** Working days of a leave (weekly offs and holidays are not taken from the balance). */
+export async function leaveWorkingDays(startDate, endDate, person) {
   const holidays = new Set(
     (await holidaysBetween(startDate, endDate)).map((holiday) => holiday.date),
   );
-  return daysBetween(startDate, endDate).filter((day) => !isSunday(day) && !holidays.has(day))
-    .length;
+  return daysBetween(startDate, endDate).filter(
+    (day) => !isWeeklyOff(person, day) && !holidays.has(day),
+  ).length;
 }
 
 /** Takes an approved paid leave from the balance, once (the leave id is unique in the ledger). */
 export async function takeFromBalance(actor, leave, month) {
-  const days = await leaveWorkingDays(leave.startDate, leave.endDate);
+  const person = await User.findById(leave.userId, 'weeklyOffs').lean();
+  const days = await leaveWorkingDays(leave.startDate, leave.endDate, person);
   if (!days) return 0;
   await LeaveBalanceEntry.updateOne(
     { leaveRequestId: leave._id },

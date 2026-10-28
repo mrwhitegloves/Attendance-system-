@@ -47,6 +47,12 @@ const letterSchema = new mongoose.Schema(
     subject: { type: String, default: '' },
     // The template text while a draft; the final filled-in text once issued.
     body: { type: String, default: '' },
+    // 'text': a template with {{placeholders}} (body above). 'offer_format': the founder's offer
+    // letter format, edited as structured content and printed as a PDF (lib/offerLetter.js).
+    layout: { type: String, enum: ['text', 'offer_format'], default: 'text' },
+    content: { type: mongoose.Schema.Types.Mixed, default: null },
+    // Mr. White Gloves or EngenX: the header of the letter.
+    brandKey: { type: String, default: 'mwg' },
     // Values typed for this letter (CTC in paise, probation months, accept-by date …).
     fields: {
       ctcAnnualPaise: { type: Number, default: null },

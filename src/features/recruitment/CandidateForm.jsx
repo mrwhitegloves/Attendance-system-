@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { EMPLOYMENT_TYPE, WORK_MODE } from '@/config/employeeOptions.js';
+import { brandOptions } from '@/config/brands.js';
 import { Button, ButtonLink, Card, ErrorText } from '@/components/shared/ui.jsx';
 import { Field, inputClass, Select } from '@/components/shared/form.jsx';
 
@@ -14,6 +15,8 @@ const FIELDS = [
   'name',
   'email',
   'phone',
+  'address',
+  'brandKey',
   'designation',
   'department',
   'branch',
@@ -41,7 +44,9 @@ export function CandidateForm({
     Object.fromEntries(
       FIELDS.map((key) => [
         key,
-        candidate?.[key] ?? { staffType: 'Office Staff', roleKey: 'employee' }[key] ?? '',
+        candidate?.[key] ??
+          { staffType: 'Office Staff', roleKey: 'employee', brandKey: 'mwg' }[key] ??
+          '',
       ]),
     ),
   );
@@ -96,6 +101,10 @@ export function CandidateForm({
           {input('name', 'Full name', { required: true, minLength: 2, maxLength: 100 })}
           {input('phone', 'Mobile', { type: 'tel', maxLength: 20 })}
           {input('email', 'Email', { type: 'email' })}
+          {input('address', 'City and state (on the offer letter)', {
+            maxLength: 300,
+            placeholder: 'Jamshedpur, Jharkhand',
+          })}
           {input('source', 'Came through (optional)', {
             maxLength: 80,
             placeholder: 'Referral, job portal…',
@@ -103,6 +112,7 @@ export function CandidateForm({
         </section>
         <section className="grid gap-4 sm:grid-cols-2">
           <h2 className="text-sm font-semibold sm:col-span-2">The job offered</h2>
+          {select('brandKey', 'Company (offer letter format)', brandOptions)}
           {select('designation', 'Designation', fromList('designation'))}
           {select('department', 'Department', fromList('department'))}
           {select('branch', 'Branch', fromList('branch'))}

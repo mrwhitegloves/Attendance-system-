@@ -23,6 +23,7 @@ import {
   RETURN_STATUSES,
 } from '../../config/assetOptions.js';
 import { CANDIDATE_STATUSES, DROP_REASONS } from '../../config/recruitmentOptions.js';
+import { BRAND_KEYS } from '../../config/brands.js';
 import { EXIT_STATUSES, EXIT_TYPES } from '../../config/exitOptions.js';
 import { PLAN_OUTCOMES, REVIEW_KINDS, REVIEW_STATUSES } from '../../config/performanceOptions.js';
 
@@ -78,6 +79,9 @@ const profileFields = {
   probationEndDate: optionalDay,
   expectedInTime: clock,
   expectedOutTime: clock,
+  brandKey: z.enum(BRAND_KEYS),
+  // Weekly days off: 0 = Sunday … 6 = Saturday (at most two).
+  weeklyOffs: z.array(z.number().int().min(0).max(6)).max(2),
   // Checked against the roles in use by the employee service.
   roleKey: text(40).min(1),
   managerId: z.union([objectId, z.literal(''), z.null()]),
@@ -341,8 +345,18 @@ export const updateTemplateBody = z
     active: z.boolean().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, 'nothing to change');
+const brandWords = z.strictObject({
+  name: text(80).optional(),
+  website: text(120).optional(),
+  email: email.optional(),
+  tagline: text(80).optional(),
+});
+
 export const companyBody = z.strictObject({
   name: text(120).optional(),
+  shortName: text(120).optional(),
+  cin: text(30).optional(),
+  brands: z.partialRecord(z.enum(BRAND_KEYS), brandWords).optional(),
   brandName: text(80).optional(),
   tagline: text(80).optional(),
   gstNumber: z
@@ -552,6 +566,7 @@ const candidateFields = {
   name,
   email: profileFields.email,
   phone: profileFields.phone,
+  address: text(300),
   designation: profileFields.designation,
   department: profileFields.department,
   branch: profileFields.branch,
@@ -560,6 +575,7 @@ const candidateFields = {
   workMode: profileFields.workMode,
   managerId: profileFields.managerId,
   roleKey: profileFields.roleKey,
+  brandKey: profileFields.brandKey,
   expectedJoiningDate: optionalDay,
   source: text(80),
   note: text(1000),
@@ -679,4 +695,54 @@ export const listReviewsQuery = z.object({
   kind: z.enum(Object.keys(REVIEW_KINDS)).optional().catch(undefined),
   status: z.enum(REVIEW_STATUSES).optional().catch(undefined),
   page,
+});
+
+// ---- Offer letter in the founder's format (structured content) ----
+
+const richText = (max) => z.string().trim().max(max);
+const offerSection = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('table'),
+    title: text(80).min(1, 'write the section title'),
+    rows: z.array(z.strictObject({ label: text(80), value: richText(500) })).max(20),
+  }),
+  z.strictObject({
+    type: z.literal('bullets'),
+    title: text(80).min(1, 'write the section title'),
+    items: z.array(richText(600)).max(30),
+  }),
+  z.strictObject({
+    type: z.literal('paragraphs'),
+    title: text(80).min(1, 'write the section title'),
+    paragraphs: z.array(richText(3000)).max(10),
+  }),
+  z.strictObject({
+    type: z.literal('terms'),
+    title: text(80).min(1, 'write the section title'),
+    items: z.array(z.strictObject({ title: text(120), text: richText(3000) })).max(20),
+  }),
+]);
+
+export const offerContentBody = z.strictObject({
+  toName: text(120),
+  toAddress: text(300),
+  date: day,
+  subject: text(200),
+  salutation: text(120),
+  intro: richText(3000),
+  sections: z.array(offerSection).max(12),
+  closing: z.array(richText(3000)).max(6),
+  signOff: z.strictObject({
+    greeting: text(80),
+    forLine: text(150),
+    name: text(100),
+    title: text(150),
+    showStamp: z.boolean(),
+  }),
+  acceptance: z.strictObject({ show: z.boolean(), text: richText(3000), name: text(120) }),
+});
+
+export const offerLetterBody = z.strictObject({
+  content: offerContentBody,
+  brandKey: z.enum(BRAND_KEYS).optional(),
 });

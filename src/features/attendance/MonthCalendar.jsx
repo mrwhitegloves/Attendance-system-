@@ -36,11 +36,18 @@ export function MonthCalendar({ calendar }) {
 
   return (
     <div className={`space-y-4 ${isPending ? 'opacity-60' : ''}`}>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <StatTile label="Present days" value={calendar.totals.present} tone="success" />
         <StatTile label="Late days" value={calendar.totals.late} tone="warning" />
         <StatTile label="Leave days" value={calendar.totals.leave} tone="info" />
         <StatTile label="Absent days" value={calendar.totals.absent} tone="danger" />
+        <StatTile
+          label="Overtime this month"
+          value={
+            calendar.totals.overtimeMinutes ? formatMinutes(calendar.totals.overtimeMinutes) : '—'
+          }
+          hint="Not paid; for information"
+        />
       </div>
       <Card className="p-3 sm:p-4">
         <div className="mb-3 flex items-center justify-between">

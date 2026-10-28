@@ -18,7 +18,7 @@ import { makeUser } from './helpers.js';
 const NOW = new Date('2026-12-05T12:00:00+05:30');
 
 describe('holidays and comp-offs are paid days', () => {
-  it('a holiday and a comp-off day cost nothing; the Sunday worked is shown', async () => {
+  it('a holiday and a comp-off day cost nothing; the weekly off worked (Sunday by default) is shown', async () => {
     const hr = await makeUser({ roleKey: 'hr_admin' });
     const staff = await makeUser();
     await addHoliday(hr, { date: '2026-11-09', name: 'Diwali', kind: 'festival' });
@@ -36,15 +36,18 @@ describe('holidays and comp-offs are paid days', () => {
     const days = await buildMonthDays(staff, '2026-11', NOW);
     const on = (date) => days.find((day) => day.date === date);
     expect(on('2026-11-09')).toMatchObject({ countedAs: 'holiday', holiday: 'Diwali' });
-    expect(on('2026-11-15')).toMatchObject({ countedAs: 'sundayWorked', compOffOn: '2026-11-16' });
+    expect(on('2026-11-15')).toMatchObject({
+      countedAs: 'weeklyOffWorked',
+      compOffOn: '2026-11-16',
+    });
     expect(on('2026-11-16')).toMatchObject({ countedAs: 'compOff', compOffFor: '2026-11-15' });
     const result = calculateMonth({ days, monthlyGrossPaise: 3000000, calendarDays: 30 });
-    expect(result).toMatchObject({ holidayDays: 1, compOffDays: 1, sundaysWorked: 1 });
+    expect(result).toMatchObject({ holidayDays: 1, compOffDays: 1, weeklyOffsWorked: 1 });
     // Every other working day of November has no punch: absent. Holiday and comp-off are not.
     expect(result.absentDays).toBe(result.workingDays - 2);
   });
 
-  it('a comp-off needs a Sunday worked and a weekday off, each used once', async () => {
+  it('a comp-off needs a weekly off worked and a working day off, each used once', async () => {
     const hr = await makeUser({ roleKey: 'hr_admin' });
     const staff = await makeUser();
     await expect(

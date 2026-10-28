@@ -12,7 +12,9 @@ import {
   placeholderValues,
 } from '../lib/letterText.js';
 import { recordAudit } from './audit.service.js';
-import { getCompany } from './settings.service.js';
+import { defaultOfferContent, offerContentText } from '../lib/offerLetter.js';
+import { brandKeyOf } from '../../config/brands.js';
+import { brandFor, getCompany } from './settings.service.js';
 import { uploadDocument } from './documents.service.js';
 import { notifyUsers } from './push.service.js';
 
@@ -106,6 +108,8 @@ async function loadLetter(actor, id) {
 /** The letter text as it is now: frozen once issued, a preview with today's date while a draft. */
 async function render(letter, employee) {
   if (letter.status !== 'draft') return { text: letter.body, missing: [] };
+  if (letter.layout === 'offer_format')
+    return { text: offerContentText(letter.content), missing: [] };
   const company = await getCompany();
   return fillTemplate(
     letter.body,
@@ -126,6 +130,11 @@ async function letterPerson(letter) {
     department: candidate.department,
     branch: candidate.branch,
     joiningDate: candidate.expectedJoiningDate,
+    expectedJoiningDate: candidate.expectedJoiningDate,
+    address: candidate.address,
+    workMode: candidate.workMode,
+    managerId: candidate.managerId,
+    brandKey: candidate.brandKey,
   };
 }
 
@@ -151,10 +160,12 @@ export async function getLetter(actor, id) {
   const rendered = await render(letter, employee);
   const isOwner = Boolean(letter.userId) && String(letter.userId) === String(actor._id);
   const manage = Boolean(can(actor, 'letters.manage'));
+  const company = await getCompany();
   return {
     letter,
     rendered,
-    company: await getCompany(),
+    company,
+    brand: brandFor(company, { brandKey: letter.brandKey }),
     employee: {
       _id: employee._id,
       candidateId: employee.candidateId ?? null,
@@ -165,6 +176,7 @@ export async function getLetter(actor, id) {
     permissions: {
       manage,
       edit: manage && letter.status === 'draft',
+      pdf: letter.layout === 'offer_format',
       issue: manage && letter.status === 'draft',
       respond: letter.status === 'issued' && (isOwner || manage),
       reissue: manage && ['issued', 'accepted', 'declined'].includes(letter.status),
@@ -375,6 +387,9 @@ export async function addSignedCopy(actor, id, { file, fileName }, { ip } = {}) 
 export async function reissueLetter(actor, id, { ip } = {}) {
   requirePermission(actor, 'letters.manage');
   const letter = await loadLetter(actor, id);
+  if (letter.layout === 'offer_format') {
+    return createOfferLetter(actor, sameOwner(letter), { content: letter.content, ip });
+  }
   const template = letter.templateId
     ? await LetterTemplate.findById(letter.templateId).lean()
     : null;
@@ -384,4 +399,84 @@ export async function reissueLetter(actor, id, { ip } = {}) {
   return letter.userId
     ? createLetter(actor, letter.userId, input, { ip })
     : createCandidateLetter(actor, letter.candidateId, input, { ip });
+}
+
+// ---- Offer letters in the founder's format (structured content, PDF) ----
+
+/**
+ * A new offer letter draft in the founder's format, filled from the candidate or employee
+ * (or copied from an older version when `content` is given).
+ * @param {{ candidateId?: any, userId?: any }} owner
+ */
+export async function createOfferLetter(actor, owner, { content = null, ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  let person;
+  let ownerFields;
+  let ownerLabel;
+  if (owner.candidateId) {
+    requirePermission(actor, 'recruitment.manage');
+    const candidate = await Candidate.findById(owner.candidateId)
+      .lean()
+      .catch(() => null);
+    if (!candidate) throw notFound('Candidate');
+    if (candidate.status !== 'open') throw createAppError(409, 'This candidate is not open.');
+    person = await letterPerson({ candidateId: candidate._id });
+    ownerFields = { candidateId: candidate._id };
+    ownerLabel = `candidate ${candidate.name}`;
+  } else {
+    const user = await loadEmployee(actor, owner.userId, 'letters.view');
+    person = user;
+    ownerFields = { userId: user._id, employeeId: user.employeeId };
+    ownerLabel = `${user.name} (${user.employeeId})`;
+  }
+  const company = await getCompany();
+  const manager = person.managerId ? await User.findById(person.managerId, 'name').lean() : null;
+  const last = await Letter.findOne({ ...ownerFields, kind: 'offer' }, 'version')
+    .sort({ version: -1 })
+    .lean();
+  const letter = await Letter.create({
+    ...ownerFields,
+    kind: 'offer',
+    layout: 'offer_format',
+    brandKey: brandKeyOf(person),
+    version: (last?.version ?? 0) + 1,
+    subject: 'Offer of employment',
+    content:
+      content ??
+      defaultOfferContent({ person, company, managerName: manager?.name ?? '', today: indiaDay() }),
+    createdBy: actor._id,
+  });
+  await recordAudit(actor, {
+    action: 'letter.drafted',
+    entity: 'letter',
+    entityId: letter._id,
+    summary: `Offer letter v${letter.version} (format) drafted for ${ownerLabel}`,
+    ip,
+  });
+  return letter.toObject();
+}
+
+/** Saves the edited content of an offer letter draft. */
+export async function saveOfferContent(actor, id, { content, brandKey }, { ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  const letter = await loadLetter(actor, id);
+  if (letter.layout !== 'offer_format')
+    throw createAppError(400, 'This letter is not in the offer format.');
+  if (letter.status !== 'draft') {
+    throw createAppError(409, 'Only a draft can be changed. Make a new version instead.');
+  }
+  const set = { content, subject: content.subject.slice(0, 200) };
+  if (brandKey) set.brandKey = brandKey;
+  const saved = await Letter.updateOne({ _id: id, status: 'draft' }, { $set: set });
+  if (!saved.modifiedCount && !saved.matchedCount) {
+    throw createAppError(409, 'This letter was just issued by someone else.');
+  }
+  await recordAudit(actor, {
+    action: 'letter.edited',
+    entity: 'letter',
+    entityId: id,
+    summary: `Offer letter v${letter.version} draft edited`,
+    ip,
+  });
+  return getLetter(actor, id);
 }

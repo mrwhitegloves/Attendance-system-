@@ -16,6 +16,9 @@ const COUNTED = {
   absent: { label: 'Absent', tone: 'danger' },
   holiday: { label: 'Holiday (paid)', tone: 'info' },
   compOff: { label: 'Comp-off (paid)', tone: 'info' },
+  weeklyOff: { label: 'Weekly off', tone: 'neutral' },
+  weeklyOffWorked: { label: 'Weekly off worked', tone: 'brand' },
+  // Slips filled before weekly offs existed.
   sunday: { label: 'Sunday', tone: 'neutral' },
   sundayWorked: { label: 'Sunday worked', tone: 'brand' },
   future: { label: 'Not yet', tone: 'neutral' },
@@ -24,7 +27,7 @@ const COUNTED = {
 /** The last column: holiday name, comp-off link, or place and remark. */
 function placeText(day) {
   if (day.holiday) return day.holiday;
-  if (day.compOffFor) return `Day off for Sunday ${formatDayName(day.compOffFor)}`;
+  if (day.compOffFor) return `Day off for ${formatDayName(day.compOffFor)}`;
   if (day.compOffOn) return `Comp-off on ${formatDayName(day.compOffOn)}`;
   return day.punchIn?.location || day.remark || '—';
 }
@@ -63,7 +66,7 @@ export function MonthAttendance({ data, slipAttendance, expectedInTime }) {
     slipAttendance.halfDays !== calculation.halfDays;
 
   const facts = [
-    ['Working days (no Sundays)', calculation.workingDays],
+    ['Working days (no weekly offs)', calculation.workingDays],
     ['Full days', calculation.fullDays],
     [
       `Half days (first 3 free)`,
@@ -72,7 +75,7 @@ export function MonthAttendance({ data, slipAttendance, expectedInTime }) {
     ['Paid leave', calculation.paidLeaveDays],
     ['Holidays (paid)', calculation.holidayDays ?? 0],
     ['Comp-off days (paid)', calculation.compOffDays ?? 0],
-    ['Sundays worked', calculation.sundaysWorked ?? 0],
+    ['Weekly offs worked', calculation.weeklyOffsWorked ?? calculation.sundaysWorked ?? 0],
     ['Unpaid leave', calculation.unpaidLeaveDays],
     ['Absent', calculation.absentDays],
     ['One day of salary', formatRupees(calculation.perDayPaise)],
@@ -124,7 +127,12 @@ export function MonthAttendance({ data, slipAttendance, expectedInTime }) {
                 {days.map((day) => {
                   const counted = COUNTED[day.countedAs];
                   return (
-                    <tr key={day.date} className={day.countedAs === 'sunday' ? 'bg-raised/60' : ''}>
+                    <tr
+                      key={day.date}
+                      className={
+                        ['weeklyOff', 'sunday'].includes(day.countedAs) ? 'bg-raised/60' : ''
+                      }
+                    >
                       <td className="whitespace-nowrap px-4 py-2">{formatDayName(day.date)}</td>
                       <td className="px-2 py-2">
                         <Badge tone={counted.tone}>{counted.label}</Badge>

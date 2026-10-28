@@ -14,7 +14,7 @@ const days = (counts) =>
 describe('salary rules from attendance (founder, 2026-10-27)', () => {
   it('one day = monthly salary ÷ days in the month (30 days: ₹900)', () => {
     const result = calculateMonth({
-      days: days({ full: 25, unpaidLeave: 1, sunday: 4 }),
+      days: days({ full: 25, unpaidLeave: 1, weeklyOff: 4 }),
       monthlyGrossPaise: paise(27000),
       calendarDays: 30,
     });
@@ -25,7 +25,7 @@ describe('salary rules from attendance (founder, 2026-10-27)', () => {
 
   it('a 31-day month: one day is ₹870.97', () => {
     const result = calculateMonth({
-      days: days({ full: 26, unpaidLeave: 1, sunday: 4 }),
+      days: days({ full: 26, unpaidLeave: 1, weeklyOff: 4 }),
       monthlyGrossPaise: paise(27000),
       calendarDays: 31,
     });
@@ -66,7 +66,7 @@ describe('salary rules from attendance (founder, 2026-10-27)', () => {
 
   it('days after today are not counted', () => {
     const result = calculateMonth({
-      days: days({ full: 10, future: 16, sunday: 4 }),
+      days: days({ full: 10, future: 16, weeklyOff: 4 }),
       monthlyGrossPaise: paise(27000),
       calendarDays: 30,
     });
@@ -75,7 +75,7 @@ describe('salary rules from attendance (founder, 2026-10-27)', () => {
 });
 
 describe('how each day of a month is counted', () => {
-  it('Sundays off, late is a half day, approved leave carries paid or unpaid', async () => {
+  it('weekly offs (Sunday by default), late is a half day, approved leave carries paid or unpaid', async () => {
     const hr = await makeUser({ roleKey: 'hr_admin' });
     const staff = await makeUser();
     await Attendance.create([
@@ -106,8 +106,8 @@ describe('how each day of a month is counted', () => {
     expect(on('2026-09-03')).toBe('paidLeave');
     expect(on('2026-09-04')).toBe('unpaidLeave');
     expect(on('2026-09-05')).toBe('absent');
-    // A punch on a Sunday is shown as Sunday worked (HR can give a comp-off for it).
-    expect(on('2026-09-06')).toBe('sundayWorked');
+    // A punch on the weekly off is shown as weekly off worked (HR can give a comp-off for it).
+    expect(on('2026-09-06')).toBe('weeklyOffWorked');
     expect(month.find((day) => day.date === '2026-09-01').punchIn.time).toBe('09:20 AM');
   });
 });

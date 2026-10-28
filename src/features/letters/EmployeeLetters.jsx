@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { FileText, Plus } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { formatDateTime } from '@/lib/format.js';
 import { Badge, Button, Card, ErrorText } from '@/components/shared/ui.jsx';
@@ -22,13 +22,35 @@ export function EmployeeLetters({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  // An offer letter in the company's own format (MWG / EngenX), edited on its own screen.
+  const newOffer = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const { letter } = await apiFetch(offerUrl, { method: 'POST' });
+      router.push(`/letters/${letter._id}/build`);
+    } catch (failure) {
+      setError(failure.message);
+      setBusy(false);
+    }
+  };
   return (
     <>
       {data.canManage && (
-        <div className="mb-3 flex justify-end">
-          <Button onClick={() => setOpen(true)} disabled={!templates.length}>
-            <Plus size={16} /> New letter
+        <div className="mb-3 flex flex-wrap justify-end gap-2">
+          <Button onClick={newOffer} disabled={busy}>
+            <FileText size={16} /> New offer letter
           </Button>
+          <Button variant="secondary" onClick={() => setOpen(true)} disabled={!templates.length}>
+            <Plus size={16} /> Letter from a template
+          </Button>
+        </div>
+      )}
+      {error && (
+        <div className="mb-3">
+          <ErrorText>{error}</ErrorText>
         </div>
       )}
       <Card>
