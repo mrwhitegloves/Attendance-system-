@@ -8,6 +8,8 @@ import { Migration } from '../src/server/models/system.models.js';
 await connectDb();
 if (process.argv[2] === 'status') {
   const done = new Set((await Migration.find({}, 'name').lean()).map((row) => row.name));
+  if (await Migration.exists({ name: '__lock' }))
+    console.log('Migrations are running right now on another server (lock row present).');
   for (const migration of MIGRATIONS)
     console.log(done.has(migration.name) ? 'done   ' : 'pending', migration.name);
 } else {

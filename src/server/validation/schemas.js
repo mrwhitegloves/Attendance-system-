@@ -261,7 +261,7 @@ export const kycDetailsBody = {
   }),
 };
 export const fileBody = z.strictObject({
-  file: z.string().max(7_200_000, 'the file is larger than 5 MB'),
+  file: z.string().max(4_300_000, 'the file is larger than 3 MB'),
   fileName: text(120).optional().default(''),
 });
 export const kycReviewBody = z.strictObject({
@@ -290,7 +290,7 @@ export const updateDocumentTypeBody = z
   .refine((value) => Object.keys(value).length > 0, 'nothing to change');
 export const uploadDocumentBody = z.strictObject({
   typeId: objectId,
-  file: z.string().max(7_200_000, 'the file is larger than 5 MB'),
+  file: z.string().max(4_300_000, 'the file is larger than 3 MB'),
   fileName: text(120).optional().default(''),
   expiresOn: optionalDay.optional().default(''),
   signed: z.boolean().optional().default(false),
@@ -510,7 +510,7 @@ export const requestBody = z.strictObject({
   // Rupees; stored as paise.
   amount: z.coerce.number().positive('enter the amount').max(1000000).multipleOf(0.01).optional(),
   date: day.optional(),
-  file: z.string().max(7_200_000, 'the file is larger than 5 MB').optional(),
+  file: z.string().max(4_300_000, 'the file is larger than 3 MB').optional(),
   fileName: text(120).optional(),
 });
 
@@ -787,7 +787,7 @@ export const bankFileQuery = z.object({ month });
 // ---- Salary import from an Excel sheet ----
 
 export const salaryImportBody = z.strictObject({
-  file: z.string().max(7_200_000, 'the file is larger than 5 MB'),
+  file: z.string().max(4_300_000, 'the file is larger than 3 MB'),
   effectiveFrom: day,
   reason: text(300).min(3, 'write the reason (for example: salaries at the start)'),
 });

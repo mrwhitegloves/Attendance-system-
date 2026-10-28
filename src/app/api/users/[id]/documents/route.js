@@ -3,7 +3,7 @@ import { uploadDocumentBody } from '@/server/validation/schemas.js';
 import { getEmployeeDocuments, uploadDocument } from '@/server/services/documents.service.js';
 
 // GET /api/users/:id/documents — the catalogue with this employee's documents.
-// POST — upload a new version (PDF or photo, at most 5 MB).
+// POST — upload a new version (PDF or photo, at most 3 MB).
 export const GET = withApi({ permission: 'documents.view' }, ({ user, params }) =>
   getEmployeeDocuments(user, params.id),
 );

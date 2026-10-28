@@ -163,7 +163,7 @@ function UploadDialog({ userId, type, onClose }) {
   return (
     <Dialog open onClose={onClose} title={`Upload: ${type.name}`}>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="File (PDF or photo, at most 5 MB)" htmlFor="doc-file">
+        <Field label="File (PDF or photo, at most 3 MB)" htmlFor="doc-file">
           <input
             id="doc-file"
             type="file"

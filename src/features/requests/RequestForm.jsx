@@ -183,7 +183,7 @@ export function RequestForm({ initialKind }) {
         <Field
           label={form.kind === 'expense' ? 'Bill or receipt (PDF or photo)' : 'File (optional)'}
           htmlFor="request-file"
-          hint="At most 5 MB."
+          hint="At most 3 MB."
         >
           <input
             id="request-file"

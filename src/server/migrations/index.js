@@ -121,14 +121,42 @@ export const MIGRATIONS = [
   },
 ];
 
+// On Vercel several servers can start at the same moment. Only the one that writes this row
+// runs the migrations; the others skip. A row older than LOCK_MINUTES is left over from a
+// crashed start and is taken over.
+const LOCK_NAME = '__lock';
+const LOCK_MINUTES = 10;
+
+async function takeLock() {
+  await Migration.deleteOne({
+    name: LOCK_NAME,
+    ranAt: { $lt: new Date(Date.now() - LOCK_MINUTES * 60 * 1000) },
+  });
+  try {
+    await Migration.create({ name: LOCK_NAME });
+    return true;
+  } catch (error) {
+    if (error.code === 11000) return false;
+    throw error;
+  }
+}
+
 export async function runMigrations() {
   const done = new Set((await Migration.find({}, 'name').lean()).map((row) => row.name));
+  if (MIGRATIONS.every((migration) => done.has(migration.name))) return [];
+  await Migration.init(); // the unique index on name must exist before the lock relies on it
+  if (!(await takeLock())) return [];
   const ran = [];
-  for (const migration of MIGRATIONS) {
-    if (done.has(migration.name)) continue;
-    await migration.up();
-    await Migration.create({ name: migration.name });
-    ran.push(migration.name);
+  try {
+    const doneNow = new Set((await Migration.find({}, 'name').lean()).map((row) => row.name));
+    for (const migration of MIGRATIONS) {
+      if (doneNow.has(migration.name)) continue;
+      await migration.up();
+      await Migration.create({ name: migration.name });
+      ran.push(migration.name);
+    }
+  } finally {
+    await Migration.deleteOne({ name: LOCK_NAME });
   }
   return ran;
 }

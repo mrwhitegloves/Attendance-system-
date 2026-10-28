@@ -1,9 +1,9 @@
 import { createAppError } from './errors.js';
 
 // Uploaded files arrive as data URLs ("data:application/pdf;base64,…"). Only these kinds are
-// accepted, at most 5 MB.
+// accepted, at most 3 MB: Vercel refuses requests over 4.5 MB, and base64 adds a third.
 
-export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+export const MAX_FILE_BYTES = 3 * 1024 * 1024;
 
 const KINDS = {
   'application/pdf': 'pdf',
@@ -21,7 +21,7 @@ export function decodeFileDataUrl(dataUrl) {
     throw createAppError(400, 'Please choose a PDF or a photo (JPG, PNG, WebP).');
   const bytes = Buffer.from(data || '', 'base64');
   if (!bytes.length) throw createAppError(400, 'The file is empty.');
-  if (bytes.length > MAX_FILE_BYTES) throw createAppError(413, 'The file is larger than 5 MB.');
+  if (bytes.length > MAX_FILE_BYTES) throw createAppError(413, 'The file is larger than 3 MB.');
   return { bytes, contentType, extension: KINDS[contentType] };
 }
 

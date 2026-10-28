@@ -2,6 +2,7 @@ import { readSheet } from 'read-excel-file/node';
 import { User } from '../models/user.model.js';
 import { requirePermission } from '../permissions/can.js';
 import { createAppError } from '../lib/errors.js';
+import { MAX_FILE_BYTES } from '../lib/files.js';
 import { toCsv } from '../lib/csv.js';
 import { recordAudit } from './audit.service.js';
 import { proposeSalary } from './salary.service.js';
@@ -37,7 +38,7 @@ async function readRows(dataUrl) {
   if (contentType !== XLSX) throw createAppError(400, 'Please choose an Excel file (.xlsx).');
   const bytes = Buffer.from(data || '', 'base64');
   if (!bytes.length) throw createAppError(400, 'The file is empty.');
-  if (bytes.length > 5 * 1024 * 1024) throw createAppError(413, 'The file is larger than 5 MB.');
+  if (bytes.length > MAX_FILE_BYTES) throw createAppError(413, 'The file is larger than 3 MB.');
   const rows = await readSheet(bytes).catch(() => {
     throw createAppError(400, 'This file could not be read as an Excel sheet.');
   });
