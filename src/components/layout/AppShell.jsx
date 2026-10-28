@@ -7,6 +7,7 @@ import { useState } from 'react';
 import {
   Camera,
   CalendarCheck,
+  FileBarChart,
   FolderOpen,
   Inbox,
   IndianRupee,
@@ -35,6 +36,7 @@ import { SessionWatch } from '@/features/auth/SessionWatch.jsx';
 const ICONS = {
   Camera,
   CalendarCheck,
+  FileBarChart,
   FolderOpen,
   Inbox,
   IndianRupee,

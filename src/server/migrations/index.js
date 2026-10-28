@@ -114,6 +114,11 @@ export const MIGRATIONS = [
       );
     },
   },
+  {
+    name: '016-report-permission',
+    // Reports: the new permission reaches roles already in the database.
+    up: () => addMissingDefaultPermissions(['reports.export']),
+  },
 ];
 
 export async function runMigrations() {

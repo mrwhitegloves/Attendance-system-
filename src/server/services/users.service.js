@@ -303,6 +303,7 @@ export function permissionsOf(user) {
     recruitment: Boolean(can(user, 'recruitment.view')),
     exits: can(user, 'exits.view'),
     performance: can(user, 'performance.view'),
+    reports: Boolean(can(user, 'reports.export')),
     payouts: Boolean(can(user, 'payouts.manage') || can(user, 'payouts.approve')),
     performanceManage: can(user, 'performance.manage'),
   };

@@ -60,6 +60,7 @@ export const NAVIGATION = [
   { href: '/performance', label: 'Performance', icon: 'TrendingUp', show: (p) => p.performance },
   { href: '/assets', label: 'Assets', icon: 'Laptop', show: (p) => p.assets },
   { href: '/payouts', label: 'Salary payments', icon: 'Wallet', show: (p) => p.payouts },
+  { href: '/reports', label: 'Reports', icon: 'FileBarChart', show: (p) => p.reports },
   { href: '/audit-log', label: 'Audit log', icon: 'ScrollText', show: (p) => p.audit },
   { href: '/settings', label: 'Settings', icon: 'Settings', show: (p) => p.settings },
   { href: '/me', label: 'My profile', icon: 'UserRound', show: () => true },

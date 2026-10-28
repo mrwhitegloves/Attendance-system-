@@ -811,3 +811,10 @@ export const saveSettlementBody = z.strictObject({
     )
     .max(30),
 });
+
+// ---- Reports ----
+
+export const reportQuery = z.object({
+  ...dateRange,
+  month: month.optional().catch(undefined),
+});

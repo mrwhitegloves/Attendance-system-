@@ -43,6 +43,7 @@ export const PERMISSIONS = {
   'assets.manage': 'Add assets, hand them over and take them back',
   'payouts.approve': 'Approve salary payouts (CEO; never your own)',
   'payouts.manage': 'Record salary payments and download the bank upload file',
+  'reports.export': 'Download reports (CSV); each report also needs the full view of its data',
   'notifications.punches': 'Get a notification for every punch',
   'notifications.broadcast': 'Send a notification to all employees',
   'settings.manage': 'Change settings, lists, document types and templates',
@@ -101,6 +102,7 @@ export const DEFAULT_ROLES = {
       'assets.view': 'all',
       'exits.view': 'all',
       'payouts.manage': true,
+      'reports.export': true,
     },
   },
   manager: {
