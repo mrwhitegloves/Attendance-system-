@@ -1,0 +1,482 @@
+import { LETTER_KINDS, Letter, LetterTemplate } from '../models/letter.model.js';
+import { DocumentType } from '../models/document.model.js';
+import { User } from '../models/user.model.js';
+import { Candidate } from '../models/candidate.model.js';
+import { can, canSeeEmployee, requirePermission } from '../permissions/can.js';
+import { createAppError, notFound } from '../lib/errors.js';
+import { indiaDay } from '../lib/dates.js';
+import {
+  DEFAULT_TEMPLATES,
+  PLACEHOLDERS,
+  fillTemplate,
+  placeholderValues,
+} from '../lib/letterText.js';
+import { recordAudit } from './audit.service.js';
+import { defaultOfferContent, offerContentText } from '../lib/offerLetter.js';
+import { brandKeyOf } from '../../config/brands.js';
+import { brandFor, getCompany } from './settings.service.js';
+import { uploadDocument } from './documents.service.js';
+import { notifyUsers } from './push.service.js';
+
+// Letters (CEO spec section 4, offer letter lifecycle). Rules:
+// - a letter starts as a draft from a template; only a draft can change;
+// - issuing fills every placeholder (refused while any is empty) and freezes the text;
+// - a new version of the same kind supersedes the older letters (they are kept);
+// - the employee accepts or declines in the app, or HR records it (a signed copy counts as acceptance);
+// - a signed copy is stored once, as the matching employee document;
+// - a candidate's offer letter is seen by recruitment people only; HR records the reply; it
+//   moves to the employee when the candidate joins (recruitment.service).
+
+const SIGNED_COPY_TYPE = {
+  offer: 'Offer letter (signed)',
+  appointment: 'Appointment letter (signed)',
+  salary_revision: 'Salary revision letter',
+  relieving: 'Relieving letter',
+  experience: 'Experience letter',
+};
+
+// ---- Templates (Settings → Letter templates) ----
+
+/** Templates in the order of an employee's life: offer, appointment, … */
+export async function listTemplates({ includeInactive = false } = {}) {
+  const order = Object.keys(LETTER_KINDS);
+  const templates = await LetterTemplate.find(includeInactive ? {} : { active: true }).lean();
+  return templates.sort(
+    (a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || a.name.localeCompare(b.name),
+  );
+}
+
+export async function addTemplate(actor, input, { ip } = {}) {
+  requirePermission(actor, 'settings.manage');
+  const template = await LetterTemplate.create(input);
+  await recordAudit(actor, {
+    action: 'letter_template.added',
+    entity: 'letter_template',
+    entityId: template._id,
+    summary: template.name,
+    ip,
+  });
+  return template.toObject();
+}
+
+export async function updateTemplate(actor, id, input, { ip } = {}) {
+  requirePermission(actor, 'settings.manage');
+  const template = await LetterTemplate.findByIdAndUpdate(id, input, { returnDocument: 'after' })
+    .lean()
+    .catch(() => null);
+  if (!template) throw notFound('Template');
+  await recordAudit(actor, {
+    action: 'letter_template.updated',
+    entity: 'letter_template',
+    entityId: id,
+    summary: template.name,
+    ip,
+  });
+  return template;
+}
+
+export async function seedLetterTemplates() {
+  if (await LetterTemplate.exists({})) return;
+  await LetterTemplate.insertMany(DEFAULT_TEMPLATES);
+}
+
+// ---- Letters ----
+
+async function loadEmployee(actor, userId, permission) {
+  const user = await User.findById(userId)
+    .lean()
+    .catch(() => null);
+  if (!user || !(await canSeeEmployee(actor, permission, user.employeeId)))
+    throw notFound('Employee');
+  return user;
+}
+
+async function loadLetter(actor, id) {
+  const letter = await Letter.findById(id)
+    .lean()
+    .catch(() => null);
+  if (!letter) throw notFound('Letter');
+  const visible = letter.userId
+    ? await canSeeEmployee(actor, 'letters.view', letter.employeeId)
+    : Boolean(can(actor, 'recruitment.view'));
+  if (!visible) throw notFound('Letter');
+  // A draft is HR's work in progress: only people who prepare letters see it.
+  if (letter.status === 'draft' && !can(actor, 'letters.manage')) throw notFound('Letter');
+  return letter;
+}
+
+/** The letter text as it is now: frozen once issued, a preview with today's date while a draft. */
+async function render(letter, employee) {
+  if (letter.status !== 'draft') return { text: letter.body, missing: [] };
+  if (letter.layout === 'offer_format')
+    return { text: offerContentText(letter.content), missing: [] };
+  const company = await getCompany();
+  return fillTemplate(
+    letter.body,
+    placeholderValues({ employee, letter, company, issueDay: indiaDay() }),
+  );
+}
+
+/** The person a letter is for: the employee, or the candidate in the same shape. */
+async function letterPerson(letter) {
+  if (letter.userId) return User.findById(letter.userId).lean();
+  const candidate = await Candidate.findById(letter.candidateId).lean();
+  return {
+    _id: null,
+    candidateId: candidate._id,
+    name: candidate.name,
+    employeeId: '',
+    designation: candidate.designation,
+    department: candidate.department,
+    branch: candidate.branch,
+    joiningDate: candidate.expectedJoiningDate,
+    expectedJoiningDate: candidate.expectedJoiningDate,
+    address: candidate.address,
+    workMode: candidate.workMode,
+    managerId: candidate.managerId,
+    brandKey: candidate.brandKey,
+  };
+}
+
+/** Which letters are "the same person's" (for versions and superseding). */
+const sameOwner = (letter) =>
+  letter.userId ? { userId: letter.userId } : { candidateId: letter.candidateId };
+
+export async function listLettersFor(actor, userId) {
+  const user = await loadEmployee(actor, userId, 'letters.view');
+  const filter = { userId: user._id };
+  if (!can(actor, 'letters.manage')) filter.status = { $ne: 'draft' };
+  const letters = await Letter.find(filter, '-body').sort({ createdAt: -1 }).lean();
+  return {
+    user: { _id: user._id, name: user.name, employeeId: user.employeeId },
+    letters,
+    canManage: Boolean(can(actor, 'letters.manage')),
+  };
+}
+
+export async function getLetter(actor, id) {
+  const letter = await loadLetter(actor, id);
+  const employee = await letterPerson(letter);
+  const rendered = await render(letter, employee);
+  const isOwner = Boolean(letter.userId) && String(letter.userId) === String(actor._id);
+  const manage = Boolean(can(actor, 'letters.manage'));
+  const company = await getCompany();
+  return {
+    letter,
+    rendered,
+    company,
+    brand: brandFor(company, { brandKey: letter.brandKey }),
+    employee: {
+      _id: employee._id,
+      candidateId: employee.candidateId ?? null,
+      name: employee.name,
+      employeeId: employee.employeeId,
+      designation: employee.designation,
+    },
+    permissions: {
+      manage,
+      edit: manage && letter.status === 'draft',
+      pdf: letter.layout === 'offer_format',
+      issue: manage && letter.status === 'draft',
+      respond: letter.status === 'issued' && (isOwner || manage),
+      reissue: manage && ['issued', 'accepted', 'declined'].includes(letter.status),
+      signedCopy:
+        manage &&
+        Boolean(letter.userId) &&
+        ['issued', 'accepted'].includes(letter.status) &&
+        Boolean(SIGNED_COPY_TYPE[letter.kind]),
+    },
+  };
+}
+
+export async function createLetter(actor, userId, input, { ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  const user = await loadEmployee(actor, userId, 'letters.view');
+  return draftLetter(
+    actor,
+    { userId: user._id, employeeId: user.employeeId },
+    `${user.name} (${user.employeeId})`,
+    input,
+    { ip },
+  );
+}
+
+/** An offer (or other) letter for a candidate, before they are an employee. */
+export async function createCandidateLetter(actor, candidateId, input, { ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  requirePermission(actor, 'recruitment.manage');
+  const candidate = await Candidate.findById(candidateId)
+    .lean()
+    .catch(() => null);
+  if (!candidate) throw notFound('Candidate');
+  if (candidate.status !== 'open') throw createAppError(409, 'This candidate is not open.');
+  return draftLetter(actor, { candidateId: candidate._id }, `candidate ${candidate.name}`, input, {
+    ip,
+  });
+}
+
+async function draftLetter(actor, owner, ownerLabel, { templateId, fields }, { ip }) {
+  const template = await LetterTemplate.findOne({ _id: templateId, active: true })
+    .lean()
+    .catch(() => null);
+  if (!template) throw createAppError(400, 'Choose a letter template.');
+  const last = await Letter.findOne({ ...owner, kind: template.kind }, 'version')
+    .sort({ version: -1 })
+    .lean();
+  const letter = await Letter.create({
+    ...owner,
+    templateId: template._id,
+    kind: template.kind,
+    version: (last?.version ?? 0) + 1,
+    subject: template.subject,
+    body: template.body,
+    fields,
+    createdBy: actor._id,
+  });
+  await recordAudit(actor, {
+    action: 'letter.drafted',
+    entity: 'letter',
+    entityId: letter._id,
+    summary: `${LETTER_KINDS[template.kind]} v${letter.version} drafted for ${ownerLabel}`,
+    ip,
+  });
+  return letter.toObject();
+}
+
+export async function updateDraft(actor, id, input, { ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  const letter = await loadLetter(actor, id);
+  if (letter.status !== 'draft')
+    throw createAppError(409, 'Only a draft can be changed. Make a new version instead.');
+  const set = {};
+  if (input.subject !== undefined) set.subject = input.subject;
+  if (input.body !== undefined) set.body = input.body;
+  for (const [key, value] of Object.entries(input.fields ?? {})) set[`fields.${key}`] = value;
+  await Letter.updateOne({ _id: id }, { $set: set });
+  await recordAudit(actor, {
+    action: 'letter.edited',
+    entity: 'letter',
+    entityId: id,
+    summary: `${LETTER_KINDS[letter.kind]} v${letter.version} draft edited`,
+    ip,
+  });
+  return getLetter(actor, id);
+}
+
+/** Freezes the text and sends it. Refused while a placeholder has no value. */
+export async function issueLetter(actor, id, { ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  const letter = await loadLetter(actor, id);
+  if (letter.status !== 'draft') throw createAppError(409, 'This letter is already issued.');
+  const employee = await letterPerson(letter);
+  const { text, missing } = await render(letter, employee);
+  if (missing.length) {
+    throw createAppError(
+      400,
+      `Fill these first: ${missing.map((key) => PLACEHOLDERS[key] ?? key).join(', ')}.`,
+      'missing_values',
+    );
+  }
+  const issued = await Letter.findOneAndUpdate(
+    { _id: id, status: 'draft' },
+    { status: 'issued', body: text, issuedBy: actor._id, issuedAt: new Date() },
+    { returnDocument: 'after' },
+  ).lean();
+  if (!issued) throw createAppError(409, 'This letter was just issued by someone else.');
+  await Letter.updateMany(
+    {
+      ...sameOwner(letter),
+      kind: letter.kind,
+      _id: { $ne: letter._id },
+      status: { $in: ['issued', 'accepted', 'declined'] },
+    },
+    { status: 'superseded', supersededBy: letter._id },
+  );
+  await recordAudit(actor, {
+    action: 'letter.issued',
+    entity: 'letter',
+    entityId: id,
+    summary: `${LETTER_KINDS[letter.kind]} v${letter.version} issued to ${employee.name}${employee.employeeId ? ` (${employee.employeeId})` : ' (candidate)'}`,
+    ip,
+  });
+  if (letter.userId)
+    notifyUsers([employee._id], {
+      title: `${LETTER_KINDS[letter.kind]} for you`,
+      body: 'Open it to read and accept.',
+      icon: '/logo.png',
+      data: { url: `/letters/${id}` },
+    }).catch(() => {});
+  return getLetter(actor, id);
+}
+
+/** Accepted or declined: by the employee in the app, or recorded by HR. */
+export async function respondToLetter(actor, id, { decision, note }, { ip } = {}) {
+  const letter = await loadLetter(actor, id);
+  const isOwner = String(letter.userId) === String(actor._id);
+  if (!isOwner) requirePermission(actor, 'letters.manage');
+  if (letter.status !== 'issued') throw createAppError(409, `This letter is ${letter.status}.`);
+  await Letter.updateOne(
+    { _id: id, status: 'issued' },
+    {
+      status: decision,
+      respondedAt: new Date(),
+      respondedVia: isOwner ? 'employee' : 'hr',
+      responseNote: note,
+    },
+  );
+  await recordAudit(actor, {
+    action: `letter.${decision}`,
+    entity: 'letter',
+    entityId: id,
+    summary: `${LETTER_KINDS[letter.kind]} v${letter.version} ${decision}${isOwner ? ' by the employee' : ' (recorded by HR)'}${note ? `: ${note}` : ''}`,
+    ip,
+  });
+  return getLetter(actor, id);
+}
+
+/** A signed copy goes into the employee's documents (stored once) and counts as acceptance. */
+export async function addSignedCopy(actor, id, { file, fileName }, { ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  const letter = await loadLetter(actor, id);
+  if (!['issued', 'accepted'].includes(letter.status))
+    throw createAppError(409, `This letter is ${letter.status}.`);
+  const typeName = SIGNED_COPY_TYPE[letter.kind];
+  const type = typeName
+    ? await DocumentType.findOne({ name: typeName, active: true }).lean()
+    : null;
+  if (!type)
+    throw createAppError(
+      400,
+      `Add the document type "${typeName ?? LETTER_KINDS[letter.kind]}" in Settings first.`,
+    );
+  await uploadDocument(
+    actor,
+    letter.userId,
+    {
+      typeId: String(type._id),
+      file,
+      fileName,
+      signed: true,
+      note: `Signed ${LETTER_KINDS[letter.kind].toLowerCase()} v${letter.version}`,
+      expiresOn: '',
+    },
+    { ip },
+  );
+  if (letter.status === 'issued') {
+    await Letter.updateOne(
+      { _id: id },
+      {
+        status: 'accepted',
+        respondedAt: new Date(),
+        respondedVia: 'hr',
+        responseNote: 'Signed copy received',
+      },
+    );
+    await recordAudit(actor, {
+      action: 'letter.accepted',
+      entity: 'letter',
+      entityId: id,
+      summary: `${LETTER_KINDS[letter.kind]} v${letter.version} accepted (signed copy received)`,
+      ip,
+    });
+  }
+  return getLetter(actor, id);
+}
+
+/** A new draft of the same kind, with the same values, from the current template text. */
+export async function reissueLetter(actor, id, { ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  const letter = await loadLetter(actor, id);
+  if (letter.layout === 'offer_format') {
+    return createOfferLetter(actor, sameOwner(letter), { content: letter.content, ip });
+  }
+  const template = letter.templateId
+    ? await LetterTemplate.findById(letter.templateId).lean()
+    : null;
+  if (!template?.active)
+    throw createAppError(400, 'The template of this letter is switched off. Start a new letter.');
+  const input = { templateId: String(template._id), fields: letter.fields };
+  return letter.userId
+    ? createLetter(actor, letter.userId, input, { ip })
+    : createCandidateLetter(actor, letter.candidateId, input, { ip });
+}
+
+// ---- Offer letters in the founder's format (structured content, PDF) ----
+
+/**
+ * A new offer letter draft in the founder's format, filled from the candidate or employee
+ * (or copied from an older version when `content` is given).
+ * @param {{ candidateId?: any, userId?: any }} owner
+ */
+export async function createOfferLetter(actor, owner, { content = null, ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  let person;
+  let ownerFields;
+  let ownerLabel;
+  if (owner.candidateId) {
+    requirePermission(actor, 'recruitment.manage');
+    const candidate = await Candidate.findById(owner.candidateId)
+      .lean()
+      .catch(() => null);
+    if (!candidate) throw notFound('Candidate');
+    if (candidate.status !== 'open') throw createAppError(409, 'This candidate is not open.');
+    person = await letterPerson({ candidateId: candidate._id });
+    ownerFields = { candidateId: candidate._id };
+    ownerLabel = `candidate ${candidate.name}`;
+  } else {
+    const user = await loadEmployee(actor, owner.userId, 'letters.view');
+    person = user;
+    ownerFields = { userId: user._id, employeeId: user.employeeId };
+    ownerLabel = `${user.name} (${user.employeeId})`;
+  }
+  const company = await getCompany();
+  const manager = person.managerId ? await User.findById(person.managerId, 'name').lean() : null;
+  const last = await Letter.findOne({ ...ownerFields, kind: 'offer' }, 'version')
+    .sort({ version: -1 })
+    .lean();
+  const letter = await Letter.create({
+    ...ownerFields,
+    kind: 'offer',
+    layout: 'offer_format',
+    brandKey: brandKeyOf(person),
+    version: (last?.version ?? 0) + 1,
+    subject: 'Offer of employment',
+    content:
+      content ??
+      defaultOfferContent({ person, company, managerName: manager?.name ?? '', today: indiaDay() }),
+    createdBy: actor._id,
+  });
+  await recordAudit(actor, {
+    action: 'letter.drafted',
+    entity: 'letter',
+    entityId: letter._id,
+    summary: `Offer letter v${letter.version} (format) drafted for ${ownerLabel}`,
+    ip,
+  });
+  return letter.toObject();
+}
+
+/** Saves the edited content of an offer letter draft. */
+export async function saveOfferContent(actor, id, { content, brandKey }, { ip } = {}) {
+  requirePermission(actor, 'letters.manage');
+  const letter = await loadLetter(actor, id);
+  if (letter.layout !== 'offer_format')
+    throw createAppError(400, 'This letter is not in the offer format.');
+  if (letter.status !== 'draft') {
+    throw createAppError(409, 'Only a draft can be changed. Make a new version instead.');
+  }
+  const set = { content, subject: content.subject.slice(0, 200) };
+  if (brandKey) set.brandKey = brandKey;
+  const saved = await Letter.updateOne({ _id: id, status: 'draft' }, { $set: set });
+  if (!saved.modifiedCount && !saved.matchedCount) {
+    throw createAppError(409, 'This letter was just issued by someone else.');
+  }
+  await recordAudit(actor, {
+    action: 'letter.edited',
+    entity: 'letter',
+    entityId: id,
+    summary: `Offer letter v${letter.version} draft edited`,
+    ip,
+  });
+  return getLetter(actor, id);
+}

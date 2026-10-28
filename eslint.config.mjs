@@ -1,17 +1,26 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import { defineConfig, globalIgnores } from 'eslint/config';
+import nextVitals from 'eslint-config-next/core-web-vitals';
 
 const eslintConfig = defineConfig([
   ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
+  {
+    rules: {
+      // Functional style only: no classes in our own code.
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'ClassDeclaration', message: 'Use plain functions, not classes.' },
+        { selector: 'ClassExpression', message: 'Use plain functions, not classes.' },
+      ],
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none' }],
+    },
+  },
   globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
+    '.next/**',
+    'out/**',
+    'build/**',
+    'scratch/**',
+    'attendance-mobile.jsx',
+    'landing-page-mobile (1).jsx',
   ]),
 ]);
 

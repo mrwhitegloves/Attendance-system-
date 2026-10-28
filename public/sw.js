@@ -1,8 +1,8 @@
-// MWG Attendance System — Service Worker
+// MWG HRMS — Service Worker
 // Handles: Push Notifications (admin) + Scheduled Local Reminders (employees) + Offline Cache
 
-const CACHE_NAME = 'mwg-attendance-v2';
-const OFFLINE_URLS = ['/', '/login'];
+const CACHE_NAME = 'mwg-hrms-v3';
+const OFFLINE_URLS = ['/logo.png', '/manifest.json'];
 
 // Track active reminder timers so we can cancel and reschedule
 const reminderTimers = [];
@@ -30,6 +30,9 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api/')) return;
+  // Only static files are cached; pages hold personal data and always come from the network.
+  const isStatic = url.pathname.startsWith('/_next/static/') || /\.(png|svg|ico|json|woff2?)$/.test(url.pathname);
+  if (url.origin !== self.location.origin || !isStatic) return;
 
   event.respondWith(
     fetch(event.request)
@@ -194,6 +197,21 @@ self.addEventListener('push', (event) => {
     console.error('[SW] Push parse error:', e);
   }
 
+  // The account was switched off or the password changed: send every open page to sign-in.
+  if (data.type === 'session_ended') {
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        clients.forEach((client) => client.postMessage({ type: 'SESSION_ENDED' }));
+        return self.registration.showNotification('Signed out', {
+          body: 'Please sign in again.',
+          icon: '/logo.png',
+          tag: 'mwg-session-ended',
+        });
+      }),
+    );
+    return;
+  }
+
   const options = {
     body: data.body,
     icon: data.icon || '/logo.png',
@@ -201,7 +219,7 @@ self.addEventListener('push', (event) => {
     vibrate: [200, 100, 200],
     data: data.data || {},
     actions: [
-      { action: 'open', title: '📊 Open Dashboard' },
+      { action: 'open', title: 'Open' },
       { action: 'dismiss', title: 'Dismiss' },
     ],
     requireInteraction: false,
@@ -211,16 +229,20 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
-// ── Notification Click: open app ──────────────────────────────────────────────
-self.addEventListener('notificationclick', (event) => {
+// ── Notification Click: open the page the notification is about ──────────────
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  if (event.action === 'dismiss') return;
+  if (event.action === "dismiss") return;
+  const target = new URL((event.notification.data && event.notification.data.url) || "/dashboard", self.location.origin).href;
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      const existing = clients.find((c) => c.url.includes(self.location.origin));
-      if (existing) { existing.focus(); return; }
-      return self.clients.openWindow('/');
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      const existing = clients.find((c) => c.url.startsWith(self.location.origin));
+      if (existing) {
+        existing.focus();
+        return existing.navigate(target);
+      }
+      return self.clients.openWindow(target);
     })
   );
 });

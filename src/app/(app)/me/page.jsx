@@ -1,0 +1,95 @@
+import { requirePageUser, toPlain } from '@/server/auth/current.js';
+import { roleLabel } from '@/server/permissions/roles.js';
+import { getOwnFile, fileChecklist } from '@/server/services/users.service.js';
+import { env } from '@/server/config/env.js';
+import { Card, CardHeader, PageHeader } from '@/components/shared/ui.jsx';
+import { Avatar, CompletenessBar } from '@/components/shared/Avatar.jsx';
+import { EmployeeFile } from '@/features/employees/EmployeeFile.jsx';
+import { MyAccount } from '@/features/auth/MyAccount.jsx';
+import { KycPanel } from '@/features/kyc/KycPanel.jsx';
+import { getKyc } from '@/server/services/kyc.service.js';
+import { getEmployeeDocuments } from '@/server/services/documents.service.js';
+import { DocumentsPanel } from '@/features/documents/DocumentsPanel.jsx';
+import { can } from '@/server/permissions/can.js';
+import { formatDay } from '@/lib/format.js';
+import { listLettersFor } from '@/server/services/letters.service.js';
+import { MyLetters } from '@/features/letters/MyLetters.jsx';
+import { listPayslips } from '@/server/services/payslips.service.js';
+import { PayslipList } from '@/features/payslips/PayslipList.jsx';
+import { salaryInForce } from '@/server/services/salary.service.js';
+import { SalaryBreakdown } from '@/features/salary/SalaryBreakdown.jsx';
+
+export const metadata = { title: 'My profile' };
+
+export default async function MePage() {
+  const signedIn = await requirePageUser();
+  const { user, managerName } = await getOwnFile(signedIn);
+  const kyc = can(signedIn, 'kyc.view') ? await getKyc(signedIn, signedIn._id) : null;
+  const documents = can(signedIn, 'documents.view')
+    ? await getEmployeeDocuments(signedIn, signedIn._id)
+    : null;
+  const letters = can(signedIn, 'letters.view')
+    ? await listLettersFor(signedIn, signedIn._id)
+    : null;
+  const salary = can(signedIn, 'salary.view') ? await salaryInForce(signedIn._id) : null;
+  const payslips = can(signedIn, 'payslips.view')
+    ? await listPayslips(signedIn, { userId: String(signedIn._id), status: 'final', page: 1 })
+    : null;
+  return (
+    <>
+      <PageHeader title="My profile" subtitle="To change your details, please contact HR." />
+      <div className="mb-4 flex items-center gap-4">
+        <Avatar name={user.name} src={user.photoUrl} size="xl" />
+        <div>
+          <p className="text-lg font-semibold">{user.name}</p>
+          <p className="text-sm text-muted">
+            {[user.employeeId, user.designation].filter(Boolean).join(' · ')}
+          </p>
+          <div className="mt-1">
+            <CompletenessBar percent={user.completeness?.percent ?? 0} />
+          </div>
+        </div>
+      </div>
+      <div className="space-y-4">
+        <EmployeeFile
+          employee={toPlain(user)}
+          managerName={managerName}
+          roleName={roleLabel(user.roleKey)}
+          checklist={await fileChecklist(user)}
+          canEdit={false}
+        />
+        {letters?.letters.length > 0 && <MyLetters letters={toPlain(letters.letters)} />}
+        {payslips?.items.length > 0 && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold">My salary slips</h2>
+            <PayslipList result={toPlain(payslips)} showFilters={false} showPerson={false} />
+          </section>
+        )}
+        {salary && (
+          <Card>
+            <CardHeader
+              title="My salary"
+              subtitle={`In force since ${formatDay(salary.effectiveFrom)}`}
+            />
+            <div className="p-4">
+              <SalaryBreakdown structure={toPlain(salary)} />
+            </div>
+          </Card>
+        )}
+        {kyc && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold">KYC and bank</h2>
+            <KycPanel kyc={toPlain(kyc)} />
+          </section>
+        )}
+        {documents && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold">My documents</h2>
+            <DocumentsPanel data={toPlain(documents)} />
+          </section>
+        )}
+        <MyAccount vapidPublicKey={env.VAPID_PUBLIC_KEY || null} />
+      </div>
+    </>
+  );
+}

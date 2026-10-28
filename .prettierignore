@@ -1,0 +1,12 @@
+.next
+node_modules
+public
+scratch
+docs
+package-lock.json
+attendance-mobile.jsx
+landing-page-mobile (1).jsx
+lint_results.json
+tmp_lint.txt
+*.md
+vercel.json
