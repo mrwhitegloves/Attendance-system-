@@ -19,6 +19,7 @@ export function EmployeeLetters({
   data,
   templates,
   createUrl = `/api/users/${data.user._id}/letters`,
+  offerUrl = `/api/users/${data.user._id}/offer-letters`,
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
