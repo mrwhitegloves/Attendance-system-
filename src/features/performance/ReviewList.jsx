@@ -13,6 +13,7 @@ import {
 import { Badge, Card } from '@/components/shared/ui.jsx';
 import { DataTable, Pagination } from '@/components/shared/DataTable.jsx';
 import { compactInputClass, Select } from '@/components/shared/form.jsx';
+import { DateRangeFilter } from '@/components/shared/DateRangeFilter.jsx';
 
 /** Reviews and improvement plans, newest period first. */
 export function ReviewList({ result, showPerson }) {
@@ -21,6 +22,7 @@ export function ReviewList({ result, showPerson }) {
   return (
     <Card className={isPending ? 'opacity-60' : ''}>
       <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
+        <DateRangeFilter label="Review period" />
         <Select
           className={compactInputClass}
           value={get('kind')}

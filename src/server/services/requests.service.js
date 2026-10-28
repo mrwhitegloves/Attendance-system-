@@ -13,6 +13,7 @@ import { recordAudit } from './audit.service.js';
 import { notifyUsers } from './push.service.js';
 import { countPendingLeaves } from './leaves.service.js';
 import { checkMissedPunch, writeMissedPunch } from './attendance.service.js';
+import { momentCondition } from '../lib/dateFilter.js';
 
 // Employee requests (CEO spec section 10). Rules:
 // - a missed punch is added to attendance only when approved, after checking the day again;
@@ -171,6 +172,8 @@ export async function listRequests(actor, query) {
   }
   const extra = {};
   if (query.kind) extra.kind = query.kind;
+  const sent = momentCondition(query);
+  if (sent) extra.createdAt = sent;
   if (query.status !== 'all') extra.status = query.status;
   if (query.q) {
     const pattern = containsRegex(query.q);

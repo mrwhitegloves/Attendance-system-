@@ -10,6 +10,7 @@ import { Badge, Button, Card, ErrorText } from '@/components/shared/ui.jsx';
 import { DataTable, Pagination } from '@/components/shared/DataTable.jsx';
 import { PersonCell } from '@/components/shared/Avatar.jsx';
 import { compactInputClass, Select } from '@/components/shared/form.jsx';
+import { DateRangeFilter } from '@/components/shared/DateRangeFilter.jsx';
 
 /** Salary slips as a table. With `userId`, one employee's slips and a "new slip" button. */
 export function PayslipList({ result, userId, canCreate, showFilters = true, showPerson = true }) {
@@ -38,6 +39,7 @@ export function PayslipList({ result, userId, canCreate, showFilters = true, sho
     <Card className={isPending ? 'opacity-60' : ''}>
       {(showFilters || canCreate) && (
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
+          <DateRangeFilter label="Salary month" />
           {showFilters && (
             <>
               <input

@@ -7,35 +7,19 @@ import { DataTable, Pagination } from '@/components/shared/DataTable.jsx';
 import { PersonCell } from '@/components/shared/Avatar.jsx';
 import { compactInputClass, Select } from '@/components/shared/form.jsx';
 import { PunchCell } from './PunchCell.jsx';
+import { DateRangeFilter } from '@/components/shared/DateRangeFilter.jsx';
 
 const STATUSES = ['Checked In', 'Late', 'Checked Out', 'Leave', 'Absent'];
 
 /** Every punch in scope, newest first; filters live in the address. */
 export function RecordsList({ result, people, showPerson }) {
   const { get, set, isPending } = useListParams();
-  const hasFilters = ['from', 'to', 'employeeId', 'status'].some((key) => get(key));
+  const hasFilters = ['range', 'from', 'to', 'employeeId', 'status'].some((key) => get(key));
 
   return (
     <Card className={isPending ? 'opacity-60' : ''}>
       <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
-        <label className="flex items-center gap-1.5 text-xs text-muted">
-          From
-          <input
-            type="date"
-            className={compactInputClass}
-            value={get('from')}
-            onChange={(event) => set({ from: event.target.value })}
-          />
-        </label>
-        <label className="flex items-center gap-1.5 text-xs text-muted">
-          To
-          <input
-            type="date"
-            className={compactInputClass}
-            value={get('to')}
-            onChange={(event) => set({ to: event.target.value })}
-          />
-        </label>
+        <DateRangeFilter label="Date" />
         {showPerson && (
           <Select
             className={compactInputClass}

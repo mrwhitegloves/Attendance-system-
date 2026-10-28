@@ -8,6 +8,7 @@ import { daysBetween } from '../lib/dates.js';
 import { recordAudit } from './audit.service.js';
 import { notifyUsers, notifyPunchWatchers } from './push.service.js';
 import { takeFromBalance } from './leaveRules.service.js';
+import { overlapCondition } from '../lib/dateFilter.js';
 
 // Leave requests. Approving writes one "Leave" attendance row per day (never twice).
 // Nobody decides their own leave.
@@ -41,7 +42,11 @@ export async function requestLeave(actor, input) {
 }
 
 export async function listLeaves(actor, query) {
-  const filter = { ...(await employeeScopeFilter(actor, 'leave.view')) };
+  const filter = {
+    ...(await employeeScopeFilter(actor, 'leave.view')),
+    // Leave that touches the chosen days.
+    ...overlapCondition(query, 'startDate', 'endDate'),
+  };
   if (query.status !== 'all') filter.status = query.status;
   if (query.employeeId) {
     if (!(await canSeeEmployee(actor, 'leave.view', query.employeeId))) {

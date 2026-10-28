@@ -7,6 +7,7 @@ import { EXIT_STATUS, EXIT_TYPES } from '@/config/exitOptions.js';
 import { Badge, Card } from '@/components/shared/ui.jsx';
 import { DataTable, Pagination } from '@/components/shared/DataTable.jsx';
 import { compactInputClass, Select } from '@/components/shared/form.jsx';
+import { DateRangeFilter } from '@/components/shared/DateRangeFilter.jsx';
 
 /** Exits in scope, soonest last working day first. */
 export function ExitList({ result }) {
@@ -15,6 +16,7 @@ export function ExitList({ result }) {
   return (
     <Card className={isPending ? 'opacity-60' : ''}>
       <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
+        <DateRangeFilter label="Last working day" />
         <Select
           className={compactInputClass}
           value={get('status', 'notice')}

@@ -10,6 +10,7 @@ import { recordAudit, diffFields } from './audit.service.js';
 import { checkLookupValues } from './lookups.service.js';
 import { createUser } from './users.service.js';
 import { startOnboarding } from './onboarding.service.js';
+import { momentCondition } from '../lib/dateFilter.js';
 
 // Candidates and their offers (CEO spec section 4). Rules:
 // - a candidate is not an employee: no employee ID, no sign-in, nothing in attendance or payroll;
@@ -49,6 +50,8 @@ export async function listCandidates(actor, query) {
   requirePermission(actor, 'recruitment.view');
   const filter = {};
   if (query.status !== 'all') filter.status = query.status;
+  const added = momentCondition(query);
+  if (added) filter.createdAt = added;
   if (query.q) {
     const pattern = containsRegex(query.q);
     filter.$or = [

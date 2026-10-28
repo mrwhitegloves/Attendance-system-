@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYOUT_STATUSES } from '../../config/payoutOptions.js';
 import { ATTENDANCE_SUMMARY, DEDUCTIONS, EARNINGS } from '../../config/payslipFields.js';
 
 // Monthly salary slips (one per employee and month). Collection `payslips`.
@@ -48,6 +49,23 @@ const payslipSchema = new mongoose.Schema(
     // (lib/payslipRules.js). Shown on the slip screen; changing a field by hand does not change it.
     calculation: { type: mongoose.Schema.Types.Mixed, default: null },
     notes: { type: String, default: '' },
+
+    // ---- Payout (CEO answers, 2026-10-28) ----
+    // A final slip is approved for payment by the CEO, then paid by hand and recorded with the
+    // date and a reference (never marked paid without one, except cash with a note).
+    payout: {
+      status: { type: String, enum: PAYOUT_STATUSES, default: 'unpaid', index: true },
+      approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      approvedByName: { type: String, default: '' },
+      approvedAt: { type: Date, default: null },
+      paidOn: { type: String, default: null, index: true }, // India day
+      mode: { type: String, default: '' },
+      reference: { type: String, default: '' },
+      note: { type: String, default: '' },
+      paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      paidByName: { type: String, default: '' },
+      recordedAt: { type: Date, default: null },
+    },
 
     // Where the first values came from.
     salaryStructureId: {

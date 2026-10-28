@@ -14,6 +14,7 @@ import {
 import { Badge, Card } from '@/components/shared/ui.jsx';
 import { DataTable, Pagination } from '@/components/shared/DataTable.jsx';
 import { compactInputClass, Select } from '@/components/shared/form.jsx';
+import { DateRangeFilter } from '@/components/shared/DateRangeFilter.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Any status' },
@@ -38,6 +39,7 @@ export function RequestList({ result, box, showPerson }) {
   return (
     <Card className={isPending ? 'opacity-60' : ''}>
       <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
+        <DateRangeFilter label="Sent" />
         {showPerson && (
           <form onSubmit={submitSearch} className="min-w-0 flex-1 sm:max-w-xs">
             <input

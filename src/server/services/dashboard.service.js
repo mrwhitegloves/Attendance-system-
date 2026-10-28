@@ -12,6 +12,7 @@ import { countRequestsToDecide } from './requests.service.js';
 import { recruitmentCounts } from './recruitment.service.js';
 import { countOpenOnboardings } from './onboarding.service.js';
 import { exitCounts } from './exits.service.js';
+import { payoutCounts } from './payouts.service.js';
 
 // The CEO dashboard (CEO spec section 1, "MWG People & Finance Control"): headcount, verified %,
 // payroll exposure, open items and a priority queue. Everything is worked out live from the
@@ -272,7 +273,28 @@ export async function getControlCenter(actor) {
       });
   }
 
+  // ---- Salary payouts: waiting for the CEO, approved but not paid ----
+  const payouts = await payoutCounts(actor);
+  if (payouts?.waiting && can(actor, 'payouts.approve'))
+    queue.push({
+      key: 'payouts-approve',
+      label: 'Salary payouts to approve',
+      count: payouts.waiting,
+      href: '/payouts?status=unpaid',
+      tone: 'brand',
+    });
+  if (payouts?.approved && can(actor, 'payouts.manage'))
+    queue.push({
+      key: 'payouts-pay',
+      label: 'Approved salaries to pay',
+      count: payouts.approved,
+      href: '/payouts?status=approved',
+      tone: 'warning',
+    });
+
   const order = [
+    'payouts-approve',
+    'payouts-pay',
     'exits-overdue',
     'salary',
     'requests',

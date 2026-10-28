@@ -23,6 +23,7 @@ import {
   UserPlus,
   UserRound,
   Users,
+  Wallet,
 } from 'lucide-react';
 import { NAVIGATION } from '@/config/navigation.js';
 import { BRANDING } from '@/config/branding.js';
@@ -47,6 +48,7 @@ const ICONS = {
   UserPlus,
   UserRound,
   Users,
+  Wallet,
 };
 
 /** The frame of every signed-in screen: black sidebar on wide screens, bottom bar on phones. */

@@ -19,6 +19,7 @@ import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
 import { decodeImageDataUrl } from '../lib/images.js';
 import { notifyActiveEmployees } from './push.service.js';
 import { compOffsBetween, holidaysBetween } from './leaveRules.service.js';
+import { dayCondition } from '../lib/dateFilter.js';
 
 // Attendance rules (CEO, 2026-10-27), enforced by the server:
 // - one punch-in and one punch-out a day, at any hour; the time is the server's, in India time;
@@ -175,11 +176,8 @@ export async function listAttendance(actor, query) {
       return emptyPage(query.page);
     filter.employeeId = query.employeeId;
   }
-  if (query.from || query.to) {
-    filter.date = {};
-    if (query.from) filter.date.$gte = query.from;
-    if (query.to) filter.date.$lte = query.to;
-  }
+  const days = dayCondition(query);
+  if (days) filter.date = days;
   if (query.status) filter.status = query.status;
   const result = await runListQuery(Attendance, {
     filter,

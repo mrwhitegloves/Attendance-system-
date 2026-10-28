@@ -17,6 +17,8 @@ import { calculateMonth } from '../lib/payslipRules.js';
 import { getCompany } from './settings.service.js';
 import { notifyUsers } from './push.service.js';
 import { brandKeyOf } from '../../config/brands.js';
+import { EmployeeRequest } from '../models/request.model.js';
+import { monthCondition } from '../lib/dateFilter.js';
 
 // Salary slips. Rules:
 // - one slip per employee and month; it starts as a draft filled from the employee file, KYC,
@@ -61,17 +63,33 @@ async function loadSlip(actor, id) {
 /** First values for a month: employee file, KYC, salary structure in force, attendance counts. */
 async function prefill(user, month, now = new Date()) {
   const { last } = monthBounds(month);
-  const [kyc, structure, days, balance] = await Promise.all([
+  const [kyc, structure, days, balance, claims] = await Promise.all([
     Kyc.findOne({ userId: user._id }).lean(),
     salaryInForce(user._id, last),
     buildMonthDays(user, month, now),
     leaveBalanceOf(user._id, month),
+    // Approved expense claims are paid with the salary (CEO answers, 2026-10-28): every one
+    // approved by the end of the month and not yet on another final slip.
+    EmployeeRequest.find(
+      {
+        userId: user._id,
+        kind: 'expense',
+        status: 'approved',
+        payslipId: null,
+        decidedAt: { $lte: new Date(`${last}T23:59:59.999+05:30`) },
+      },
+      '_id approvedAmountPaise amountPaise',
+    ).lean(),
   ]);
   const fixed = (lines) =>
     Object.fromEntries(
       lines.map((line) => [line.key, line.fixed ? (structure?.components?.[line.key] ?? 0) : 0]),
     );
   const earnings = fixed(EARNINGS);
+  earnings.reimbursement = claims.reduce(
+    (total, claim) => total + (claim.approvedAmountPaise ?? claim.amountPaise ?? 0),
+    0,
+  );
   const calculation = calculateMonth({
     days,
     monthlyGrossPaise: sum(
@@ -104,7 +122,7 @@ async function prefill(user, month, now = new Date()) {
     },
     earnings,
     deductions: { ...fixed(DEDUCTIONS), lossOfPay: calculation.lossOfPayPaise },
-    calculation,
+    calculation: { ...calculation, reimbursementRequestIds: claims.map((claim) => claim._id) },
     salaryStructureId: structure?._id ?? null,
     salaryVersion: structure?.version ?? null,
   };
@@ -292,6 +310,13 @@ export async function finalisePayslip(actor, id, { ip } = {}) {
     { _id: id, status: 'draft' },
     { status: 'final', finalisedBy: actor._id, finalisedAt: new Date(), company },
   );
+  const claimIds = slip.calculation?.reimbursementRequestIds ?? [];
+  if (claimIds.length) {
+    await EmployeeRequest.updateMany(
+      { _id: { $in: claimIds }, payslipId: null },
+      { payslipId: id },
+    );
+  }
   await recordAudit(actor, {
     action: 'payslip.finalised',
     entity: 'payslip',
@@ -312,16 +337,24 @@ export async function reopenPayslip(actor, id, { reason }, { ip } = {}) {
   requirePermission(actor, 'payslips.finalise');
   const slip = await loadSlip(actor, id);
   if (slip.status !== 'final') throw createAppError(409, 'This slip is not final.');
+  if (slip.payout?.status === 'paid') {
+    throw createAppError(409, 'This salary is already paid. A paid slip cannot be re-opened.');
+  }
   await Payslip.updateOne(
-    { _id: id },
+    { _id: id, 'payout.status': { $ne: 'paid' } },
     {
       status: 'draft',
       finalisedBy: null,
       finalisedAt: null,
       lastEditedBy: actor._id,
       lastEditedAt: new Date(),
+      'payout.status': 'unpaid',
+      'payout.approvedBy': null,
+      'payout.approvedByName': '',
+      'payout.approvedAt': null,
     },
   );
+  await EmployeeRequest.updateMany({ payslipId: id }, { payslipId: null });
   await recordAudit(actor, {
     action: 'payslip.reopened',
     entity: 'payslip',
@@ -338,6 +371,7 @@ export async function listPayslips(actor, query) {
   if (!can(actor, 'payslips.manage')) filter.status = 'final';
   else if (query.status) filter.status = query.status;
   if (query.month) filter.month = query.month;
+  else if (monthCondition(query)) filter.month = monthCondition(query);
   if (query.userId) filter.userId = query.userId;
   if (query.q) {
     const pattern = containsRegex(query.q);

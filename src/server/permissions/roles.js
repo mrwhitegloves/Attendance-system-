@@ -41,6 +41,8 @@ export const PERMISSIONS = {
   'performance.manage': 'Write reviews and improvement plans (never your own)',
   'assets.view': 'See company assets and who has them',
   'assets.manage': 'Add assets, hand them over and take them back',
+  'payouts.approve': 'Approve salary payouts (CEO; never your own)',
+  'payouts.manage': 'Record salary payments and download the bank upload file',
   'notifications.punches': 'Get a notification for every punch',
   'notifications.broadcast': 'Send a notification to all employees',
   'settings.manage': 'Change settings, lists, document types and templates',
@@ -70,6 +72,8 @@ export const DEFAULT_ROLES = {
       'salary.approve': false,
       'payslips.finalise': false,
       'roles.manage': false,
+      // Every payout needs the CEO (CEO answers, 2026-10-28).
+      'payouts.approve': false,
     },
   },
   finance: {
@@ -96,6 +100,7 @@ export const DEFAULT_ROLES = {
       'requests.decide': 'all',
       'assets.view': 'all',
       'exits.view': 'all',
+      'payouts.manage': true,
     },
   },
   manager: {
@@ -113,6 +118,9 @@ export const DEFAULT_ROLES = {
       'exits.view': 'team',
       'performance.view': 'team',
       'performance.manage': 'team',
+      // Managers see the salary and slips of their team (CEO answers, 2026-10-28).
+      'salary.view': 'team',
+      'payslips.view': 'team',
     },
   },
   employee: {

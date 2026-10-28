@@ -9,6 +9,7 @@ import { Badge, Card } from '@/components/shared/ui.jsx';
 import { DataTable, Pagination } from '@/components/shared/DataTable.jsx';
 import { compactInputClass, Select } from '@/components/shared/form.jsx';
 import { LETTER_STATUS } from '@/features/letters/labels.js';
+import { DateRangeFilter } from '@/components/shared/DateRangeFilter.jsx';
 
 /** Candidates with the state of their newest offer letter. */
 export function CandidateList({ result }) {
@@ -18,6 +19,7 @@ export function CandidateList({ result }) {
   return (
     <Card className={isPending ? 'opacity-60' : ''}>
       <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
+        <DateRangeFilter label="Added" />
         <form
           onSubmit={(event) => {
             event.preventDefault();

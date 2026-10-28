@@ -6,6 +6,7 @@ import { seedDocumentTypes } from '../services/documents.service.js';
 import { seedLetterTemplates } from '../services/letters.service.js';
 import { addMissingDefaultPermissions, seedRoles } from '../services/roles.service.js';
 import { recomputeAllCompleteness, refreshCompleteness } from '../services/completeness.service.js';
+import { Payslip } from '../models/payslip.model.js';
 
 // Changes to existing data, in order. Each runs once (its name is stored in `migrations`)
 // and must be safe to run again. Never edit the database by hand; add a migration here.
@@ -95,6 +96,23 @@ export const MIGRATIONS = [
     name: '014-performance-permissions',
     // Performance reviews: the new permissions reach roles already in the database.
     up: () => addMissingDefaultPermissions(['performance.view', 'performance.manage']),
+  },
+  {
+    name: '015-payouts',
+    // Salary payouts (CEO answers, 2026-10-28): the new permissions; managers see the salary
+    // and slips of their team; final slips made before payouts existed wait for approval.
+    up: async () => {
+      await addMissingDefaultPermissions([
+        'payouts.approve',
+        'payouts.manage',
+        'payslips.view',
+        'salary.view',
+      ]);
+      await Payslip.updateMany(
+        { status: 'final', 'payout.status': { $exists: false } },
+        { $set: { 'payout.status': 'unpaid' } },
+      );
+    },
   },
 ];
 

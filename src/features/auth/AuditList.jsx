@@ -4,6 +4,7 @@ import { useListParams } from '@/lib/useListParams.js';
 import { formatDateTime } from '@/lib/format.js';
 import { DataTable, Pagination } from '@/components/shared/DataTable.jsx';
 import { compactInputClass, Select } from '@/components/shared/form.jsx';
+import { DateRangeFilter } from '@/components/shared/DateRangeFilter.jsx';
 
 const ACTIONS = {
   'auth.sign_in': 'Signed in',
@@ -74,6 +75,7 @@ export function AuditList({ result }) {
   return (
     <div className={isPending ? 'opacity-60' : ''}>
       <div className="border-b border-border p-3">
+        <DateRangeFilter label="When" />
         <Select
           className={compactInputClass}
           value={get('action')}

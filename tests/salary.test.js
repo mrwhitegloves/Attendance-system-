@@ -129,7 +129,8 @@ describe('salary versions and approval', () => {
 });
 
 describe('who sees salaries', () => {
-  it('employees see only their own approved structures; managers none', async () => {
+  // CEO answers, 2026-10-28: managers see the salaries of their own team, nobody else's.
+  it('employees see only their own approved structures; managers only their team', async () => {
     const hr = await makeUser({ roleKey: 'hr_admin' });
     const ceo = await makeUser({ roleKey: 'ceo' });
     const manager = await makeUser({ roleKey: 'manager' });
@@ -147,7 +148,11 @@ describe('who sees salaries', () => {
     expect((await getSalary(staff, staff._id)).versions).toHaveLength(1);
     expect(
       (await call(salaryRoute, { user: manager, params: { id: String(staff._id) } })).status,
-    ).toBe(403);
+    ).toBe(200);
+    const outsider = await makeUser();
+    expect(
+      (await call(salaryRoute, { user: manager, params: { id: String(outsider._id) } })).status,
+    ).toBe(404);
     const overview = await salaryOverview(ceo);
     expect(overview.totals.monthlyCtc).toBe(paise(31800));
   });

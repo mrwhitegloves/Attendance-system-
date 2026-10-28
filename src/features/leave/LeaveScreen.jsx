@@ -11,6 +11,7 @@ import { PersonCell } from '@/components/shared/Avatar.jsx';
 import { LinkTabs } from '@/components/shared/Tabs.jsx';
 import { Dialog, ConfirmDialog } from '@/components/shared/Dialog.jsx';
 import { Field, inputClass } from '@/components/shared/form.jsx';
+import { DateRangeFilter } from '@/components/shared/DateRangeFilter.jsx';
 
 const STATUS_TABS = ['all', 'pending', 'approved', 'rejected', 'cancelled'];
 
@@ -45,6 +46,9 @@ export function LeaveScreen({
     <>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
+          <div className="mb-3">
+            <DateRangeFilter label="Leave dates" />
+          </div>
           <LinkTabs tabs={tabs} active={status} />
         </div>
         {canRequest && (

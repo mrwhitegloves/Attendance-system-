@@ -15,6 +15,8 @@ import { SALARY_COMPONENTS } from '../models/salary.model.js';
 import { ATTENDANCE_SUMMARY, DEDUCTIONS, EARNINGS } from '../../config/payslipFields.js';
 import { ATTENDANCE_STATUSES } from '../models/attendance.model.js';
 import { MIN_PASSWORD_LENGTH } from '../auth/password.js';
+import { DATE_RANGE_KEYS } from '../../lib/dateRanges.js';
+import { PAYOUT_STATUSES, PAY_MODES } from '../../config/payoutOptions.js';
 import { REQUEST_KIND_KEYS, REQUEST_STATUSES } from '../../config/requestKinds.js';
 import {
   ASSET_CATEGORIES,
@@ -35,6 +37,12 @@ const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'use HH:MM (24 hours
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'invalid id');
 const page = z.coerce.number().int().min(1).max(10000).default(1);
 const text = (max) => z.string().trim().max(max);
+// The date filter of every list (lib/dateRanges.js): a named range, or custom from/to days.
+const dateRange = {
+  range: z.enum(DATE_RANGE_KEYS).optional().catch(undefined),
+  from: day.optional().catch(undefined),
+  to: day.optional().catch(undefined),
+};
 
 export const loginBody = z.strictObject({
   identifier: text(120).min(1, 'enter your employee ID, email or username'),
@@ -160,8 +168,7 @@ export const punchBody = z.strictObject({
 });
 
 export const listAttendanceQuery = z.object({
-  from: day.optional(),
-  to: day.optional(),
+  ...dateRange,
   employeeId: text(20).optional(),
   status: z.enum(ATTENDANCE_STATUSES).optional(),
   page,
@@ -192,6 +199,7 @@ export const decideLeaveBody = z.strictObject({
 });
 
 export const listLeavesQuery = z.object({
+  ...dateRange,
   status: z.enum(['pending', 'approved', 'rejected', 'cancelled', 'all']).default('all'),
   employeeId: text(20).optional(),
   page,
@@ -210,6 +218,7 @@ export const broadcastBody = z.strictObject({
 });
 
 export const auditQuery = z.object({
+  ...dateRange,
   action: text(60).optional(),
   entityId: text(40).optional(),
   page,
@@ -460,6 +469,7 @@ export const reopenPayslipBody = z.strictObject({
   reason: text(300).min(3, 'write why it is re-opened'),
 });
 export const listPayslipsQuery = z.object({
+  ...dateRange,
   month: month.optional(),
   status: z.enum(['draft', 'final']).optional(),
   userId: objectId.optional(),
@@ -513,6 +523,7 @@ export const decideRequestBody = z.strictObject({
 });
 
 export const listRequestsQuery = z.object({
+  ...dateRange,
   box: z.enum(['mine', 'decide', 'all']).default('mine'),
   kind: z.enum(REQUEST_KIND_KEYS).optional().catch(undefined),
   status: z.enum([...REQUEST_STATUSES, 'all']).default('all'),
@@ -611,6 +622,7 @@ export const joinCandidateBody = z.strictObject({
 });
 
 export const listCandidatesQuery = z.object({
+  ...dateRange,
   status: z.enum([...CANDIDATE_STATUSES, 'all']).default('open'),
   q: text(80).optional(),
   page,
@@ -644,6 +656,7 @@ export const exitUpdateBody = z
 export const exitCloseBody = z.strictObject({ note: text(1000).optional() });
 
 export const listExitsQuery = z.object({
+  ...dateRange,
   status: z.enum([...EXIT_STATUSES, 'all']).default('notice'),
   page,
 });
@@ -691,6 +704,7 @@ export const reviewUpdateBody = z
 export const acknowledgeReviewBody = z.strictObject({ comment: text(2000).optional() });
 
 export const listReviewsQuery = z.object({
+  ...dateRange,
   employeeId: text(20).optional(),
   kind: z.enum(Object.keys(REVIEW_KINDS)).optional().catch(undefined),
   status: z.enum(REVIEW_STATUSES).optional().catch(undefined),
@@ -745,4 +759,35 @@ export const offerContentBody = z.strictObject({
 export const offerLetterBody = z.strictObject({
   content: offerContentBody,
   brandKey: z.enum(BRAND_KEYS).optional(),
+});
+
+// ---- Salary payouts ----
+
+export const listPayoutsQuery = z.object({
+  ...dateRange,
+  status: z.enum(PAYOUT_STATUSES).optional().catch(undefined),
+  month: month.optional().catch(undefined),
+  q: text(80).optional(),
+  page,
+});
+
+export const approvePayoutsBody = z.strictObject({
+  ids: z.array(objectId).min(1, 'choose at least one salary').max(500),
+});
+
+export const recordPaymentBody = z.strictObject({
+  paidOn: day,
+  mode: z.enum(Object.keys(PAY_MODES)),
+  reference: text(80).optional(),
+  note: text(300).optional(),
+});
+
+export const bankFileQuery = z.object({ month });
+
+// ---- Salary import from an Excel sheet ----
+
+export const salaryImportBody = z.strictObject({
+  file: z.string().max(7_200_000, 'the file is larger than 5 MB'),
+  effectiveFrom: day,
+  reason: text(300).min(3, 'write the reason (for example: salaries at the start)'),
 });

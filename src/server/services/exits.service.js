@@ -10,6 +10,7 @@ import { recordAudit } from './audit.service.js';
 import { refreshCompleteness } from './completeness.service.js';
 import { countAssetsWith } from './assets.service.js';
 import { updateUser } from './users.service.js';
+import { dayCondition } from '../lib/dateFilter.js';
 
 // Exits (CEO spec: "on resignation: start notice-period tracking, handover, asset recovery …;
 // on exit: revoke access"). Rules:
@@ -234,6 +235,8 @@ export async function listExits(actor, query) {
   requirePermission(actor, 'exits.view');
   const filter = { ...(await employeeScopeFilter(actor, 'exits.view')) };
   if (query.status !== 'all') filter.status = query.status;
+  const lastDays = dayCondition(query);
+  if (lastDays) filter.lastWorkingDay = lastDays;
   const result = await runListQuery(Exit, {
     filter,
     sort: { lastWorkingDay: 1, createdAt: -1 },

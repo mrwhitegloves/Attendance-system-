@@ -12,6 +12,7 @@ import { runListQuery } from '../lib/pagination.js';
 import { REVIEW_KINDS } from '../../config/performanceOptions.js';
 import { recordAudit } from './audit.service.js';
 import { notifyUsers } from './push.service.js';
+import { overlapCondition } from '../lib/dateFilter.js';
 
 // Performance reviews and improvement plans. Rules:
 // - written by someone who manages the employee (a manager for the team, HR for everyone),
@@ -71,6 +72,7 @@ export async function listReviews(actor, query) {
     ],
   };
   if (query.employeeId) filter.$and.push({ employeeId: query.employeeId });
+  filter.$and.push(overlapCondition(query, 'periodStart', 'periodEnd'));
   if (query.kind) filter.$and.push({ kind: query.kind });
   if (query.status) filter.$and.push({ status: query.status });
   return runListQuery(Review, {

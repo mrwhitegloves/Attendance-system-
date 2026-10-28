@@ -1,5 +1,6 @@
 import { AuditLog } from '../models/system.models.js';
 import { runListQuery } from '../lib/pagination.js';
+import { momentCondition } from '../lib/dateFilter.js';
 
 // The audit log: who changed what and when. Never stores a password.
 
@@ -39,9 +40,11 @@ export function diffFields(before, after, fields) {
   return changes;
 }
 
-export async function listAuditLog({ page, action, entityId }) {
+export async function listAuditLog({ page, action, entityId, ...dates }) {
   const filter = {};
   if (action) filter.action = action;
+  const when = momentCondition(dates);
+  if (when) filter.createdAt = when;
   if (entityId) filter.entityId = entityId;
   return runListQuery(AuditLog, { filter, sort: { createdAt: -1 }, page, pageSize: 50 });
 }

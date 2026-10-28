@@ -41,6 +41,8 @@ const requestSchema = new mongoose.Schema(
     decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     decidedByName: { type: String, default: '' },
     decidedAt: { type: Date, default: null },
+    // An approved expense claim is paid with the salary: the slip that carries it.
+    payslipId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payslip', default: null },
   },
   { timestamps: true },
 );
