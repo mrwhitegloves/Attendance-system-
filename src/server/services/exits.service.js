@@ -11,12 +11,13 @@ import { refreshCompleteness } from './completeness.service.js';
 import { countAssetsWith } from './assets.service.js';
 import { updateUser } from './users.service.js';
 import { dayCondition } from '../lib/dateFilter.js';
+import { settlementDone } from './settlement.service.js';
 
 // Exits (CEO spec: "on resignation: start notice-period tracking, handover, asset recovery …;
 // on exit: revoke access"). Rules:
 // - one open exit per employee; starting it puts the employee in the notice period;
-// - the tasks come from Settings → Lists (exit tasks); one check is automatic: every company
-//   asset is back;
+// - the tasks come from Settings → Lists (exit tasks); two checks are automatic: every company
+//   asset is back, and the full-and-final settlement is approved (settlement.service);
 // - closing needs every task and the check done; it marks the employee exited and deactivates
 //   the account (signed out everywhere at once); records are kept;
 // - a resignation can be withdrawn while open: the employment status goes back to what it was.
@@ -39,6 +40,12 @@ async function view(exit) {
       label: 'Every company asset returned',
       done: assetsLeft === 0,
       detail: assetsLeft ? `${assetsLeft} still with the employee` : '',
+    },
+    {
+      key: 'settlement',
+      label: 'Full and final settlement approved',
+      done: settlementDone(exit),
+      detail: exit.settlement ? 'Waiting for the CEO' : 'Not prepared yet',
     },
   ];
   const tasksDone = exit.tasks.filter((task) => task.done).length;

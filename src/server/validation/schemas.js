@@ -791,3 +791,23 @@ export const salaryImportBody = z.strictObject({
   effectiveFrom: day,
   reason: text(300).min(3, 'write the reason (for example: salaries at the start)'),
 });
+
+// ---- Full and final settlement ----
+
+export const prepareSettlementBody = z.strictObject({
+  noticeDays: z.coerce.number().int().min(0).max(180).optional(),
+});
+
+export const saveSettlementBody = z.strictObject({
+  noticeDays: z.coerce.number().int().min(0).max(180).optional(),
+  lines: z
+    .array(
+      z.strictObject({
+        kind: z.enum(['add', 'deduct']),
+        label: text(120).min(2, 'write what the line is for'),
+        amount: z.coerce.number().min(0).max(10_000_000).multipleOf(0.01),
+        note: text(300).optional(),
+      }),
+    )
+    .max(30),
+});

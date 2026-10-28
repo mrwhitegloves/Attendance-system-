@@ -6,6 +6,11 @@ import { getFileBytes } from '../infra/storage.js';
 import { createAppError } from '../lib/errors.js';
 import { OfferLetterDocument } from '../../features/letters/pdf/OfferLetterDocument.jsx';
 import { PayslipDocument } from '../../features/payslips/pdf/PayslipDocument.jsx';
+import { SettlementDocument } from '../../features/exits/pdf/SettlementDocument.jsx';
+import { User } from '../models/user.model.js';
+import { Exit } from '../models/exit.model.js';
+import { canSeeEmployee, requirePermission } from '../permissions/can.js';
+import { notFound } from '../lib/errors.js';
 import { getLetter } from './letters.service.js';
 import { getPayslip } from './payslips.service.js';
 import { brandFor, getCompany } from './settings.service.js';
@@ -83,4 +88,31 @@ export async function payslipPdf(actor, id) {
     createElement(PayslipDocument, { slip, company, brand, logoSrc, stampSrc }),
   );
   return { buffer, fileName: fileName(`Salary-slip-${slip.employee.name}-${slip.month}`) };
+}
+
+/** The full-and-final statement of the employee's last exit. */
+export async function settlementPdf(actor, userId) {
+  requirePermission(actor, 'exits.view');
+  const person = await User.findById(userId)
+    .lean()
+    .catch(() => null);
+  if (!person || !(await canSeeEmployee(actor, 'exits.view', person.employeeId))) {
+    throw notFound('Employee');
+  }
+  const exit = await Exit.findOne({ userId: person._id, status: { $in: ['notice', 'completed'] } })
+    .sort({ createdAt: -1 })
+    .lean();
+  if (!exit?.settlement) throw createAppError(409, 'The settlement is not prepared yet.');
+  const company = await getCompany();
+  const brand = brandFor(company, person);
+  const buffer = await renderToBuffer(
+    createElement(SettlementDocument, {
+      person,
+      exit,
+      company,
+      brand,
+      logoSrc: await brandLogo(brand),
+    }),
+  );
+  return { buffer, fileName: fileName(`Full-and-final-${person.name}`) };
 }

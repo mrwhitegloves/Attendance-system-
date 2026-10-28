@@ -4,6 +4,8 @@ import { PATCH as taskRoute } from '@/app/api/users/[id]/exits/current/tasks/[ta
 import { POST as completeRoute } from '@/app/api/users/[id]/exits/current/complete/route.js';
 import { POST as withdrawRoute } from '@/app/api/users/[id]/exits/current/withdraw/route.js';
 import { GET as listRoute } from '@/app/api/exits/route.js';
+import { POST as prepareSettlementRoute } from '@/app/api/users/[id]/settlement/route.js';
+import { POST as approveSettlementRoute } from '@/app/api/users/[id]/settlement/approve/route.js';
 import { GET as me } from '@/app/api/auth/me/route.js';
 import { POST as addAsset } from '@/app/api/assets/route.js';
 import { POST as assignAsset } from '@/app/api/assets/[id]/assign/route.js';
@@ -86,6 +88,19 @@ describe('exits', () => {
       params: { id: laptop._id },
       body: { status: 'in_stock' },
     });
+    // The full and final must be approved too (founder, 2026-10-28).
+    const noSettlement = await call(completeRoute, {
+      method: 'POST',
+      user: hr,
+      params: { id },
+      body: {},
+    });
+    expect(noSettlement.status).toBe(409);
+    expect(noSettlement.body.error).toContain('Full and final settlement approved');
+    const ceo = await makeUser({ roleKey: 'ceo' });
+    await call(prepareSettlementRoute, { method: 'POST', user: hr, params: { id }, body: {} });
+    await call(approveSettlementRoute, { method: 'POST', user: ceo, params: { id } });
+
     const cookie = `${SESSION_COOKIE}=${await createSession(staff._id)}`;
     const closed = await call(completeRoute, {
       method: 'POST',

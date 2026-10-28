@@ -13,6 +13,7 @@ import { recruitmentCounts } from './recruitment.service.js';
 import { countOpenOnboardings } from './onboarding.service.js';
 import { exitCounts } from './exits.service.js';
 import { payoutCounts } from './payouts.service.js';
+import { Exit } from '../models/exit.model.js';
 
 // The CEO dashboard (CEO spec section 1, "MWG People & Finance Control"): headcount, verified %,
 // payroll exposure, open items and a priority queue. Everything is worked out live from the
@@ -292,9 +293,35 @@ export async function getControlCenter(actor) {
       tone: 'warning',
     });
 
+  // ---- Full and final settlements ----
+  if (can(actor, 'payouts.approve') || can(actor, 'payouts.manage')) {
+    const [toApprove, toSettle] = await Promise.all([
+      Exit.countDocuments({ 'settlement.status': 'draft' }),
+      Exit.countDocuments({ 'settlement.status': 'approved' }),
+    ]);
+    if (toApprove && can(actor, 'payouts.approve'))
+      queue.push({
+        key: 'settlements-approve',
+        label: 'Full and final settlements to approve',
+        count: toApprove,
+        href: '/exits?status=all',
+        tone: 'brand',
+      });
+    if (toSettle && can(actor, 'payouts.manage'))
+      queue.push({
+        key: 'settlements-pay',
+        label: 'Full and final settlements to pay',
+        count: toSettle,
+        href: '/exits?status=all',
+        tone: 'warning',
+      });
+  }
+
   const order = [
     'payouts-approve',
+    'settlements-approve',
     'payouts-pay',
+    'settlements-pay',
     'exits-overdue',
     'salary',
     'requests',

@@ -93,9 +93,6 @@ export function ExitPanel({ userId, employeeName, exits, canManage, canClose, is
             )}
           </Card>
           <AutomaticChecks checks={open.checks} />
-          <p className="text-xs text-muted">
-            The full-and-final settlement is added with salary payouts.
-          </p>
         </>
       )}
       {error && !dialog && <ErrorText>{error}</ErrorText>}
