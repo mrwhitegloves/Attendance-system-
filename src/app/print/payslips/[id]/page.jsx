@@ -183,14 +183,8 @@ export default async function PrintPayslipPage({ params }) {
             <p className="text-3xl font-extrabold tabular-nums">₹ {amount(slip.totals.net)}</p>
           </section>
 
-          {/* Signatures */}
-          <div className="flex items-end justify-between gap-6 pt-2">
-            <div className="w-56">
-              <div className="h-24" />
-              <div className="border-t border-gray-400 pt-1 text-[10px] font-bold">
-                Employee Signature
-              </div>
-            </div>
+          {/* Signature: only the company signs a salary slip (no employee signature). */}
+          <div className="flex items-end justify-end gap-6 pt-2">
             <div className="w-64">
               <div className="flex h-24 items-end">
                 {company.stampUrl && (

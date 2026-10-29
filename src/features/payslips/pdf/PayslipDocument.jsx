@@ -127,7 +127,7 @@ const s = StyleSheet.create({
   netLabel: { fontFamily: BOLD, fontSize: 7.5, color: '#D1D5DB', letterSpacing: 0.8 },
   netWords: { fontSize: 8, color: '#E5E7EB', marginTop: 2, maxWidth: 330 },
   netAmount: { fontFamily: BOLD, fontSize: 20, color: '#FFFFFF' },
-  signRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  signRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'flex-end' },
   signLine: {
     borderTopWidth: 0.75,
     borderTopColor: '#9CA3AF',
@@ -292,13 +292,8 @@ export function PayslipDocument({ slip, company, brand, logoSrc, stampSrc }) {
             <Text style={s.netAmount}>Rs. {amount(slip.totals.net)}</Text>
           </View>
 
+          {/* Only the company signs a salary slip (founder, 2026-10-29: no employee signature). */}
           <View style={s.signRow}>
-            <View style={{ width: 170 }}>
-              <View style={{ height: 72 }} />
-              <Text style={s.signLine}>Employee Signature</Text>
-              {/* Same height as the company line on the right, so both lines sit level. */}
-              <Text style={[s.muted, { fontSize: 7 }]}> </Text>
-            </View>
             <View style={{ width: 190 }}>
               {stampSrc ? (
                 // eslint-disable-next-line jsx-a11y/alt-text

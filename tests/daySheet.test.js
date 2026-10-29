@@ -55,14 +55,14 @@ describe('day sheet', () => {
     const sheet = await getDailySheet(hr, '2026-09-23');
     const row = sheet.rows.find((item) => item.user.employeeId === amit.employeeId);
     expect(row.minutesWorked).toBe(9 * 60 + 28);
-    // An earlier month: the whole month counts (30 days). Overtime: the month up to the day.
+    // An earlier month counts in full: 30 days, and the overtime of the whole month
+    // (23 Sep: 28 minutes, 24 Sep: 30 minutes), whichever day of it is viewed.
     expect(sheet.monthDays).toBe(30);
     expect(row.daysPresent).toBe(3);
-    expect(row.overtimeThisMonth).toBe(28);
-    const later = await getDailySheet(hr, '2026-09-24');
-    expect(
-      later.rows.find((item) => item.user.employeeId === amit.employeeId).overtimeThisMonth,
-    ).toBe(28 + 30);
+    expect(row.overtimeThisMonth).toBe(28 + 30);
+    const earlier = await getDailySheet(hr, '2026-09-01');
+    const first = earlier.rows.find((item) => item.user.employeeId === amit.employeeId);
+    expect(first).toMatchObject({ overtimeThisMonth: 28 + 30, daysPresent: 3 });
 
     const other = sheet.rows.find((item) => item.user.employeeId === hr.employeeId);
     expect(other).toMatchObject({ minutesWorked: null, overtimeThisMonth: 0, daysPresent: 0 });
