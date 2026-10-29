@@ -17,6 +17,7 @@ export async function apiFetch(path, { method = 'GET', body, signal } = {}) {
     const error = new Error(data?.error || 'Something went wrong. Please try again.');
     error.status = response.status;
     error.code = data?.code;
+    error.data = data;
     throw error;
   }
   return data;

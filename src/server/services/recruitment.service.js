@@ -11,6 +11,7 @@ import { checkLookupValues } from './lookups.service.js';
 import { createUser } from './users.service.js';
 import { startOnboarding } from './onboarding.service.js';
 import { momentCondition } from '../lib/dateFilter.js';
+import { phoneKey } from '../lib/phone.js';
 
 // Candidates and their offers (CEO spec section 4). Rules:
 // - a candidate is not an employee: no employee ID, no sign-in, nothing in attendance or payroll;
@@ -131,6 +132,7 @@ export async function addCandidate(actor, input, { ip } = {}) {
   await checkPlan(input);
   const candidate = await Candidate.create({
     ...input,
+    phoneKey: phoneKey(input.phone),
     managerId: input.managerId || null,
     createdBy: actor._id,
   });
@@ -151,6 +153,7 @@ export async function updateCandidate(actor, id, input, { ip } = {}) {
   await checkPlan(input, before);
   const update = { ...input };
   if ('managerId' in update) update.managerId = update.managerId || null;
+  if ('phone' in update) update.phoneKey = phoneKey(update.phone);
   await Candidate.updateOne({ _id: id }, { $set: update });
   const changes = diffFields(before, input, EDITABLE);
   if (Object.keys(changes).length) {

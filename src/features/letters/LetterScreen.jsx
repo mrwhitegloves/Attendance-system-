@@ -12,6 +12,7 @@ import {
   Send,
   Upload,
   X,
+  Trash2,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { formatDateTime } from '@/lib/format.js';
@@ -174,6 +175,11 @@ export function LetterScreen({ data, isOwn }) {
                 <CopyPlus size={16} /> Make a new version
               </Button>
             )}
+            {permissions.manage && letter.kind === 'offer' && (
+              <Button variant="ghost" onClick={() => setDialog('delete')} disabled={busy}>
+                <Trash2 size={16} /> Delete offer letter
+              </Button>
+            )}
             <ErrorText>{error}</ErrorText>
           </div>
         </Card>
@@ -206,6 +212,28 @@ export function LetterScreen({ data, isOwn }) {
           onSaved={() => router.refresh()}
         />
       )}
+      <ConfirmDialog
+        open={dialog === 'delete'}
+        title="Delete this offer letter?"
+        text="The offer letter and all its versions are deleted. This cannot be undone."
+        confirmLabel="Delete"
+        danger
+        busy={busy}
+        onConfirm={async () => {
+          setBusy(true);
+          setError('');
+          try {
+            await apiFetch(base, { method: 'DELETE' });
+            router.push('/offer-letters');
+            router.refresh();
+          } catch (failure) {
+            setError(failure.message);
+            setDialog(null);
+            setBusy(false);
+          }
+        }}
+        onClose={() => setDialog(null)}
+      />
       <ConfirmDialog
         open={dialog === 'issue'}
         title="Issue this letter?"

@@ -60,7 +60,10 @@ export async function readJson(request) {
 
 export function errorResponse(error) {
   if (error?.isAppError) {
-    return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    return NextResponse.json(
+      { error: error.message, code: error.code, ...(error.details ?? {}) },
+      { status: error.status },
+    );
   }
   if (error?.code === 11000) {
     const field = Object.keys(error.keyPattern || {})[0] || 'value';

@@ -107,6 +107,8 @@ export const createUserBody = z.strictObject({
   ...optionalProfile,
   name,
   password,
+  // A candidate's offer letter to link to the new employee (Offer letters screen).
+  offerLetterId: objectId.optional(),
   staffType: profileFields.staffType.default('Office Staff'),
   expectedInTime: clock.default('09:30'),
   expectedOutTime: clock.default('18:30'),
@@ -817,4 +819,67 @@ export const saveSettlementBody = z.strictObject({
 export const reportQuery = z.object({
   ...dateRange,
   month: month.optional().catch(undefined),
+});
+
+// ---- Offer letters screen ----
+
+export const listOfferLettersQuery = z.object({
+  q: text(80).optional(),
+  status: z.enum(['draft', 'issued', 'accepted', 'declined']).optional().catch(undefined),
+  unlinked: z
+    .enum(['1', 'true'])
+    .optional()
+    .transform((value) => Boolean(value)),
+  page,
+});
+
+export const startOfferLetterBody = z.strictObject({
+  name: text(100).min(2, 'enter the full name'),
+  phone: text(20).min(10, 'enter a 10-digit mobile number'),
+  brandKey: z.enum(BRAND_KEYS).default('mwg'),
+});
+
+export const linkOfferLetterBody = z.strictObject({ offerLetterId: objectId });
+
+// ---- Employee KYC links ----
+
+export const listKycLinksQuery = z.object({ q: text(80).optional(), page });
+
+export const createKycLinkBody = z.union([
+  z.strictObject({ userId: objectId }),
+  z.strictObject({
+    name: text(100).min(2, 'enter the full name'),
+    phone: text(20).min(10, 'enter a 10-digit mobile number'),
+  }),
+]);
+
+export const kycFileBody = z.strictObject({
+  field: text(40).min(1),
+  file: z.string().max(4_300_000, 'the file is larger than 3 MB'),
+  fileName: text(200).optional(),
+});
+
+const mobile = text(20).regex(/^[+\d][\d\s-]{9,}$/, 'enter a 10-digit mobile number');
+
+export const kycSubmitBody = z.strictObject({
+  phone: mobile,
+  dateOfBirth: day,
+  gender: z.enum(GENDERS, 'choose'),
+  bloodGroup: text(5).default(''),
+  personalEmail: email.default(''),
+  currentAddress: text(300).min(5, 'enter the address'),
+  permanentAddress: text(300).min(5, 'enter the address'),
+  emergencyContact: z.strictObject({
+    name: text(100).min(2, 'enter the name'),
+    relation: text(40).min(2, 'enter the relation'),
+    phone: mobile,
+  }),
+  pan: kycDetailsBody.pan,
+  aadhaarLast4: kycDetailsBody.aadhaar.shape.last4,
+  bank: kycDetailsBody.bank.extend({
+    accountNumber: z
+      .string()
+      .trim()
+      .regex(/^\d{9,18}$/, '9 to 18 digits'),
+  }),
 });

@@ -122,10 +122,11 @@ export async function getKyc(actor, userId) {
   };
 }
 
-/** New or changed details. The item becomes "submitted" and must be checked again. */
-export async function updateKycItem(actor, userId, name, input, { ip } = {}) {
-  requirePermission(actor, 'kyc.manage');
-  const user = await loadEmployee(actor, userId, 'kyc.view');
+/**
+ * Writes new details of an item; it becomes "submitted" and must be checked again.
+ * `makerId`: who entered them (null for the employee's own KYC form, so any checker may verify).
+ */
+export async function writeKycDetails(user, name, input, makerId) {
   const record = await loadRecord(user);
   const set = {};
   if (name === 'pan') {
@@ -148,7 +149,7 @@ export async function updateKycItem(actor, userId, name, input, { ip } = {}) {
   }
   Object.assign(set, {
     [`${name}.status`]: 'submitted',
-    [`${name}.enteredBy`]: actor._id,
+    [`${name}.enteredBy`]: makerId,
     [`${name}.enteredAt`]: new Date(),
     [`${name}.reviewedBy`]: null,
     [`${name}.reviewedAt`]: null,
@@ -156,6 +157,13 @@ export async function updateKycItem(actor, userId, name, input, { ip } = {}) {
   });
   await Kyc.updateOne({ _id: record._id }, { $set: set });
   await refreshCompleteness(user._id);
+}
+
+/** New or changed details. The item becomes "submitted" and must be checked again. */
+export async function updateKycItem(actor, userId, name, input, { ip } = {}) {
+  requirePermission(actor, 'kyc.manage');
+  const user = await loadEmployee(actor, userId, 'kyc.view');
+  await writeKycDetails(user, name, input, actor._id);
   // Never the numbers themselves in the audit log.
   await recordAudit(actor, {
     action: 'kyc.updated',
@@ -167,34 +175,19 @@ export async function updateKycItem(actor, userId, name, input, { ip } = {}) {
   return getKyc(actor, userId);
 }
 
-/** A proof file (PDF or photo) for an item. Every upload is kept in S3. */
-export async function addKycProof(actor, userId, name, { file, fileName }, { ip } = {}) {
-  requirePermission(actor, 'kyc.manage');
-  const user = await loadEmployee(actor, userId, 'kyc.view');
+/**
+ * Adds an already stored proof file ({ key, fileName, contentType, size }) to an item.
+ * `makerId`: who uploaded it (null for the employee's own KYC form).
+ */
+export async function writeKycProof(user, name, file, makerId) {
   const record = await loadRecord(user);
-  if (!isStorageConfigured()) throw createAppError(503, 'File storage is not set up yet.');
-  const decoded = decodeFileDataUrl(file);
-  const cleanName = safeFileName(fileName || `${name}.${decoded.extension}`);
-  const key = await putFile(
-    `kyc/${user.employeeId}/${name}/${Date.now()}-${cleanName}`,
-    decoded.bytes,
-    decoded.contentType,
-  );
   const item = record[name];
   const becomesSubmitted =
     hasDetails(name, item) && ['missing', 'rejected', 'verified'].includes(item.status);
   await Kyc.updateOne(
     { _id: record._id },
     {
-      $push: {
-        [`${name}.proofs`]: {
-          key,
-          fileName: cleanName,
-          contentType: decoded.contentType,
-          size: decoded.bytes.length,
-          uploadedBy: actor._id,
-        },
-      },
+      $push: { [`${name}.proofs`]: { ...file, uploadedBy: makerId } },
       ...(becomesSubmitted
         ? {
             $set: {
@@ -208,6 +201,26 @@ export async function addKycProof(actor, userId, name, { file, fileName }, { ip 
     },
   );
   await refreshCompleteness(user._id);
+}
+
+/** A proof file (PDF or photo) for an item. Every upload is kept in S3. */
+export async function addKycProof(actor, userId, name, { file, fileName }, { ip } = {}) {
+  requirePermission(actor, 'kyc.manage');
+  const user = await loadEmployee(actor, userId, 'kyc.view');
+  if (!isStorageConfigured()) throw createAppError(503, 'File storage is not set up yet.');
+  const decoded = decodeFileDataUrl(file);
+  const cleanName = safeFileName(fileName || `${name}.${decoded.extension}`);
+  const key = await putFile(
+    `kyc/${user.employeeId}/${name}/${Date.now()}-${cleanName}`,
+    decoded.bytes,
+    decoded.contentType,
+  );
+  await writeKycProof(
+    user,
+    name,
+    { key, fileName: cleanName, contentType: decoded.contentType, size: decoded.bytes.length },
+    actor._id,
+  );
   await recordAudit(actor, {
     action: 'kyc.proof_added',
     entity: 'kyc',

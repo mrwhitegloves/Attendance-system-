@@ -33,6 +33,18 @@ export const NAVIGATION = [
     mobile: true,
   },
   {
+    href: '/offer-letters',
+    label: 'Offer letters',
+    icon: 'FileSignature',
+    show: (p) => p.lettersManage,
+  },
+  {
+    href: '/kyc-links',
+    label: 'Employee KYC',
+    icon: 'ShieldCheck',
+    show: (p) => p.usersManage,
+  },
+  {
     href: '/documents',
     label: 'Documents',
     icon: 'FolderOpen',

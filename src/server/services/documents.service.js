@@ -167,6 +167,33 @@ export async function getEmployeeDocuments(actor, userId) {
   };
 }
 
+/**
+ * Adds an already stored file ({ key, fileName, contentType, size }) as the newest version of
+ * an employee's document. `makerId`: who uploaded it (null for the employee's own KYC form).
+ */
+export async function writeDocumentVersion(user, type, file, options) {
+  const { makerId, note = '', signed = false, expiresOn = '' } = options;
+  const signature = type.needsSignature ? (signed ? 'signed' : 'pending') : 'not_needed';
+  const expired = type.hasExpiry && expiresOn < today();
+  await EmployeeDocument.updateOne(
+    { userId: user._id, typeId: type._id },
+    {
+      $setOnInsert: { userId: user._id, employeeId: user.employeeId, typeId: type._id },
+      $set: {
+        status: expired ? 'expired' : 'submitted',
+        signature,
+        expiresOn: type.hasExpiry ? expiresOn : '',
+        reviewedBy: null,
+        reviewedAt: null,
+        rejectReason: '',
+      },
+      $push: { versions: { ...file, note, uploadedBy: makerId } },
+    },
+    { upsert: true },
+  );
+  await refreshCompleteness(user._id);
+}
+
 /** Uploads a new version of a document. */
 export async function uploadDocument(actor, userId, input, { ip } = {}) {
   requirePermission(actor, 'documents.manage');
@@ -185,34 +212,17 @@ export async function uploadDocument(actor, userId, input, { ip } = {}) {
     file.bytes,
     file.contentType,
   );
-  const signature = type.needsSignature ? (input.signed ? 'signed' : 'pending') : 'not_needed';
-  const expired = type.hasExpiry && input.expiresOn < today();
-  await EmployeeDocument.updateOne(
-    { userId: user._id, typeId: type._id },
+  await writeDocumentVersion(
+    user,
+    type,
+    { key, fileName, contentType: file.contentType, size: file.bytes.length },
     {
-      $setOnInsert: { userId: user._id, employeeId: user.employeeId, typeId: type._id },
-      $set: {
-        status: expired ? 'expired' : 'submitted',
-        signature,
-        expiresOn: type.hasExpiry ? input.expiresOn : '',
-        reviewedBy: null,
-        reviewedAt: null,
-        rejectReason: '',
-      },
-      $push: {
-        versions: {
-          key,
-          fileName,
-          contentType: file.contentType,
-          size: file.bytes.length,
-          note: input.note ?? '',
-          uploadedBy: actor._id,
-        },
-      },
+      makerId: actor._id,
+      note: input.note ?? '',
+      signed: input.signed,
+      expiresOn: input.expiresOn,
     },
-    { upsert: true },
   );
-  await refreshCompleteness(user._id);
   await recordAudit(actor, {
     action: 'document.uploaded',
     entity: 'document',

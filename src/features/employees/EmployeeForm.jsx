@@ -14,6 +14,7 @@ import {
   WORK_MODE,
 } from '@/config/employeeOptions.js';
 import { brandOptions } from '@/config/brands.js';
+import { OfferLetterPicker } from '@/features/offerLetters/OfferLetterPicker.jsx';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const choose = (list) => [{ value: '', label: 'Choose…' }, ...list];
@@ -233,11 +234,14 @@ export function EmployeeForm({
   canGiveCeo,
   lists,
   canManageLists,
+  canLinkOffer = false,
 }) {
   const router = useRouter();
   const editing = Boolean(employee);
   const [initial] = useState(() => initialValues(employee));
   const [form, setForm] = useState(initial);
+  // A candidate's offer letter (Offer letters screen) that moves to the new employee.
+  const [offer, setOffer] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const roleOptions = roles.filter(
@@ -265,6 +269,7 @@ export function EmployeeForm({
         }
         router.push(`/employees/${employee._id}`);
       } else {
+        if (offer) body.offerLetterId = offer._id;
         const { user } = await apiFetch('/api/users', { method: 'POST', body });
         router.push(`/employees/${user._id}`);
       }
@@ -324,8 +329,39 @@ export function EmployeeForm({
     );
   };
 
+  // Choosing the letter fills the empty fields from the candidate (name, phone, planned job).
+  const chooseOffer = (row) => {
+    setOffer(row);
+    if (!row) return;
+    const fill = {
+      name: row.person.name,
+      phone: row.person.phone,
+      designation: row.plan?.designation,
+      department: row.plan?.department,
+      branch: row.plan?.branch,
+      brandKey: row.plan?.brandKey,
+    };
+    const next = { ...form };
+    for (const [key, value] of Object.entries(fill)) {
+      if (value && (!next[key] || next[key] === initial[key])) next[key] = value;
+    }
+    setForm(next);
+  };
+
   return (
     <form onSubmit={submit} className="space-y-4">
+      {!editing && canLinkOffer && (
+        <Card className="p-4 sm:p-5">
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-semibold">Offer letter (optional)</legend>
+            <p className="text-xs text-muted">
+              Made on the Offer letters screen before this person joined. It moves to the new
+              employee.
+            </p>
+            <OfferLetterPicker id="offerLetter" value={offer} onChange={chooseOffer} />
+          </fieldset>
+        </Card>
+      )}
       {groups.map((group) => (
         <Card key={group.title} className="p-4 sm:p-5">
           <fieldset className="grid gap-4 sm:grid-cols-2">
