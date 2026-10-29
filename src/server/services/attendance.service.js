@@ -306,7 +306,8 @@ export async function getDailySheet(actor, date = indiaDay()) {
   const pendingIds = new Set(pending.map((leave) => leave.employeeId));
   const month = monthSoFar(date);
   const [overtime, present] = await Promise.all([
-    overtimeThisMonth(people, date),
+    // Overtime: an earlier month in full (founder, 2026-10-29), else up to the viewed day.
+    overtimeThisMonth(people, date.slice(0, 7) < indiaDay().slice(0, 7) ? month.upTo : date),
     daysPresent(people, date.slice(0, 7), month.upTo),
   ]);
 
