@@ -215,7 +215,7 @@ export function LetterScreen({ data, isOwn }) {
       <ConfirmDialog
         open={dialog === 'delete'}
         title="Delete this offer letter?"
-        text="The offer letter and all its versions are deleted. This cannot be undone."
+        text="The offer letter and all its versions move to Settings → Recently deleted. You can restore them there for 90 days."
         confirmLabel="Delete"
         danger
         busy={busy}

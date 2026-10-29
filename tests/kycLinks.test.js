@@ -9,7 +9,7 @@ vi.mock('@/server/infra/storage.js', () => ({
 }));
 
 const { GET: listRoute, POST: makeRoute } = await import('@/app/api/kyc-links/route.js');
-const { DELETE: closeRoute } = await import('@/app/api/kyc-links/[id]/route.js');
+const { POST: closeRoute } = await import('@/app/api/kyc-links/[id]/route.js');
 const { GET: formRoute, POST: submitRoute } = await import('@/app/api/public/kyc/[token]/route.js');
 const { POST: fileRoute } = await import('@/app/api/public/kyc/[token]/files/route.js');
 const { User } = await import('@/server/models/user.model.js');
@@ -133,7 +133,7 @@ describe('employee KYC links', () => {
     const second = await make();
     const open = (link) => call(formRoute, { params: { token: tokenOf(link) } });
     expect((await open(first.body.link)).status).toBe(410);
-    await call(closeRoute, { method: 'DELETE', user: hr, params: { id: second.body.link._id } });
+    await call(closeRoute, { method: 'POST', user: hr, params: { id: second.body.link._id } });
     expect((await open(second.body.link)).status).toBe(410);
     expect((await call(formRoute, { params: { token: 'not-a-real-token' } })).status).toBe(404);
     const list = await call(listRoute, { user: hr });

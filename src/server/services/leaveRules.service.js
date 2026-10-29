@@ -4,6 +4,7 @@ import { canSeeEmployee, requirePermission } from '../permissions/can.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { daysBetween } from '../lib/dates.js';
 import { recordAudit } from './audit.service.js';
+import { moveToTrash } from './trash.service.js';
 import { isWeeklyOff, weeklyOffWords } from '../../config/employeeOptions.js';
 
 // Holidays, comp-offs and the paid leave balance (founder, 2026-10-27).
@@ -41,17 +42,20 @@ export async function addHoliday(actor, { date, name, kind }, { ip } = {}) {
 
 export async function removeHoliday(actor, id, { ip } = {}) {
   requirePermission(actor, 'settings.manage');
-  const holiday = await Holiday.findByIdAndDelete(id)
+  const holiday = await Holiday.findById(id)
     .lean()
     .catch(() => null);
   if (!holiday) throw notFound('Holiday');
-  await recordAudit(actor, {
-    action: 'holiday.removed',
-    entity: 'holiday',
-    entityId: id,
-    summary: `${holiday.date}: ${holiday.name}`,
-    ip,
-  });
+  await moveToTrash(
+    actor,
+    {
+      kind: 'holiday',
+      label: `${holiday.name} (${holiday.date})`,
+      entityId: id,
+      parts: [{ model: Holiday, filter: { _id: holiday._id } }],
+    },
+    { ip },
+  );
   return { ok: true };
 }
 
@@ -121,14 +125,16 @@ export async function removeCompOff(actor, id, { ip } = {}) {
     .catch(() => null);
   if (!compOff || !(await canSeeEmployee(actor, 'leave.decide', compOff.employeeId)))
     throw notFound('Comp-off');
-  await CompOff.deleteOne({ _id: id });
-  await recordAudit(actor, {
-    action: 'compoff.removed',
-    entity: 'compoff',
-    entityId: compOff.userId,
-    summary: `Comp-off removed: worked ${compOff.workedOn}, day off ${compOff.offOn}`,
-    ip,
-  });
+  await moveToTrash(
+    actor,
+    {
+      kind: 'comp_off',
+      label: `Comp-off of ${compOff.employeeId}: worked ${compOff.workedOn}, day off ${compOff.offOn}`,
+      entityId: compOff.userId,
+      parts: [{ model: CompOff, filter: { _id: compOff._id } }],
+    },
+    { ip },
+  );
   return { ok: true };
 }
 

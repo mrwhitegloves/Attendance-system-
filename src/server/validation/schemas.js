@@ -883,3 +883,13 @@ export const kycSubmitBody = z.strictObject({
       .regex(/^\d{9,18}$/, '9 to 18 digits'),
   }),
 });
+
+// ---- Recently deleted ----
+
+export const listTrashQuery = z.object({
+  kind: z
+    .enum(['employee', 'offer_letter', 'kyc_link', 'holiday', 'comp_off'])
+    .optional()
+    .catch(undefined),
+  page,
+});

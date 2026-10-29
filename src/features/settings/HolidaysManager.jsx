@@ -127,7 +127,7 @@ export function HolidaysManager({ year, holidays, kinds }) {
       <ConfirmDialog
         open={Boolean(removing)}
         title={`Remove ${removing?.name ?? ''}?`}
-        text="That day becomes a normal working day again on salary slips filled after this."
+        text="That day becomes a normal working day again on salary slips filled after this. You can restore it from Settings → Recently deleted for 90 days."
         confirmLabel="Remove"
         danger
         busy={busy}
