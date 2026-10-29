@@ -48,3 +48,16 @@
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* The sidebar menu: a thin scrollbar that fits the dark sidebar. */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.2) transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.2);
+}

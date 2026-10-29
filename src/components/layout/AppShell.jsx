@@ -70,14 +70,18 @@ export function AppShell({ user, permissions, roleLabel, vapidPublicKey, childre
   return (
     <div className="min-h-screen md:pl-60">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-sidebar text-white md:flex">
-        <Link href="/dashboard" className="flex items-center gap-2.5 px-5 py-5">
+        <Link href="/dashboard" className="flex shrink-0 items-center gap-2.5 px-5 py-5">
           <Image src={BRANDING.logo} alt="" width={32} height={32} className="rounded-md" />
           <span className="leading-tight">
             <span className="block text-sm font-semibold">{BRANDING.productName}</span>
             <span className="block text-[11px] text-white/50">{BRANDING.companyName}</span>
           </span>
         </Link>
-        <nav className="flex-1 space-y-0.5 px-3" aria-label="Main">
+        {/* Only the menu scrolls; the logo stays on top and the user box at the bottom. */}
+        <nav
+          className="sidebar-scroll min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-2"
+          aria-label="Main"
+        >
           {items.map((item) => {
             const Icon = ICONS[item.icon];
             const active = isActive(item.href);
@@ -98,7 +102,7 @@ export function AppShell({ user, permissions, roleLabel, vapidPublicKey, childre
             );
           })}
         </nav>
-        <div className="border-t border-white/10 p-3">
+        <div className="shrink-0 border-t border-white/10 p-3">
           <UserBox user={user} roleLabel={roleLabel} dark />
         </div>
       </aside>
