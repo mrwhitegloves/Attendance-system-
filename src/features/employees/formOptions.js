@@ -16,5 +16,6 @@ export async function employeeFormOptions(actor) {
     lists,
     canGiveCeo: actor.roleKey === 'ceo',
     canManageLists: Boolean(can(actor, 'settings.manage')),
+    canLinkOffer: Boolean(can(actor, 'letters.manage')),
   };
 }

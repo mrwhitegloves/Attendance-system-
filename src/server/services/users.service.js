@@ -1,3 +1,4 @@
+import { linkableOffer, linkOfferToEmployee } from './offerLetters.service.js';
 import { User, PUBLIC_USER_FIELDS } from '../models/user.model.js';
 import { Counter } from '../models/system.models.js';
 import { can, canSeeEmployee, employeeScopeFilter, requirePermission } from '../permissions/can.js';
@@ -103,8 +104,15 @@ export async function listUsers(actor, query) {
 }
 
 /** Everyone in scope, short form, for pickers and filters. */
-export async function listUserOptions(actor, permission = 'users.view') {
-  const filter = { ...(await employeeScopeFilter(actor, permission)), status: 'active' };
+export async function listUserOptions(
+  actor,
+  permission = 'users.view',
+  { notActiveYet = false } = {},
+) {
+  const filter = {
+    ...(await employeeScopeFilter(actor, permission)),
+    status: notActiveYet ? { $in: ['active', 'inactive'] } : 'active',
+  };
   return User.find(filter, '_id name employeeId').sort({ name: 1 }).lean();
 }
 
@@ -152,9 +160,13 @@ function checkRoleChange(actor, roleKey, previous) {
   }
 }
 
-export async function createUser(actor, input, { ip } = {}) {
+export async function createUser(actor, { offerLetterId, ...input }, { ip } = {}) {
   requirePermission(actor, 'users.manage');
   checkRoleChange(actor, input.roleKey, 'employee');
+  if (offerLetterId) {
+    requirePermission(actor, 'letters.manage');
+    await linkableOffer(offerLetterId);
+  }
   const managerId = await checkManager(input.managerId);
   await checkLookupValues(input);
   const employeeId = await nextEmployeeId();
@@ -173,6 +185,7 @@ export async function createUser(actor, input, { ip } = {}) {
     summary: `Added ${created.name} (${employeeId})`,
     ip,
   });
+  if (offerLetterId) await linkOfferToEmployee(actor, offerLetterId, created._id, { ip });
   return getUser(actor, created._id);
 }
 
@@ -287,6 +300,7 @@ export function permissionsOf(user) {
     leaveDecide: can(user, 'leave.decide'),
     users: can(user, 'users.view'),
     usersManage: Boolean(can(user, 'users.manage')),
+    lettersManage: Boolean(can(user, 'letters.manage')),
     usersPassword: Boolean(can(user, 'users.password')),
     broadcast: Boolean(can(user, 'notifications.broadcast')),
     punchAlerts: Boolean(can(user, 'notifications.punches')),

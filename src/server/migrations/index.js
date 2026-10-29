@@ -7,6 +7,8 @@ import { seedLetterTemplates } from '../services/letters.service.js';
 import { addMissingDefaultPermissions, seedRoles } from '../services/roles.service.js';
 import { recomputeAllCompleteness, refreshCompleteness } from '../services/completeness.service.js';
 import { Payslip } from '../models/payslip.model.js';
+import { Candidate } from '../models/candidate.model.js';
+import { phoneKey } from '../lib/phone.js';
 
 // Changes to existing data, in order. Each runs once (its name is stored in `migrations`)
 // and must be safe to run again. Never edit the database by hand; add a migration here.
@@ -118,6 +120,16 @@ export const MIGRATIONS = [
     name: '016-report-permission',
     // Reports: the new permission reaches roles already in the database.
     up: () => addMissingDefaultPermissions(['reports.export']),
+  },
+  {
+    name: '017-candidate-phone-key',
+    // One offer letter per phone: candidates get the last 10 digits of their phone.
+    up: async () => {
+      const candidates = await Candidate.find({ phoneKey: { $in: [null, ''] } }, 'phone').lean();
+      for (const candidate of candidates) {
+        await Candidate.updateOne({ _id: candidate._id }, { phoneKey: phoneKey(candidate.phone) });
+      }
+    },
   },
 ];
 

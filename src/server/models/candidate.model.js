@@ -12,6 +12,8 @@ const candidateSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, default: '', trim: true, lowercase: true },
     phone: { type: String, default: '' },
+    // The last 10 digits of the phone (lib/phone.js): one offer letter per phone number.
+    phoneKey: { type: String, default: '', index: true },
     // City and state ("Jamshedpur, Jharkhand"): printed under the name on the offer letter.
     address: { type: String, default: '' },
     // The planned job: names from Settings → Lists, like an employee's.

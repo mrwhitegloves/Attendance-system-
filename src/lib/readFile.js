@@ -15,3 +15,26 @@ export function readFileAsDataUrl(file, maxBytes = MAX_UPLOAD_BYTES) {
     reader.readAsDataURL(file);
   });
 }
+
+/** Shrinks a picked image to at most `maxSide` px as a JPEG data URL (512 px: about 50 KB). */
+export function shrinkImage(file, maxSide = 512) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(image.width * scale);
+      canvas.height = Math.round(image.height * scale);
+      canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(image.src);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    image.onerror = () => reject(new Error('This file is not a picture.'));
+    image.src = URL.createObjectURL(file);
+  });
+}
+
+/** A picked file for upload: photos are made smaller (phone photos are often 3–5 MB). */
+export function readUploadFile(file) {
+  return file.type.startsWith('image/') ? shrinkImage(file, 1800) : readFileAsDataUrl(file);
+}

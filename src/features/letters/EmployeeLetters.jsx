@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Plus } from 'lucide-react';
+import { FileText, Link2, Plus } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { formatDateTime } from '@/lib/format.js';
 import { Badge, Button, Card, ErrorText } from '@/components/shared/ui.jsx';
@@ -10,6 +10,7 @@ import { DataTable } from '@/components/shared/DataTable.jsx';
 import { Dialog } from '@/components/shared/Dialog.jsx';
 import { Field, inputClass, Select } from '@/components/shared/form.jsx';
 import { LETTER_KIND_LABELS, LETTER_STATUS, letterTitle } from './labels.js';
+import { OfferLetterPicker } from '@/features/offerLetters/OfferLetterPicker.jsx';
 
 /**
  * One person's letters, newest first, and the button to start a new one. A candidate's
@@ -25,6 +26,30 @@ export function EmployeeLetters({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [picked, setPicked] = useState(null);
+  // One offer letter per person: once there is one, it is opened instead of making another.
+  const offer = data.letters.find(
+    (letter) => letter.kind === 'offer' && letter.status !== 'superseded',
+  );
+  const isEmployee = createUrl.startsWith('/api/users/');
+  const link = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/users/${data.user._id}/offer-letter`, {
+        method: 'POST',
+        body: { offerLetterId: picked._id },
+      });
+      setLinking(false);
+      setPicked(null);
+      router.refresh();
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setBusy(false);
+    }
+  };
   // An offer letter in the company's own format (MWG / EngenX), edited on its own screen.
   const newOffer = async () => {
     setBusy(true);
@@ -41,9 +66,22 @@ export function EmployeeLetters({
     <>
       {data.canManage && (
         <div className="mb-3 flex flex-wrap justify-end gap-2">
-          <Button onClick={newOffer} disabled={busy}>
-            <FileText size={16} /> New offer letter
-          </Button>
+          {offer ? (
+            <Button onClick={() => router.push(`/letters/${offer._id}`)}>
+              <FileText size={16} /> Open the offer letter
+            </Button>
+          ) : (
+            <>
+              <Button onClick={newOffer} disabled={busy}>
+                <FileText size={16} /> New offer letter
+              </Button>
+              {isEmployee && (
+                <Button variant="secondary" onClick={() => setLinking(true)} disabled={busy}>
+                  <Link2 size={16} /> Link a candidate&apos;s offer letter
+                </Button>
+              )}
+            </>
+          )}
           <Button variant="secondary" onClick={() => setOpen(true)} disabled={!templates.length}>
             <Plus size={16} /> Letter from a template
           </Button>
@@ -101,6 +139,23 @@ export function EmployeeLetters({
           onClose={() => setOpen(false)}
         />
       )}
+      <Dialog
+        open={linking}
+        onClose={() => setLinking(false)}
+        title="Link a candidate's offer letter"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setLinking(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={link} disabled={busy || !picked}>
+              Link to {data.user?.name ?? 'the employee'}
+            </Button>
+          </>
+        }
+      >
+        <OfferLetterPicker id="link-offer" value={picked} onChange={setPicked} />
+      </Dialog>
     </>
   );
 }

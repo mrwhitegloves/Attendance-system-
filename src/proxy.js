@@ -15,6 +15,6 @@ export function proxy(request) {
 }
 
 export const config = {
-  // Everything except the sign-in page, the API, Next's files and public files.
-  matcher: ['/((?!login|api|_next/static|_next/image|.*\\..*).*)'],
+  // Everything except the sign-in page, the public KYC form, the API, Next's files and public files.
+  matcher: ['/((?!login|kyc/|api|_next/static|_next/image|.*\\..*).*)'],
 };

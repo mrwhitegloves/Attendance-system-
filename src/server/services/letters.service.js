@@ -142,6 +142,28 @@ async function letterPerson(letter) {
 const sameOwner = (letter) =>
   letter.userId ? { userId: letter.userId } : { candidateId: letter.candidateId };
 
+/**
+ * One offer letter per person (founder, 2026-10-29): a new one only when the person has none
+ * that is still in use. A new version of the same letter (reissue) is not a second letter.
+ */
+export async function assertNoOfferYet(owner) {
+  const filter = owner.userId ? { userId: owner.userId } : { candidateId: owner.candidateId };
+  const existing = await Letter.findOne(
+    { ...filter, kind: 'offer', status: { $ne: 'superseded' } },
+    '_id',
+  ).lean();
+  if (existing) {
+    throw Object.assign(
+      createAppError(
+        409,
+        'This person already has an offer letter. Open it instead.',
+        'offer_exists',
+      ),
+      { details: { letterId: String(existing._id) } },
+    );
+  }
+}
+
 export async function listLettersFor(actor, userId) {
   const user = await loadEmployee(actor, userId, 'letters.view');
   const filter = { userId: user._id };
@@ -189,7 +211,7 @@ export async function getLetter(actor, id) {
   };
 }
 
-export async function createLetter(actor, userId, input, { ip } = {}) {
+export async function createLetter(actor, userId, input, { ip, reissue = false } = {}) {
   requirePermission(actor, 'letters.manage');
   const user = await loadEmployee(actor, userId, 'letters.view');
   return draftLetter(
@@ -197,12 +219,17 @@ export async function createLetter(actor, userId, input, { ip } = {}) {
     { userId: user._id, employeeId: user.employeeId },
     `${user.name} (${user.employeeId})`,
     input,
-    { ip },
+    { ip, reissue },
   );
 }
 
 /** An offer (or other) letter for a candidate, before they are an employee. */
-export async function createCandidateLetter(actor, candidateId, input, { ip } = {}) {
+export async function createCandidateLetter(
+  actor,
+  candidateId,
+  input,
+  { ip, reissue = false } = {},
+) {
   requirePermission(actor, 'letters.manage');
   requirePermission(actor, 'recruitment.manage');
   const candidate = await Candidate.findById(candidateId)
@@ -212,14 +239,16 @@ export async function createCandidateLetter(actor, candidateId, input, { ip } = 
   if (candidate.status !== 'open') throw createAppError(409, 'This candidate is not open.');
   return draftLetter(actor, { candidateId: candidate._id }, `candidate ${candidate.name}`, input, {
     ip,
+    reissue,
   });
 }
 
-async function draftLetter(actor, owner, ownerLabel, { templateId, fields }, { ip }) {
+async function draftLetter(actor, owner, ownerLabel, { templateId, fields }, { ip, reissue }) {
   const template = await LetterTemplate.findOne({ _id: templateId, active: true })
     .lean()
     .catch(() => null);
   if (!template) throw createAppError(400, 'Choose a letter template.');
+  if (template.kind === 'offer' && !reissue) await assertNoOfferYet(owner);
   const last = await Letter.findOne({ ...owner, kind: template.kind }, 'version')
     .sort({ version: -1 })
     .lean();
@@ -388,7 +417,11 @@ export async function reissueLetter(actor, id, { ip } = {}) {
   requirePermission(actor, 'letters.manage');
   const letter = await loadLetter(actor, id);
   if (letter.layout === 'offer_format') {
-    return createOfferLetter(actor, sameOwner(letter), { content: letter.content, ip });
+    return createOfferLetter(actor, sameOwner(letter), {
+      content: letter.content,
+      ip,
+      reissue: true,
+    });
   }
   const template = letter.templateId
     ? await LetterTemplate.findById(letter.templateId).lean()
@@ -397,8 +430,8 @@ export async function reissueLetter(actor, id, { ip } = {}) {
     throw createAppError(400, 'The template of this letter is switched off. Start a new letter.');
   const input = { templateId: String(template._id), fields: letter.fields };
   return letter.userId
-    ? createLetter(actor, letter.userId, input, { ip })
-    : createCandidateLetter(actor, letter.candidateId, input, { ip });
+    ? createLetter(actor, letter.userId, input, { ip, reissue: true })
+    : createCandidateLetter(actor, letter.candidateId, input, { ip, reissue: true });
 }
 
 // ---- Offer letters in the founder's format (structured content, PDF) ----
@@ -408,7 +441,11 @@ export async function reissueLetter(actor, id, { ip } = {}) {
  * (or copied from an older version when `content` is given).
  * @param {{ candidateId?: any, userId?: any }} owner
  */
-export async function createOfferLetter(actor, owner, { content = null, ip } = {}) {
+export async function createOfferLetter(
+  actor,
+  owner,
+  { content = null, ip, reissue = false } = {},
+) {
   requirePermission(actor, 'letters.manage');
   let person;
   let ownerFields;
@@ -429,6 +466,7 @@ export async function createOfferLetter(actor, owner, { content = null, ip } = {
     ownerFields = { userId: user._id, employeeId: user.employeeId };
     ownerLabel = `${user.name} (${user.employeeId})`;
   }
+  if (!reissue) await assertNoOfferYet(ownerFields);
   const company = await getCompany();
   const manager = person.managerId ? await User.findById(person.managerId, 'name').lean() : null;
   const last = await Letter.findOne({ ...ownerFields, kind: 'offer' }, 'version')
