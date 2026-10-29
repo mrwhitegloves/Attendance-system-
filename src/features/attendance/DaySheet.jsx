@@ -134,11 +134,33 @@ export function DaySheet({ sheet, today }) {
               label: 'Punch out',
               render: (row) => <PunchCell record={row.punchOut} />,
             },
-            { key: 'hours', label: 'Worked', render: (row) => formatMinutes(row.minutesWorked) },
+            {
+              key: 'hours',
+              label: 'Worked',
+              render: (row) =>
+                row.minutesWorked !== null ? (
+                  formatMinutes(row.minutesWorked)
+                ) : row.punchIn && !row.punchOut ? (
+                  <span className="text-xs text-muted">
+                    {sheet.date === sheet.today ? 'Still in' : 'No punch-out'}
+                  </span>
+                ) : (
+                  '—'
+                ),
+            },
             {
               key: 'overtime',
               label: 'Overtime this month',
-              render: (row) => (row.overtimeThisMonth ? formatMinutes(row.overtimeThisMonth) : '—'),
+              render: (row) => formatMinutes(row.overtimeThisMonth ?? 0),
+            },
+            {
+              key: 'days',
+              label: 'Days present',
+              render: (row) => (
+                <span title="Days with a punch-in, out of the days of this month so far">
+                  {row.daysPresent}/{sheet.monthDays}
+                </span>
+              ),
             },
           ]}
         />

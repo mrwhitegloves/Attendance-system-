@@ -13,7 +13,7 @@ import {
   clockToMinutes,
   daysBetween,
   indiaDay,
-  twelveHourToMinutes,
+  textTimeToMinutes,
   indiaMinutes,
 } from '../lib/dates.js';
 import { toCsv } from '../lib/csv.js';
@@ -35,8 +35,12 @@ const fullView = (permission) => (actor) => {
 };
 const dayOf = (value) => (value ? indiaDay(new Date(value)) : '');
 
-const recordMinutes = (record) =>
-  record.at ? indiaMinutes(new Date(record.at)) : twelveHourToMinutes(record.time);
+const recordMinutes = (record) => {
+  if (record.at) return indiaMinutes(new Date(record.at));
+  const fromText = textTimeToMinutes(record.time);
+  if (fromText !== null) return fromText;
+  return record.createdAt ? indiaMinutes(new Date(record.createdAt)) : null;
+};
 
 export const REPORTS = {
   payroll: {

@@ -11,9 +11,10 @@ import {
   indiaClock,
   indiaMinutes,
   clockToMinutes,
-  twelveHourToMinutes,
+  textTimeToMinutes,
   daysBetween,
   monthBounds,
+  daysInMonth,
 } from '../lib/dates.js';
 import { isStorageConfigured, putFile, signedUrl } from '../infra/storage.js';
 import { decodeImageDataUrl } from '../lib/images.js';
@@ -38,9 +39,16 @@ const punchInStatus = (person, minutes) => {
   return minutes > expected + LATE_GRACE_MINUTES ? 'Late' : 'Checked In';
 };
 
-/** Minutes since midnight of a record: from `at` when present, else from the old text time. */
-const recordMinutes = (record) =>
-  record.at ? indiaMinutes(new Date(record.at)) : twelveHourToMinutes(record.time);
+/**
+ * Minutes since midnight of a record: from `at` when present, else from the old text time
+ * ("09:41 AM" or "19:09"), else from when the record was saved.
+ */
+const recordMinutes = (record) => {
+  if (record.at) return indiaMinutes(new Date(record.at));
+  const fromText = textTimeToMinutes(record.time);
+  if (fromText !== null) return fromText;
+  return record.createdAt ? indiaMinutes(new Date(record.createdAt)) : null;
+};
 
 async function photoUrl(record) {
   if (record.selfieKey) return signedUrl(record.selfieKey);
@@ -213,6 +221,7 @@ const overtimeOf = (person, minutesWorked) =>
  * paid and not on the salary slip; the attendance screens show it). → Map employeeId → minutes.
  */
 async function overtimeThisMonth(people, upTo) {
+  if (!upTo) return new Map();
   const records = await Attendance.find({
     employeeId: { $in: people.map((person) => person.employeeId) },
     date: { $gte: `${upTo.slice(0, 7)}-01`, $lte: upTo },
@@ -231,6 +240,37 @@ async function overtimeThisMonth(people, upTo) {
     totals.set(person.employeeId, (totals.get(person.employeeId) ?? 0) + extra);
   }
   return totals;
+}
+
+/**
+ * The days of a viewed day's month that have passed (founder, 2026-10-29): the current month up
+ * to today, an earlier month in full, a later month none. → { upTo, total }
+ */
+export function monthSoFar(date, today = indiaDay()) {
+  const month = date.slice(0, 7);
+  if (month < today.slice(0, 7)) {
+    const total = daysInMonth(month);
+    return { upTo: `${month}-${String(total).padStart(2, '0')}`, total };
+  }
+  if (month === today.slice(0, 7)) return { upTo: today, total: Number(today.slice(8, 10)) };
+  return { upTo: null, total: 0 };
+}
+
+/** Days with a punch-in in the month so far, per person. → Map employeeId → days. */
+async function daysPresent(people, month, upTo) {
+  if (!upTo) return new Map();
+  const rows = await Attendance.aggregate([
+    {
+      $match: {
+        employeeId: { $in: people.map((person) => person.employeeId) },
+        date: { $gte: `${month}-01`, $lte: upTo },
+        status: { $in: [...PUNCH_IN_STATUSES, 'Checked Out'] },
+      },
+    },
+    { $group: { _id: { employeeId: '$employeeId', date: '$date' } } },
+    { $group: { _id: '$_id.employeeId', days: { $sum: 1 } } },
+  ]);
+  return new Map(rows.map((row) => [row._id, row.days]));
 }
 
 /** Status of one person on one day, from that day's records. */
@@ -264,7 +304,11 @@ export async function getDailySheet(actor, date = indiaDay()) {
   ]);
   const byEmployee = Map.groupBy(records, (record) => record.employeeId);
   const pendingIds = new Set(pending.map((leave) => leave.employeeId));
-  const overtime = await overtimeThisMonth(people, date);
+  const month = monthSoFar(date);
+  const [overtime, present] = await Promise.all([
+    overtimeThisMonth(people, date),
+    daysPresent(people, date.slice(0, 7), month.upTo),
+  ]);
 
   const rows = await Promise.all(
     people.map(async (person) => {
@@ -278,6 +322,7 @@ export async function getDailySheet(actor, date = indiaDay()) {
         punchOut: last ? await toView(last) : null,
         minutesWorked: hoursBetween(first, last),
         overtimeThisMonth: overtime.get(person.employeeId) ?? 0,
+        daysPresent: present.get(person.employeeId) ?? 0,
         remark:
           own.find((record) => record.status === 'Absent' || record.status === 'Leave')?.remark ??
           '',
@@ -288,6 +333,8 @@ export async function getDailySheet(actor, date = indiaDay()) {
   const count = (status) => rows.filter((row) => row.status === status).length;
   return {
     date,
+    today: indiaDay(),
+    monthDays: month.total,
     summary: {
       people: rows.length,
       present: count('Present') + count('Late'),

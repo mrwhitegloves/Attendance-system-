@@ -41,14 +41,28 @@ export function clockToMinutes(value) {
   return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : null;
 }
 
-/** "09:41 AM" → 581 (the text times of old records). */
-export function twelveHourToMinutes(value) {
-  const match = String(value || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+/**
+ * The text time of a record → minutes since midnight. Old records use both "09:41 AM" and
+ * "19:09" (also with seconds, or "am"/"p.m."). Anything else → null.
+ */
+export function textTimeToMinutes(value) {
+  const match = String(value || '')
+    .trim()
+    .match(/^(\d{1,2})[:.](\d{2})(?::\d{2})?\s*([ap])?\.?\s*(m\.?)?$/i);
   if (!match) return null;
-  let hours = Number(match[1]) % 12;
-  if (match[3].toUpperCase() === 'PM') hours += 12;
-  return hours * 60 + Number(match[2]);
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (minutes > 59) return null;
+  if (match[3]) {
+    if (hours < 1 || hours > 12) return null;
+    hours = (hours % 12) + (match[3].toLowerCase() === 'p' ? 12 : 0);
+  } else if (hours > 23) return null;
+  return hours * 60 + minutes;
 }
+
+/** Days of a month: "2026-09" → 30. */
+export const daysInMonth = (month) =>
+  new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
 
 /** Every day from start to end, both included: ["2026-10-01", …]. */
 export function daysBetween(start, end) {
