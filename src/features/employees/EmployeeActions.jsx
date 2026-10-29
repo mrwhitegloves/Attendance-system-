@@ -29,6 +29,23 @@ export function EmployeeActions({ employee, canEdit, canSwitch, canSeePassword, 
       setError(failure.message);
     }
   };
+  // Recommended for someone who left (founder, 2026-10-29): records stay, sign-in stops.
+  const deactivateInstead = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/users/${employee._id}`, {
+        method: 'PATCH',
+        body: { status: 'deactivated' },
+      });
+      setDeleting(null);
+      router.refresh();
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const confirmDelete = async () => {
     setBusy(true);
     setError('');
@@ -101,16 +118,27 @@ export function EmployeeActions({ employee, canEdit, canSwitch, canSeePassword, 
             <Button variant="secondary" onClick={() => setDeleting(null)} disabled={busy}>
               Cancel
             </Button>
+            {employee.status !== 'deactivated' && (
+              <Button onClick={deactivateInstead} disabled={busy}>
+                <Power size={15} /> Deactivate instead
+              </Button>
+            )}
             <Button variant="danger" onClick={confirmDelete} disabled={busy}>
               Delete
             </Button>
           </>
         }
       >
+        <p className="mb-3 rounded-lg bg-raised px-3 py-2 text-sm">
+          <span className="font-medium">Has this person left the company?</span> Deactivate instead:
+          they cannot sign in, and their attendance, salary slips and payments stay on record for
+          good.
+        </p>
         <p className="text-sm text-muted">
-          {employee.name} ({employee.employeeId}) is removed from every screen and signed out.
-          Everything that is theirs goes with them to Settings → Recently deleted, where you can
-          restore it all for 90 days. After that it is gone for good.
+          Delete only a record made by mistake. {employee.name} ({employee.employeeId}) is removed
+          from every screen and signed out. Everything that is theirs goes with them to Settings →
+          Recently deleted, where you can restore it all for 90 days. After that it is gone for
+          good.
         </p>
         {deleting?.length > 0 && (
           <ul className="mt-3 list-inside list-disc text-sm">
