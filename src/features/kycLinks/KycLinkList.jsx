@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Copy, Link2, MessageCircle, UserPlus, XCircle } from 'lucide-react';
+import { Copy, Link2, MessageCircle, Trash2, UserPlus, XCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { useListParams } from '@/lib/useListParams.js';
 import { formatDateTime } from '@/lib/format.js';
@@ -27,6 +27,7 @@ export function KycLinkList({ result, employees }) {
   const [search, setSearch] = useState(get('q'));
   const [dialog, setDialog] = useState(null); // 'employee' | 'new'
   const [made, setMade] = useState(null);
+  // { row, action: 'close' | 'delete' }
   const [closing, setClosing] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -46,7 +47,9 @@ export function KycLinkList({ result, employees }) {
     setBusy(true);
     setError('');
     try {
-      await apiFetch(`/api/kyc-links/${closing._id}`, { method: 'DELETE' });
+      await apiFetch(`/api/kyc-links/${closing.row._id}`, {
+        method: closing.action === 'delete' ? 'DELETE' : 'POST',
+      });
       setClosing(null);
       router.refresh();
     } catch (failure) {
@@ -136,23 +139,38 @@ export function KycLinkList({ result, employees }) {
             {
               key: 'actions',
               label: '',
-              render: (row) =>
-                row.state === 'open' ? (
-                  <div className="flex gap-1" onClick={(event) => event.stopPropagation()}>
-                    <Button variant="secondary" size="sm" onClick={() => copy(row.path)}>
-                      <Copy size={14} /> {copied === row.path ? 'Copied' : 'Copy link'}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label="Close the link"
-                      title="Close the link"
-                      onClick={() => setClosing(row)}
-                    >
-                      <XCircle size={14} />
-                    </Button>
-                  </div>
-                ) : null,
+              render: (row) => (
+                <div
+                  className="flex justify-end gap-1"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {row.state === 'open' && (
+                    <>
+                      <Button variant="secondary" size="sm" onClick={() => copy(row.path)}>
+                        <Copy size={14} /> {copied === row.path ? 'Copied' : 'Copy link'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Close the link"
+                        title="Close the link"
+                        onClick={() => setClosing({ row, action: 'close' })}
+                      >
+                        <XCircle size={14} />
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Delete the link"
+                    title="Delete"
+                    onClick={() => setClosing({ row, action: 'delete' })}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              ),
             },
           ]}
         />
@@ -174,9 +192,13 @@ export function KycLinkList({ result, employees }) {
       {made && <LinkMadeDialog link={made} onClose={() => setMade(null)} />}
       <ConfirmDialog
         open={Boolean(closing)}
-        title="Close this link?"
-        text="The link stops working. You can make a new one at any time."
-        confirmLabel="Close link"
+        title={closing?.action === 'delete' ? 'Delete this KYC link?' : 'Close this link?'}
+        text={
+          closing?.action === 'delete'
+            ? 'The link stops working and moves to Settings → Recently deleted, where you can restore it for 90 days. What the employee already sent stays in their file.'
+            : 'The link stops working. You can make a new one at any time.'
+        }
+        confirmLabel={closing?.action === 'delete' ? 'Delete' : 'Close link'}
         danger
         busy={busy}
         onConfirm={close}

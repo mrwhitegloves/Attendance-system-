@@ -9,6 +9,7 @@ const SECTIONS = [
   { id: 'document-types', label: 'Document types', href: '/settings/document-types' },
   { id: 'letter-templates', label: 'Letter templates', href: '/settings/letter-templates' },
   { id: 'company', label: 'Company', href: '/settings/company' },
+  { id: 'recently-deleted', label: 'Recently deleted', href: '/settings/recently-deleted' },
   {
     id: 'roles',
     label: 'Roles and permissions',

@@ -117,7 +117,7 @@ export function CompOffs({ userId, items, canManage }) {
       <ConfirmDialog
         open={Boolean(removing)}
         title="Remove this comp-off?"
-        text="The day off counts as a normal day again (absent if there is no punch) on slips filled after this."
+        text="The day off counts as a normal day again (absent if there is no punch) on slips filled after this. You can restore it from Settings → Recently deleted for 90 days."
         confirmLabel="Remove"
         danger
         busy={busy}

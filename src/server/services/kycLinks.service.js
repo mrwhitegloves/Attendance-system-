@@ -10,6 +10,7 @@ import { decodeImageDataUrl } from '../lib/images.js';
 import { isFullPhone, phoneKey } from '../lib/phone.js';
 import { isStorageConfigured, putFile } from '../infra/storage.js';
 import { recordAudit } from './audit.service.js';
+import { moveToTrash } from './trash.service.js';
 import { refreshCompleteness } from './completeness.service.js';
 import { createUser } from './users.service.js';
 import { writeKycDetails, writeKycProof } from './kyc.service.js';
@@ -155,6 +156,28 @@ export async function closeKycLink(actor, id, { ip } = {}) {
     summary: `KYC link of ${link.employeeId} closed`,
     ip,
   });
+  return { ok: true };
+}
+
+/** Moves a link to Recently deleted (90 days, restorable); it stops working at once. */
+export async function deleteKycLink(actor, id, { ip } = {}) {
+  requirePermission(actor, 'users.manage');
+  const link = await KycLink.findById(id)
+    .lean()
+    .catch(() => null);
+  if (!link) throw notFound('KYC link');
+  const user = await User.findById(link.userId, 'name').lean();
+  await moveToTrash(
+    actor,
+    {
+      kind: 'kyc_link',
+      label: `KYC link of ${user?.name ?? link.employeeId} (${link.employeeId})`,
+      detail: link.status === 'submitted' ? 'Submitted' : 'Not submitted',
+      entityId: id,
+      parts: [{ model: KycLink, filter: { _id: link._id } }],
+    },
+    { ip },
+  );
   return { ok: true };
 }
 

@@ -164,7 +164,7 @@ export function OfferLetterList({ result }) {
         title="Delete this offer letter?"
         text={
           deleting
-            ? `The offer letter of ${deleting.person.name} and all its versions are deleted. This cannot be undone.`
+            ? `The offer letter of ${deleting.person.name} and all its versions move to Settings → Recently deleted (restorable for 90 days).`
             : ''
         }
         confirmLabel="Delete"

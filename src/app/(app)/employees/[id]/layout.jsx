@@ -45,6 +45,11 @@ export default async function EmployeeLayout({ children, params }) {
           canEdit={canEdit}
           canSwitch={canEdit && employee._id !== String(user._id)}
           canSeePassword={Boolean(can(user, 'users.password'))}
+          canDelete={
+            canEdit &&
+            employee._id !== String(user._id) &&
+            (employee.roleKey !== 'ceo' || user.roleKey === 'ceo')
+          }
         />
       </div>
       <EmployeeTabs

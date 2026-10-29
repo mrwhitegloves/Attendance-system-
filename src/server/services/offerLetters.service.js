@@ -6,6 +6,7 @@ import { createAppError, notFound } from '../lib/errors.js';
 import { containsRegex } from '../lib/pagination.js';
 import { isFullPhone, phoneKey } from '../lib/phone.js';
 import { recordAudit } from './audit.service.js';
+import { moveToTrash } from './trash.service.js';
 import { assertNoOfferYet, createOfferLetter } from './letters.service.js';
 
 // The Offer letters screen (founder, 2026-10-29). Rules:
@@ -155,7 +156,7 @@ export async function startOfferLetter(actor, { name, phone, brandKey }, { ip } 
   return createOfferLetter(actor, { candidateId: candidate._id }, { ip });
 }
 
-/** Deletes an offer letter with all its versions (the founder's rule; audited). */
+/** Moves an offer letter with all its versions to Recently deleted (90 days, restorable). */
 export async function deleteOfferLetter(actor, id, { ip } = {}) {
   requirePermission(actor, 'letters.manage');
   const letter = await Letter.findById(id)
@@ -164,17 +165,20 @@ export async function deleteOfferLetter(actor, id, { ip } = {}) {
   if (!letter || letter.kind !== 'offer') throw notFound('Offer letter');
   const owner = letter.userId ? { userId: letter.userId } : { candidateId: letter.candidateId };
   const person = letter.userId
-    ? await User.findById(letter.userId, 'name employeeId').lean()
-    : await Candidate.findById(letter.candidateId, 'name').lean();
-  const { deletedCount } = await Letter.deleteMany({ ...owner, kind: 'offer' });
-  await recordAudit(actor, {
-    action: 'letter.deleted',
-    entity: 'letter',
-    entityId: id,
-    summary: `Offer letter of ${person?.name ?? 'a person'} deleted (${deletedCount} version${deletedCount === 1 ? '' : 's'})`,
-    ip,
-  });
-  return { ok: true, deleted: deletedCount };
+    ? await User.findById(letter.userId, 'name employeeId phone').lean()
+    : await Candidate.findById(letter.candidateId, 'name phone').lean();
+  const { counts } = await moveToTrash(
+    actor,
+    {
+      kind: 'offer_letter',
+      label: `Offer letter of ${person?.name ?? 'a person'}`,
+      detail: person?.phone ?? '',
+      entityId: id,
+      parts: [{ model: Letter, filter: { ...owner, kind: 'offer' } }],
+    },
+    { ip },
+  );
+  return { ok: true, deleted: counts.letters ?? 0 };
 }
 
 /** The candidate's offer letter that may still be linked to an employee (else an error). */
