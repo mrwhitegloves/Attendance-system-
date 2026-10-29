@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Camera, CheckCircle2, MapPin, RotateCcw } from 'lucide-react';
+import { Camera, CheckCircle2, MapPin, MapPinOff, RotateCcw } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { formatDayName } from '@/lib/format.js';
 import { Badge, Button, Card, ErrorText, Spinner } from '@/components/shared/ui.jsx';
@@ -121,6 +121,8 @@ export function PunchScreen({ day }) {
   };
 
   const nextLabel = day.next === 'in' ? 'Punch in' : 'Punch out';
+  // A punch needs the location (founder, 2026-10-29): no location, no punch.
+  const locationReady = location.status === 'ok';
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
@@ -135,6 +137,10 @@ export function PunchScreen({ day }) {
             {location.address}
           </p>
         </div>
+
+        {day.next !== 'done' && !locationReady && location.status !== 'finding' && (
+          <LocationNeeded location={location} />
+        )}
 
         {done && (
           <p className="mb-4 flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
@@ -169,8 +175,8 @@ export function PunchScreen({ day }) {
             <ErrorText>{error}</ErrorText>
             <div className="flex flex-wrap justify-center gap-2">
               {!cameraOn && !photo && (
-                <Button size="lg" onClick={startCamera}>
-                  <Camera size={18} /> Open camera
+                <Button size="lg" onClick={startCamera} disabled={!locationReady}>
+                  <Camera size={18} /> {nextLabel}
                 </Button>
               )}
               {cameraOn && (
@@ -183,8 +189,8 @@ export function PunchScreen({ day }) {
                   <Button variant="secondary" size="lg" onClick={startCamera} disabled={busy}>
                     <RotateCcw size={18} /> Retake
                   </Button>
-                  <Button size="lg" onClick={() => submit(false)} disabled={busy}>
-                    {busy && <Spinner />} {nextLabel}
+                  <Button size="lg" onClick={() => submit(false)} disabled={busy || !locationReady}>
+                    {busy && <Spinner />} Confirm {nextLabel.toLowerCase()}
                   </Button>
                 </>
               )}
@@ -240,6 +246,42 @@ export function PunchScreen({ day }) {
         onConfirm={() => submit(true)}
         onClose={() => setLateWarning('')}
       />
+    </div>
+  );
+}
+
+/** Location is off or not found: a clear way to turn it on, and how. */
+function LocationNeeded({ location }) {
+  return (
+    <div className="mb-4 rounded-xl border border-danger/40 bg-danger/10 p-4 text-sm">
+      <p className="flex items-center gap-2 font-semibold text-danger">
+        <MapPinOff size={18} />
+        {location.status === 'denied'
+          ? 'Turn on location to punch'
+          : 'Your location is needed to punch'}
+      </p>
+      <p className="mt-1 text-muted">
+        {location.status === 'denied'
+          ? 'Your location is saved with every punch. Allow location for this site, then press the button.'
+          : location.status === 'unsupported'
+            ? 'This browser cannot share a location. Please open the app in Chrome or Safari on your phone.'
+            : 'Switch on Location (GPS) on your phone, then press the button.'}
+      </p>
+      {location.status === 'denied' && (
+        <ul className="mt-2 list-inside list-disc text-xs text-muted">
+          <li>
+            Android (Chrome): tap the icon left of the address bar → Permissions → Location → Allow.
+          </li>
+          <li>
+            iPhone (Safari): Settings → Privacy → Location Services → Safari Websites → While Using.
+          </li>
+        </ul>
+      )}
+      {location.status !== 'unsupported' && (
+        <Button className="mt-3" onClick={location.retry}>
+          <MapPin size={16} /> Turn on location
+        </Button>
+      )}
     </div>
   );
 }

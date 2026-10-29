@@ -284,6 +284,40 @@ function dayStatus(records, pendingLeave) {
   return 'No punch';
 }
 
+/**
+ * The person's own last `count` days, newest first (dashboard history): punches with their
+ * photo and place, the day's status and the hours worked.
+ */
+export async function getMyRecentDays(actor, count = 7, now = new Date()) {
+  requirePermission(actor, 'attendance.punch');
+  const today = indiaDay(now);
+  const start = new Date(`${today}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - (count - 1));
+  const days = daysBetween(start.toISOString().slice(0, 10), today).reverse();
+  const records = await Attendance.find({
+    employeeId: actor.employeeId,
+    date: { $gte: days.at(-1), $lte: today },
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+  const byDay = Map.groupBy(records, (record) => record.date);
+  return Promise.all(
+    days.map(async (date) => {
+      const own = byDay.get(date) ?? [];
+      const first = own.find(isPunchIn) ?? null;
+      const last = own.findLast((record) => record.status === 'Checked Out') ?? null;
+      return {
+        date,
+        status: isWeeklyOff(actor, date) && !first ? 'Weekly off' : dayStatus(own, false),
+        punchIn: first ? await toView(first) : null,
+        punchOut: last ? await toView(last) : null,
+        minutesWorked: hoursBetween(first, last),
+        remark: own.find((record) => record.remark)?.remark ?? '',
+      };
+    }),
+  );
+}
+
 /** One day for everyone in scope: who came, when, from where. */
 export async function getDailySheet(actor, date = indiaDay()) {
   const scope = await employeeScopeFilter(actor, 'attendance.view');
