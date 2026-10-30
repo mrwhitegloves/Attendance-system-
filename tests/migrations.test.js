@@ -23,3 +23,36 @@ describe('migration runner', () => {
     expect(await Migration.countDocuments()).toBe(1);
   });
 });
+
+describe('018: employees without a sign-in email', () => {
+  it('rebuilds the old email index so several employees may have no email', async () => {
+    const { User } = await import('@/server/models/user.model.js');
+    // The first version's index: unique, not sparse.
+    await User.collection.dropIndex('email_1');
+    await User.collection.createIndex({ email: 1 }, { unique: true });
+    await User.collection.insertOne({ name: 'A', employeeId: 'MWG-801', password: 'x' });
+    await expect(
+      User.collection.insertOne({ name: 'B', employeeId: 'MWG-802', password: 'x' }),
+    ).rejects.toThrow(/duplicate/);
+
+    const migration = MIGRATIONS.find((item) => item.name === '018-email-index-allows-empty');
+    await migration.up();
+    await migration.up(); // safe to run again
+
+    await User.collection.insertOne({ name: 'B', employeeId: 'MWG-802', password: 'x' });
+    await User.collection.insertOne({
+      name: 'C',
+      employeeId: 'MWG-803',
+      password: 'x',
+      email: 'c@x.in',
+    });
+    await expect(
+      User.collection.insertOne({
+        name: 'D',
+        employeeId: 'MWG-804',
+        password: 'x',
+        email: 'c@x.in',
+      }),
+    ).rejects.toThrow(/duplicate/);
+  });
+});
