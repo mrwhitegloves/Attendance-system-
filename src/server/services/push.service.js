@@ -31,7 +31,7 @@ export async function notifyUsers(userIds, payload) {
 }
 
 /** Active users whose role has a permission. */
-async function usersWithPermission(permission) {
+export async function usersWithPermission(permission) {
   const roleKeys = roleKeysWith(permission);
   const users = await User.find({ roleKey: { $in: roleKeys }, status: 'active' }, '_id').lean();
   return users.map((user) => user._id);

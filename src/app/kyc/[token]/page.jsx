@@ -35,7 +35,7 @@ export default async function KycPage({ params }) {
       </header>
       {problem ? (
         <Card className="p-6 text-center text-sm">{problem}</Card>
-      ) : data.state === 'submitted' ? (
+      ) : data.state !== 'open' ? (
         <Thanks name={data.name} />
       ) : (
         <>

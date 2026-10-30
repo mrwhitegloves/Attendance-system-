@@ -56,6 +56,16 @@ const userSchema = new mongoose.Schema(
       relation: { type: String, default: '' },
       phone: { type: String, default: '' },
     },
+    // From the KYC form (founder, 2026-10-30): fresher, or the last company before this one.
+    previousEmployment: {
+      experienceType: { type: String, enum: ['fresher', 'experienced', ''], default: '' },
+      companyName: { type: String, default: '' },
+      hrName: { type: String, default: '' },
+      hrPhone: { type: String, default: '' },
+      hrEmail: { type: String, default: '' },
+      reportingManager: { type: String, default: '' },
+      lastDrawnMonthlyPaise: { type: Number, default: null },
+    },
 
     // ---- Employment ----
     // Names from the managed lists (Settings → Lists); a rename updates every employee.
@@ -98,6 +108,7 @@ export const User = mongoose.models.User || mongoose.model('User', userSchema);
 export const PUBLIC_USER_FIELDS = [
   '_id name phone employeeId employeeCode email username roleKey status lastLoginAt createdAt updatedAt',
   'photoKey dateOfBirth gender bloodGroup personalEmail currentAddress permanentAddress emergencyContact',
+  'previousEmployment',
   'department designation branch staffType employmentType workMode employmentStatus joiningDate',
   'probationEndDate managerId expectedInTime expectedOutTime completeness brandKey weeklyOffs',
 ].join(' ');

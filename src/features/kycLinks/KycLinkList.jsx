@@ -13,10 +13,13 @@ import { compactInputClass, Field, inputClass, Select } from '@/components/share
 
 const STATE = {
   open: { label: 'Waiting for the employee', tone: 'info' },
-  submitted: { label: 'Submitted', tone: 'success' },
-  expired: { label: 'Expired', tone: 'warning' },
+  sentBack: { label: 'Sent back to the employee', tone: 'warning' },
+  submitted: { label: 'Waiting for HR review', tone: 'warning' },
+  approved: { label: 'Approved, in the file', tone: 'success' },
+  expired: { label: 'Expired', tone: 'neutral' },
   closed: { label: 'Closed', tone: 'neutral' },
 };
+const stateKey = (row) => (row.state === 'open' && row.rejectReason ? 'sentBack' : row.state);
 
 const fullUrl = (path) => `${window.location.origin}${path}`;
 
@@ -94,7 +97,11 @@ export function KycLinkList({ result, employees }) {
         </div>
         <DataTable
           rows={result.items}
-          onRowClick={(row) => row.employee._id && router.push(`/employees/${row.employee._id}`)}
+          onRowClick={(row) =>
+            row.state === 'submitted'
+              ? router.push(`/kyc-links/${row._id}`)
+              : row.employee._id && router.push(`/employees/${row.employee._id}`)
+          }
           empty={{
             title: 'No KYC links yet',
             text: 'Make a link and send it to the employee on WhatsApp.',
@@ -118,7 +125,9 @@ export function KycLinkList({ result, employees }) {
             {
               key: 'state',
               label: 'Status',
-              render: (row) => <Badge tone={STATE[row.state].tone}>{STATE[row.state].label}</Badge>,
+              render: (row) => (
+                <Badge tone={STATE[stateKey(row)].tone}>{STATE[stateKey(row)].label}</Badge>
+              ),
             },
             {
               key: 'when',
@@ -144,6 +153,11 @@ export function KycLinkList({ result, employees }) {
                   className="flex justify-end gap-1"
                   onClick={(event) => event.stopPropagation()}
                 >
+                  {row.state === 'submitted' && (
+                    <Button size="sm" onClick={() => router.push(`/kyc-links/${row._id}`)}>
+                      Review
+                    </Button>
+                  )}
                   {row.state === 'open' && (
                     <>
                       <Button variant="secondary" size="sm" onClick={() => copy(row.path)}>

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { CheckCircle2, CircleAlert } from 'lucide-react';
 import { Card, CardHeader } from '@/components/shared/ui.jsx';
 import { CompletenessBar } from '@/components/shared/Avatar.jsx';
-import { formatDateTime, formatDay } from '@/lib/format.js';
+import { formatDateTime, formatDay, formatRupees } from '@/lib/format.js';
 import { EMPLOYMENT_STATUS, EMPLOYMENT_TYPE, GENDER, WORK_MODE } from '@/config/employeeOptions.js';
 
 const orDash = (value) => (value ? value : '—');
@@ -11,6 +11,7 @@ const orDash = (value) => (value ? value : '—');
 export function EmployeeFile({ employee, managerName, roleName, checklist, canEdit, editHref }) {
   const href = editHref ?? `/employees/${employee._id}/edit`;
   const contact = employee.emergencyContact ?? {};
+  const previous = employee.previousEmployment ?? {};
   const sections = [
     {
       title: 'Personal',
@@ -32,6 +33,26 @@ export function EmployeeFile({ employee, managerName, roleName, checklist, canEd
         ['Relation', orDash(contact.relation)],
         ['Phone', orDash(contact.phone)],
       ],
+    },
+    {
+      title: 'Previous employment',
+      rows:
+        previous.experienceType === 'experienced'
+          ? [
+              ['Experience', 'Experienced'],
+              ['Previous company', orDash(previous.companyName)],
+              ["HR's name", orDash(previous.hrName)],
+              ["HR's contact number", orDash(previous.hrPhone)],
+              ["HR's email", orDash(previous.hrEmail)],
+              ['Reporting manager', orDash(previous.reportingManager)],
+              [
+                'Last drawn monthly salary',
+                previous.lastDrawnMonthlyPaise != null
+                  ? formatRupees(previous.lastDrawnMonthlyPaise)
+                  : '—',
+              ],
+            ]
+          : [['Experience', previous.experienceType === 'fresher' ? 'Fresher' : '—']],
     },
     {
       title: 'Employment',

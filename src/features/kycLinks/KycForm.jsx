@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { CheckCircle2, Upload } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle2, CloudOff, Upload } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { ACCEPTED_UPLOADS, readUploadFile, shrinkImage } from '@/lib/readFile.js';
 import { BLOOD_GROUPS, GENDER } from '@/config/employeeOptions.js';
 import { Button, Card, ErrorText, Spinner } from '@/components/shared/ui.jsx';
 import { Field, inputClass, Select } from '@/components/shared/form.jsx';
+import { flattenDraft, readLocalDraft, useDraftSaver } from './useDraft.js';
 
 const EMPTY = {
   phone: '',
@@ -27,32 +28,57 @@ const EMPTY = {
   'bank.ifsc': '',
   'bank.accountNumber': '',
   accountNumberAgain: '',
+  sameAddress: false,
+  experienceType: '',
+  'previousCompany.name': '',
+  'previousCompany.hrName': '',
+  'previousCompany.hrPhone': '',
+  'previousCompany.hrEmail': '',
+  'previousCompany.reportingManager': '',
+  lastDrawnSalary: '',
 };
+
+// Form-only keys that are not sent.
+const NOT_SENT = ['accountNumberAgain', 'sameAddress'];
+const PREVIOUS = ['previousCompany', 'lastDrawnSalary'];
 
 /** "a.b" keys → nested objects, as the server expects. */
 function toBody(form) {
   const body = {};
   for (const [key, value] of Object.entries(form)) {
-    if (key === 'accountNumberAgain') continue;
+    if (NOT_SENT.includes(key)) continue;
     const [group, field] = key.split('.');
-    if (field) body[group] = { ...body[group], [field]: value.trim() };
-    else body[key] = value.trim();
+    // A fresher has no previous company.
+    if (form.experienceType !== 'experienced' && PREVIOUS.includes(group)) continue;
+    const clean = String(value ?? '').trim();
+    if (field) body[group] = { ...body[group], [field]: clean };
+    else body[key] = clean;
   }
+  if (form.sameAddress) body.permanentAddress = body.currentAddress;
   return body;
 }
 
 /** The employee's KYC form, opened from the link HR sent (no sign-in). */
 export function KycForm({ token, data }) {
-  const [form, setForm] = useState(EMPTY);
+  // The saved draft (server), then — after the page is shown — this device's newer copy.
+  const [form, setForm] = useState(() => ({ ...EMPTY, ...flattenDraft(data.draft) }));
   const [uploads, setUploads] = useState(data.uploads);
   const [uploading, setUploading] = useState('');
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [sameAddress, setSameAddress] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const draft = useDraftSaver(token, form, { enabled: !done });
 
-  const update = (key) => (event) => setForm({ ...form, [key]: event.target.value });
+  useEffect(() => {
+    const local = readLocalDraft(token, data.draftRev ?? 0);
+    if (local) setForm((current) => ({ ...current, ...local }));
+  }, [token, data.draftRev]);
+
+  const sameAddress = Boolean(form.sameAddress);
+  const experienced = form.experienceType === 'experienced';
+  const update = (key) => (event) =>
+    setForm((current) => ({ ...current, [key]: event.target.value }));
 
   const upload = (field) => async (event) => {
     const file = event.target.files?.[0];
@@ -84,11 +110,9 @@ export function KycForm({ token, data }) {
     }
     setBusy(true);
     try {
-      const body = toBody({
-        ...form,
-        permanentAddress: sameAddress ? form.currentAddress : form.permanentAddress,
-      });
+      const body = toBody(form);
       await apiFetch(`/api/public/kyc/${token}`, { method: 'POST', body });
+      draft.clear();
       setDone(true);
       window.scrollTo({ top: 0 });
     } catch (failure) {
@@ -148,6 +172,18 @@ export function KycForm({ token, data }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {data.rejectReason && (
+        <div className="rounded-xl border border-danger/40 bg-danger/10 p-4 text-sm">
+          <p className="flex items-center gap-2 font-semibold text-danger">
+            <AlertTriangle size={18} /> HR sent your form back
+          </p>
+          <p className="mt-1">{data.rejectReason}</p>
+          <p className="mt-1 text-xs text-muted">
+            Your answers and files are still here. Correct them and send the form again.
+          </p>
+        </div>
+      )}
+      <DraftStatus status={draft.status} />
       <Card className="p-4 sm:p-5">
         <h2 className="mb-3 text-sm font-semibold">Your photo</h2>
         <div className="flex items-center gap-4">
@@ -218,7 +254,9 @@ export function KycForm({ token, data }) {
               <input
                 type="checkbox"
                 checked={sameAddress}
-                onChange={(event) => setSameAddress(event.target.checked)}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, sameAddress: event.target.checked }))
+                }
               />
               Same as the current address
             </label>
@@ -285,6 +323,93 @@ export function KycForm({ token, data }) {
         </fieldset>
       </Card>
 
+      <Card className="p-4 sm:p-5">
+        <fieldset>
+          <legend className="mb-3 text-sm font-semibold">
+            Your work experience <span className="text-danger">*</span>
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              ['fresher', 'Fresher', 'This is my first job.'],
+              ['experienced', 'Experienced', 'I worked in another company before.'],
+            ].map(([value, label, hint]) => (
+              <label
+                key={value}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm ${form.experienceType === value ? 'border-brand bg-brand/5' : 'border-border'}`}
+              >
+                <input
+                  type="radio"
+                  name="experienceType"
+                  value={value}
+                  required
+                  checked={form.experienceType === value}
+                  onChange={update('experienceType')}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block font-medium">{label}</span>
+                  <span className="block text-xs text-muted">{hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      </Card>
+
+      {experienced && (
+        <>
+          <Card className="p-4 sm:p-5">
+            <fieldset className="grid gap-4 sm:grid-cols-2">
+              <legend className="mb-3 text-sm font-semibold">Previous company details</legend>
+              {text('previousCompany.name', 'Previous company name')}
+              {text('previousCompany.hrName', "Previous company HR's name")}
+              {text('previousCompany.hrPhone', "Previous company HR's contact number", {
+                type: 'tel',
+                inputMode: 'tel',
+              })}
+              {text('previousCompany.hrEmail', "Previous company HR's email ID", { type: 'email' })}
+              {text('previousCompany.reportingManager', 'Reporting manager name (optional)', {
+                required: false,
+              })}
+            </fieldset>
+          </Card>
+
+          <Card className="p-4 sm:p-5">
+            <fieldset className="grid gap-4">
+              <legend className="mb-3 text-sm font-semibold">Previous company salary</legend>
+              {text('lastDrawnSalary', 'Last drawn monthly salary (₹)', {
+                type: 'number',
+                inputMode: 'decimal',
+                min: 1,
+                step: '0.01',
+              })}
+              <p className="text-xs text-muted">
+                Salary slip or salary bank statement of your latest 3 months (photo or PDF).
+              </p>
+              {fileField('salarySlip1', 'Latest month')}
+              {fileField('salarySlip2', 'Month before')}
+              {fileField('salarySlip3', 'Third month')}
+            </fieldset>
+          </Card>
+
+          <Card className="p-4 sm:p-5">
+            <h2 className="mb-3 text-sm font-semibold">Previous company employment document</h2>
+            {fileField(
+              'experienceDoc',
+              'Experience certificate, joining letter or offer letter of the previous company',
+            )}
+          </Card>
+        </>
+      )}
+
+      <Card className="p-4 sm:p-5">
+        <h2 className="mb-1 text-sm font-semibold">White Gloves Technology documents</h2>
+        <p className="mb-3 text-xs text-muted">
+          Your offer letter from White Gloves Technology, signed by you (photo or PDF).
+        </p>
+        {fileField('signedOfferLetter', 'Signed offer letter')}
+      </Card>
+
       {data.documents.length > 0 && (
         <Card className="p-4 sm:p-5">
           <h2 className="mb-1 text-sm font-semibold">Documents (if you have them)</h2>
@@ -308,11 +433,38 @@ export function KycForm({ token, data }) {
             {busy && <Spinner />} Submit my details
           </Button>
           <p className="text-center text-xs text-muted">
-            You can send this form only once. HR can correct any detail later.
+            Your answers are saved while you type. After you send the form, HR checks it.
           </p>
         </div>
       </Card>
     </form>
+  );
+}
+
+/** Shows whether the answers are saved (on the server, or only on this device). */
+function DraftStatus({ status }) {
+  if (status === 'idle') return null;
+  return (
+    <p
+      className={`sticky top-2 z-10 ml-auto flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs shadow-sm ${status === 'offline' ? 'bg-warning/15 text-warning' : 'bg-surface text-muted'}`}
+      aria-live="polite"
+    >
+      {status === 'saving' && (
+        <>
+          <Spinner className="h-3 w-3" /> Saving…
+        </>
+      )}
+      {status === 'saved' && (
+        <>
+          <CheckCircle2 size={13} className="text-success" /> Your answers are saved
+        </>
+      )}
+      {status === 'offline' && (
+        <>
+          <CloudOff size={13} /> No internet: saved on this phone, will be sent
+        </>
+      )}
+    </p>
   );
 }
 
@@ -322,7 +474,7 @@ export function Thanks({ name }) {
       <CheckCircle2 className="mx-auto mb-3 text-success" size={40} />
       <h2 className="text-lg font-semibold">Thank you{name ? `, ${name}` : ''}!</h2>
       <p className="mt-1 text-sm text-muted">
-        Your details were sent to HR. You can close this page.
+        Your details were sent to HR for checking. You can close this page.
       </p>
     </Card>
   );

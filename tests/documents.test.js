@@ -25,7 +25,8 @@ describe('document catalogue', () => {
     const staff = await makeUser();
     await runMigrations();
     await runMigrations();
-    expect(await DocumentType.countDocuments()).toBe(25);
+    // 25 from the first catalogue + "Previous salary slip" (migration 019, KYC form).
+    expect(await DocumentType.countDocuments()).toBe(26);
     const user = await User.findById(staff._id).lean();
     expect(user.completeness.missing).toContain('Resume');
     expect(user.completeness.missing).toContain('NDA (signed)');
