@@ -9,6 +9,8 @@ import { recomputeAllCompleteness, refreshCompleteness } from '../services/compl
 import { Payslip } from '../models/payslip.model.js';
 import { Candidate } from '../models/candidate.model.js';
 import { phoneKey } from '../lib/phone.js';
+import { KycLink } from '../models/kycLink.model.js';
+import { DocumentType } from '../models/document.model.js';
 
 // Changes to existing data, in order. Each runs once (its name is stored in `migrations`)
 // and must be safe to run again. Never edit the database by hand; add a migration here.
@@ -142,6 +144,28 @@ export const MIGRATIONS = [
       if (current?.unique && current.sparse) return;
       if (current) await User.collection.dropIndex('email_1');
       await User.collection.createIndex({ email: 1 }, { unique: true, sparse: true });
+    },
+  },
+  {
+    name: '019-kyc-review-and-previous-salary',
+    // KYC forms are now checked by HR before they reach the file. Forms sent before this were
+    // written at once: they count as approved. The catalogue gets "Previous salary slip".
+    up: async () => {
+      await KycLink.updateMany(
+        { status: 'submitted', submitted: { $ne: null } },
+        { $set: { status: 'approved' } },
+      );
+      const exists = await DocumentType.findOne({ name: 'Previous salary slip' })
+        .collation({ locale: 'en', strength: 2 })
+        .lean();
+      if (!exists) {
+        const last = await DocumentType.findOne({}, 'order').sort({ order: -1 }).lean();
+        await DocumentType.create({
+          category: 'hiring',
+          name: 'Previous salary slip',
+          order: (last?.order ?? 0) + 1,
+        });
+      }
     },
   },
 ];

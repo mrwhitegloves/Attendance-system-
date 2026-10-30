@@ -57,6 +57,30 @@ function sections({ editing, lists, managers, roles, staffTypes, employeeId }) {
       ],
     },
     {
+      title: 'Previous employment',
+      fields: [
+        {
+          key: 'previousEmployment.experienceType',
+          label: 'Experience',
+          type: 'select',
+          options: choose([
+            { value: 'fresher', label: 'Fresher' },
+            { value: 'experienced', label: 'Experienced' },
+          ]),
+        },
+        { key: 'previousEmployment.companyName', label: 'Previous company' },
+        { key: 'previousEmployment.hrName', label: "Previous company HR's name" },
+        { key: 'previousEmployment.hrPhone', label: "HR's contact number", type: 'tel' },
+        { key: 'previousEmployment.hrEmail', label: "HR's email", type: 'email' },
+        { key: 'previousEmployment.reportingManager', label: 'Reporting manager there' },
+        {
+          key: 'previousEmployment.lastDrawnMonthly',
+          label: 'Last drawn monthly salary (₹)',
+          type: 'number',
+        },
+      ],
+    },
+    {
       title: 'Employment',
       fields: [
         {
@@ -155,6 +179,13 @@ const KEYS = [
   'emergencyContact.name',
   'emergencyContact.relation',
   'emergencyContact.phone',
+  'previousEmployment.experienceType',
+  'previousEmployment.companyName',
+  'previousEmployment.hrName',
+  'previousEmployment.hrPhone',
+  'previousEmployment.hrEmail',
+  'previousEmployment.reportingManager',
+  'previousEmployment.lastDrawnMonthly',
   'employeeCode',
   'designation',
   'department',
@@ -194,7 +225,12 @@ function initialValues(employee) {
         ? ''
         : key === 'weeklyOffs'
           ? (employee?.weeklyOffs ?? [0]).join(',')
-          : String((employee && read(employee, key)) ?? DEFAULTS[key] ?? ''),
+          : key === 'previousEmployment.lastDrawnMonthly'
+            ? // Stored in paise, typed in rupees.
+              employee?.previousEmployment?.lastDrawnMonthlyPaise != null
+              ? String(employee.previousEmployment.lastDrawnMonthlyPaise / 100)
+              : ''
+            : String((employee && read(employee, key)) ?? DEFAULTS[key] ?? ''),
     ]),
   );
 }
@@ -206,7 +242,7 @@ function toBody(form, initial, editing) {
   );
   const body = {};
   for (const key of changed) {
-    if (key.startsWith('emergencyContact.')) continue;
+    if (key.startsWith('emergencyContact.') || key.startsWith('previousEmployment.')) continue;
     if (key === 'password' && !form.password) continue;
     body[key] =
       key === 'managerId'
@@ -220,6 +256,18 @@ function toBody(form, initial, editing) {
       name: form['emergencyContact.name'],
       relation: form['emergencyContact.relation'],
       phone: form['emergencyContact.phone'],
+    };
+  }
+  if (changed.some((key) => key.startsWith('previousEmployment.'))) {
+    const rupees = form['previousEmployment.lastDrawnMonthly'];
+    body.previousEmployment = {
+      experienceType: form['previousEmployment.experienceType'],
+      companyName: form['previousEmployment.companyName'],
+      hrName: form['previousEmployment.hrName'],
+      hrPhone: form['previousEmployment.hrPhone'],
+      hrEmail: form['previousEmployment.hrEmail'],
+      reportingManager: form['previousEmployment.reportingManager'],
+      lastDrawnMonthlyPaise: rupees === '' ? null : Math.round(Number(rupees) * 100),
     };
   }
   return body;

@@ -76,6 +76,15 @@ const profileFields = {
     relation: text(40),
     phone: text(20),
   }),
+  previousEmployment: z.strictObject({
+    experienceType: z.enum(['fresher', 'experienced', '']),
+    companyName: text(120),
+    hrName: text(100),
+    hrPhone: text(20),
+    hrEmail: text(120),
+    reportingManager: text(100),
+    lastDrawnMonthlyPaise: z.number().int().min(0).max(1_000_000_000).nullable(),
+  }),
   department: text(60),
   designation: text(60),
   branch: text(60),
@@ -861,7 +870,7 @@ export const kycFileBody = z.strictObject({
 
 const mobile = text(20).regex(/^[+\d][\d\s-]{9,}$/, 'enter a 10-digit mobile number');
 
-export const kycSubmitBody = z.strictObject({
+const kycAnswers = {
   phone: mobile,
   dateOfBirth: day,
   gender: z.enum(GENDERS, 'choose'),
@@ -882,6 +891,52 @@ export const kycSubmitBody = z.strictObject({
       .trim()
       .regex(/^\d{9,18}$/, '9 to 18 digits'),
   }),
+  // Fresher, or experienced with the previous company (founder, 2026-10-30).
+  experienceType: z.enum(['fresher', 'experienced'], 'choose fresher or experienced'),
+  previousCompany: z
+    .strictObject({
+      name: text(120).min(2, 'enter the company name'),
+      hrName: text(100).min(2, "enter the HR's name"),
+      hrPhone: mobile,
+      hrEmail: z.email("enter the HR's email"),
+      reportingManager: text(100).default(''),
+    })
+    .optional(),
+  lastDrawnSalary: z.coerce
+    .number('enter the salary in rupees')
+    .positive('enter the salary in rupees')
+    .max(10_000_000)
+    .optional(),
+};
+
+export const kycSubmitBody = z.strictObject(kycAnswers).superRefine((value, context) => {
+  if (value.experienceType !== 'experienced') return;
+  if (!value.previousCompany) {
+    context.addIssue({
+      code: 'custom',
+      path: ['previousCompany'],
+      message: 'fill in the previous company',
+    });
+  }
+  if (!value.lastDrawnSalary) {
+    context.addIssue({
+      code: 'custom',
+      path: ['lastDrawnSalary'],
+      message: 'enter the last salary',
+    });
+  }
+});
+
+// A draft: whatever is typed so far (flat "a.b" keys, short texts, a few booleans).
+export const kycDraftBody = z.strictObject({
+  rev: z.number().int().positive(),
+  draft: z
+    .record(z.string().max(60), z.union([z.string().max(400), z.boolean()]))
+    .refine((value) => Object.keys(value).length <= 60, 'too many fields'),
+});
+
+export const rejectKycBody = z.strictObject({
+  reason: text(500).min(3, 'say what must be corrected'),
 });
 
 // ---- Recently deleted ----
