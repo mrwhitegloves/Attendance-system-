@@ -131,6 +131,19 @@ export const MIGRATIONS = [
       }
     },
   },
+  {
+    name: '018-email-index-allows-empty',
+    // The first version made `email` unique without "sparse": only one employee could be
+    // without a sign-in email ("This email is already used"). Rebuilt as unique + sparse:
+    // an email is still never used twice, an empty one is allowed for everyone.
+    up: async () => {
+      const indexes = await User.collection.indexes();
+      const current = indexes.find((index) => index.name === 'email_1');
+      if (current?.unique && current.sparse) return;
+      if (current) await User.collection.dropIndex('email_1');
+      await User.collection.createIndex({ email: 1 }, { unique: true, sparse: true });
+    },
+  },
 ];
 
 // On Vercel several servers can start at the same moment. Only the one that writes this row
