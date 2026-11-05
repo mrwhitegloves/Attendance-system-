@@ -12,7 +12,9 @@ import { containsRegex } from '../lib/pagination.js';
 import { recordAudit } from './audit.service.js';
 import { salaryInForce } from './salary.service.js';
 import { buildMonthDays } from './attendance.service.js';
-import { leaveBalanceOf } from './leaveRules.service.js';
+import { leaveBalanceOf, takeFromBalance } from './leaveRules.service.js';
+import { writeLeaveDays } from './leaves.service.js';
+import { LeaveRequest } from '../models/leaveRequest.model.js';
 import { calculateMonth } from '../lib/payslipRules.js';
 import { getCompany } from './settings.service.js';
 import { notifyUsers } from './push.service.js';
@@ -392,4 +394,70 @@ export async function listPayslips(actor, query) {
     Payslip.countDocuments(filter),
   ]);
   return { items, total, page, pageSize, pages: Math.max(1, Math.ceil(total / pageSize)) };
+}
+
+/**
+ * An absent day of a draft slip's month was really leave (founder, 2026-11-05): HR marks it on
+ * the slip screen, paid or unpaid. It is recorded like an approved leave (a leave request
+ * approved by HR, the day's "Leave" attendance row, and for paid leave optionally a day off the
+ * paid leave balance), then only the slip's attendance numbers and loss of pay are worked out
+ * again; earnings typed by hand stay as they are.
+ */
+export async function markAbsentAsLeave(
+  actor,
+  id,
+  { date, paid, useBalance, reason },
+  { ip } = {},
+) {
+  requirePermission(actor, 'payslips.manage');
+  const slip = await loadSlip(actor, id);
+  if (slip.status !== 'draft') throw createAppError(409, 'This slip is final. Re-open it first.');
+  if (date.slice(0, 7) !== slip.month)
+    throw createAppError(400, 'date: choose a day of this slip’s month');
+  const user = await User.findById(slip.userId).lean();
+  const day = (await buildMonthDays(user, slip.month)).find((item) => item.date === date);
+  if (day?.countedAs !== 'absent') {
+    throw createAppError(409, 'Only a day counted as absent can be marked as leave.');
+  }
+  const leave = (
+    await LeaveRequest.create({
+      employeeId: user.employeeId,
+      employeeName: user.name,
+      userId: user._id,
+      startDate: date,
+      endDate: date,
+      reason,
+      status: 'approved',
+      paid,
+      adminNote: `Marked as ${paid ? 'paid' : 'unpaid'} leave by ${actor.name} on the salary slip`,
+      processedAt: new Date(),
+      processedBy: actor._id,
+    })
+  ).toObject();
+  await writeLeaveDays(leave, actor);
+  if (paid && useBalance) await takeFromBalance(actor, leave, slip.month);
+
+  // The slip's attendance part again, from the records (as "Fill again" would do it).
+  const fresh = await prefill(user, slip.month);
+  const set = {
+    attendance: fresh.attendance,
+    'deductions.lossOfPay': fresh.deductions.lossOfPay,
+    calculation: {
+      ...fresh.calculation,
+      reimbursementRequestIds: slip.calculation?.reimbursementRequestIds ?? [],
+    },
+    lastEditedBy: actor._id,
+    lastEditedAt: new Date(),
+  };
+  const deductions = { ...slip.deductions, lossOfPay: fresh.deductions.lossOfPay };
+  Object.assign(set, withTotals({ earnings: slip.earnings, deductions }));
+  await Payslip.updateOne({ _id: id, status: 'draft' }, { $set: set });
+  await recordAudit(actor, {
+    action: 'payslip.absent_marked_leave',
+    entity: 'payslip',
+    entityId: id,
+    summary: `${user.name} (${user.employeeId}): ${date} marked as ${paid ? 'paid' : 'unpaid'} leave on the ${slip.month} slip${paid && useBalance ? ', taken from the paid leave balance' : ''}. ${reason}`,
+    ip,
+  });
+  return getPayslip(actor, id);
 }

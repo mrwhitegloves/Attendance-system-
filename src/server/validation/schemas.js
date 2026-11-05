@@ -948,3 +948,11 @@ export const listTrashQuery = z.object({
     .catch(undefined),
   page,
 });
+
+// An absent day on a draft salary slip marked as leave (founder, 2026-11-05).
+export const markLeaveBody = z.strictObject({
+  date: day,
+  paid: z.boolean(),
+  useBalance: z.boolean().default(false),
+  reason: text(300).min(3, 'say why (for the leave record)'),
+});

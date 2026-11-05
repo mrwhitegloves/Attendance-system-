@@ -30,6 +30,9 @@ export default async function PayslipPage({ params }) {
           data={toPlain(attendance)}
           slipAttendance={slip.attendance}
           expectedInTime={attendance.expectedInTime}
+          slipId={String(slip._id)}
+          canMarkLeave={slip.permissions.edit}
+          leaveBalance={slip.attendance?.balanceLeaves ?? 0}
         />
       </div>
     </>
