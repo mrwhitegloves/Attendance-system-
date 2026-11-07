@@ -168,6 +168,11 @@ export const MIGRATIONS = [
       }
     },
   },
+  {
+    name: '020-attendance-edit-permission',
+    // Correcting punch times: the new permission reaches roles already in the database.
+    up: () => addMissingDefaultPermissions(['attendance.edit']),
+  },
 ];
 
 // On Vercel several servers can start at the same moment. Only the one that writes this row

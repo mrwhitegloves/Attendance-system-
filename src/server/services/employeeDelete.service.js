@@ -1,5 +1,6 @@
 import { User } from '../models/user.model.js';
 import { Attendance } from '../models/attendance.model.js';
+import { AttendanceEdit } from '../models/attendanceEdit.model.js';
 import { LeaveRequest } from '../models/leaveRequest.model.js';
 import { Kyc } from '../models/kyc.model.js';
 import { KycLink } from '../models/kycLink.model.js';
@@ -25,6 +26,7 @@ import { moveToTrash } from './trash.service.js';
 
 const OWN_RECORDS = [
   ['attendance records', Attendance],
+  ['attendance edits', AttendanceEdit],
   ['leave requests', LeaveRequest],
   ['KYC', Kyc],
   ['KYC links', KycLink],
