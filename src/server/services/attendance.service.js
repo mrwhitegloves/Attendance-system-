@@ -2,7 +2,8 @@ import { Attendance, PUNCH_IN_STATUSES } from '../models/attendance.model.js';
 import { User } from '../models/user.model.js';
 import { LeaveRequest } from '../models/leaveRequest.model.js';
 import { Payslip } from '../models/payslip.model.js';
-import { canSeeEmployee, employeeScopeFilter, requirePermission } from '../permissions/can.js';
+import { AttendanceEdit } from '../models/attendanceEdit.model.js';
+import { can, canSeeEmployee, employeeScopeFilter, requirePermission } from '../permissions/can.js';
 import { createAppError, notFound } from '../lib/errors.js';
 import { runListQuery } from '../lib/pagination.js';
 import { isWeeklyOff } from '../../config/employeeOptions.js';
@@ -31,10 +32,10 @@ import { dayCondition } from '../lib/dateFilter.js';
 export const LATE_GRACE_MINUTES = 5;
 export const MONTHLY_LATE_LIMIT = 3;
 
-const isPunchIn = (record) => PUNCH_IN_STATUSES.includes(record.status);
+export const isPunchIn = (record) => PUNCH_IN_STATUSES.includes(record.status);
 
 /** "Late" from the 6th minute after the person's expected time, else "Checked In". */
-const punchInStatus = (person, minutes) => {
+export const punchInStatus = (person, minutes) => {
   const expected = clockToMinutes(person.expectedInTime) ?? clockToMinutes('09:30');
   return minutes > expected + LATE_GRACE_MINUTES ? 'Late' : 'Checked In';
 };
@@ -43,7 +44,7 @@ const punchInStatus = (person, minutes) => {
  * Minutes since midnight of a record: from `at` when present, else from the old text time
  * ("09:41 AM" or "19:09"), else from when the record was saved.
  */
-const recordMinutes = (record) => {
+export const recordMinutes = (record) => {
   if (record.at) return indiaMinutes(new Date(record.at));
   const fromText = textTimeToMinutes(record.time);
   if (fromText !== null) return fromText;
@@ -274,7 +275,7 @@ async function daysPresent(people, month, upTo) {
 }
 
 /** Status of one person on one day, from that day's records. */
-function dayStatus(records, pendingLeave) {
+export function dayStatus(records, pendingLeave) {
   if (records.some((record) => record.status === 'Leave')) return 'Leave';
   if (records.some((record) => record.status === 'Late')) return 'Late';
   if (records.some((record) => record.status === 'Checked In' || record.status === 'Checked Out'))
@@ -383,7 +384,11 @@ export async function getDailySheet(actor, date = indiaDay()) {
   };
 }
 
-/** One person's month as a calendar, with totals. */
+/**
+ * One person's month as a calendar, with totals. People who may correct punch times (never
+ * their own) also get `canEdit` and the month's edits (newest first), so they see how often the
+ * month was edited before they change it again.
+ */
 export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0, 7)) {
   const person = await User.findById(
     userId,
@@ -428,10 +433,22 @@ export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0
     }),
   );
   const count = (status) => days.filter((day) => day.status === status).length;
+  const canEdit =
+    Boolean(can(actor, 'attendance.edit')) && String(person._id) !== String(actor._id);
+  const edits = canEdit
+    ? await AttendanceEdit.find(
+        { employeeId: person.employeeId, month },
+        'date before after reason editedByName createdAt',
+      )
+        .sort({ createdAt: -1 })
+        .lean()
+    : [];
   return {
     user: person,
     month,
     days,
+    canEdit,
+    edits,
     totals: {
       present: count('Present') + count('Late'),
       late: count('Late'),

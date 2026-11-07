@@ -186,6 +186,14 @@ export const listAttendanceQuery = z.object({
 });
 
 export const dayQuery = z.object({ date: day.optional() });
+
+// HR or the CEO corrects the punch times of one day (an empty punch-out removes it).
+export const editAttendanceBody = z.strictObject({
+  date: day,
+  punchInTime: clock,
+  punchOutTime: z.union([clock, z.literal('')]).default(''),
+  reason: text(300).min(3, 'write the reason (at least 3 letters)'),
+});
 export const monthQuery = z.object({ month: month.optional() });
 
 export const leaveBody = z

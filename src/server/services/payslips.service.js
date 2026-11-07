@@ -403,6 +403,28 @@ export async function listPayslips(actor, query) {
  * paid leave balance), then only the slip's attendance numbers and loss of pay are worked out
  * again; earnings typed by hand stay as they are.
  */
+/**
+ * The attendance part of a draft slip again, from the records (as "Fill again" would do it):
+ * days, loss of pay and totals. Earnings and other deductions typed by hand stay. No permission
+ * check: callers have checked access to the slip or the employee. A final slip is never touched.
+ */
+export async function refreshSlipAttendance(actor, slip, user) {
+  const fresh = await prefill(user, slip.month);
+  const set = {
+    attendance: fresh.attendance,
+    'deductions.lossOfPay': fresh.deductions.lossOfPay,
+    calculation: {
+      ...fresh.calculation,
+      reimbursementRequestIds: slip.calculation?.reimbursementRequestIds ?? [],
+    },
+    lastEditedBy: actor._id,
+    lastEditedAt: new Date(),
+  };
+  const deductions = { ...slip.deductions, lossOfPay: fresh.deductions.lossOfPay };
+  Object.assign(set, withTotals({ earnings: slip.earnings, deductions }));
+  await Payslip.updateOne({ _id: slip._id, status: 'draft' }, { $set: set });
+}
+
 export async function markAbsentAsLeave(
   actor,
   id,
@@ -436,22 +458,7 @@ export async function markAbsentAsLeave(
   ).toObject();
   await writeLeaveDays(leave, actor);
   if (paid && useBalance) await takeFromBalance(actor, leave, slip.month);
-
-  // The slip's attendance part again, from the records (as "Fill again" would do it).
-  const fresh = await prefill(user, slip.month);
-  const set = {
-    attendance: fresh.attendance,
-    'deductions.lossOfPay': fresh.deductions.lossOfPay,
-    calculation: {
-      ...fresh.calculation,
-      reimbursementRequestIds: slip.calculation?.reimbursementRequestIds ?? [],
-    },
-    lastEditedBy: actor._id,
-    lastEditedAt: new Date(),
-  };
-  const deductions = { ...slip.deductions, lossOfPay: fresh.deductions.lossOfPay };
-  Object.assign(set, withTotals({ earnings: slip.earnings, deductions }));
-  await Payslip.updateOne({ _id: id, status: 'draft' }, { $set: set });
+  await refreshSlipAttendance(actor, slip, user);
   await recordAudit(actor, {
     action: 'payslip.absent_marked_leave',
     entity: 'payslip',

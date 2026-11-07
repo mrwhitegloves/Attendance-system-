@@ -9,6 +9,7 @@ import { Role } from '../models/role.model.js';
 export const PERMISSIONS = {
   'attendance.punch': 'Mark own attendance',
   'attendance.view': 'See attendance',
+  'attendance.edit': 'Correct punch times with a reason (never your own)',
   'leave.request': 'Request leave',
   'leave.view': 'See leave requests',
   'leave.decide': 'Approve or reject leave',
