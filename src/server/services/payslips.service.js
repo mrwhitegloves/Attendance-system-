@@ -15,12 +15,13 @@ import { buildMonthDays } from './attendance.service.js';
 import { leaveBalanceOf, takeFromBalance } from './leaveRules.service.js';
 import { writeLeaveDays } from './leaves.service.js';
 import { LeaveRequest } from '../models/leaveRequest.model.js';
-import { calculateMonth } from '../lib/payslipRules.js';
+import { attendanceEarnings, calculateMonth } from '../lib/payslipRules.js';
 import { getCompany } from './settings.service.js';
 import { notifyUsers } from './push.service.js';
 import { brandKeyOf } from '../../config/brands.js';
 import { EmployeeRequest } from '../models/request.model.js';
 import { monthCondition } from '../lib/dateFilter.js';
+import { moveToTrash } from './trash.service.js';
 
 // Salary slips. Rules:
 // - one slip per employee and month; it starts as a draft filled from the employee file, KYC,
@@ -29,7 +30,8 @@ import { monthCondition } from '../lib/dateFilter.js';
 // - a final slip is locked; the person who last changed it cannot make it final (maker-checker);
 // - re-opening a final slip needs a reason and is audited;
 // - employees see only their own final slips.
-// Attendance numbers and loss of pay follow the founder's rules in lib/payslipRules.js.
+// Attendance numbers and the earnings they decide (Basic … by paid days, Paid Leave, HD
+// Allowance) follow the founder's rules in lib/payslipRules.js.
 
 const sum = (values, lines) => lines.reduce((total, line) => total + (values?.[line.key] ?? 0), 0);
 
@@ -87,19 +89,20 @@ async function prefill(user, month, now = new Date()) {
     Object.fromEntries(
       lines.map((line) => [line.key, line.fixed ? (structure?.components?.[line.key] ?? 0) : 0]),
     );
-  const earnings = fixed(EARNINGS);
-  earnings.reimbursement = claims.reduce(
-    (total, claim) => total + (claim.approvedAmountPaise ?? claim.amountPaise ?? 0),
-    0,
-  );
+  const monthly = fixed(EARNINGS.filter((line) => line.fixed));
   const calculation = calculateMonth({
     days,
     monthlyGrossPaise: sum(
-      earnings,
+      monthly,
       EARNINGS.filter((line) => line.fixed),
     ),
     calendarDays: Number(last.slice(8)),
   });
+  const earnings = { ...fixed(EARNINGS), ...attendanceEarnings(monthly, calculation) };
+  earnings.reimbursement = claims.reduce(
+    (total, claim) => total + (claim.approvedAmountPaise ?? claim.amountPaise ?? 0),
+    0,
+  );
   return {
     employee: {
       name: user.name,
@@ -115,15 +118,17 @@ async function prefill(user, month, now = new Date()) {
       accountLast4: kyc?.bank?.accountLast4 ?? '',
     },
     attendance: {
-      totalWorkingDays: calculation.workingDays,
+      totalWorkingDays: calculation.slipWorkingDays,
       fullDays: calculation.fullDays,
       halfDays: calculation.halfDays,
-      leavesTaken: calculation.paidLeaveDays + calculation.unpaidLeaveDays,
+      leavesTaken: calculation.leavesTaken,
       // Paid leave balance at the end of the month (never shown below zero on the slip).
       balanceLeaves: Math.max(0, balance),
+      unpaidDays: calculation.lossOfPayDays,
     },
     earnings,
-    deductions: { ...fixed(DEDUCTIONS), lossOfPay: calculation.lossOfPayPaise },
+    // Unpaid days are already left out of the earnings: no loss of pay is subtracted.
+    deductions: { ...fixed(DEDUCTIONS), lossOfPay: 0 },
     calculation: { ...calculation, reimbursementRequestIds: claims.map((claim) => claim._id) },
     salaryStructureId: structure?._id ?? null,
     salaryVersion: structure?.version ?? null,
@@ -335,6 +340,30 @@ export async function finalisePayslip(actor, id, { ip } = {}) {
   return getPayslip(actor, id);
 }
 
+/**
+ * Deletes a draft slip (founder, 2026-11-10). It goes to Recently deleted for 90 days and can be
+ * restored from there. A final slip must be re-opened first; a paid one can never be deleted.
+ */
+export async function deletePayslip(actor, id, { ip } = {}) {
+  requirePermission(actor, 'payslips.manage');
+  const slip = await loadSlip(actor, id);
+  if (slip.status !== 'draft') {
+    throw createAppError(409, 'This slip is final. Re-open it first to delete it.');
+  }
+  await moveToTrash(
+    actor,
+    {
+      kind: 'payslip',
+      label: `${slip.employee.name} (${slip.employeeId}), ${slip.month}`,
+      detail: `Net ${amountInWords(slip.totals?.net ?? 0)}`,
+      entityId: slip._id,
+      parts: [{ model: Payslip, filter: { _id: slip._id, status: 'draft' } }],
+    },
+    { ip },
+  );
+  return { ok: true };
+}
+
 export async function reopenPayslip(actor, id, { reason }, { ip } = {}) {
   requirePermission(actor, 'payslips.finalise');
   const slip = await loadSlip(actor, id);
@@ -397,21 +426,25 @@ export async function listPayslips(actor, query) {
 }
 
 /**
- * An absent day of a draft slip's month was really leave (founder, 2026-11-05): HR marks it on
- * the slip screen, paid or unpaid. It is recorded like an approved leave (a leave request
- * approved by HR, the day's "Leave" attendance row, and for paid leave optionally a day off the
- * paid leave balance), then only the slip's attendance numbers and loss of pay are worked out
- * again; earnings typed by hand stay as they are.
- */
-/**
  * The attendance part of a draft slip again, from the records (as "Fill again" would do it):
- * days, loss of pay and totals. Earnings and other deductions typed by hand stay. No permission
- * check: callers have checked access to the slip or the employee. A final slip is never touched.
+ * days, the earnings the attendance decides (fixed lines by paid days, Paid Leave, HD Allowance)
+ * and totals. Other earnings and deductions typed by hand (incentive, advance …) stay. No
+ * permission check: callers have checked access to the slip or the employee. A final slip is
+ * never touched.
  */
 export async function refreshSlipAttendance(actor, slip, user) {
   const fresh = await prefill(user, slip.month);
+  const decided = Object.fromEntries(
+    EARNINGS.filter((line) => line.fixed || line.fromAttendance).map((line) => [
+      line.key,
+      fresh.earnings[line.key] ?? 0,
+    ]),
+  );
   const set = {
     attendance: fresh.attendance,
+    ...Object.fromEntries(
+      Object.entries(decided).map(([key, value]) => [`earnings.${key}`, value]),
+    ),
     'deductions.lossOfPay': fresh.deductions.lossOfPay,
     calculation: {
       ...fresh.calculation,
@@ -420,11 +453,19 @@ export async function refreshSlipAttendance(actor, slip, user) {
     lastEditedBy: actor._id,
     lastEditedAt: new Date(),
   };
+  const earnings = { ...slip.earnings, ...decided };
   const deductions = { ...slip.deductions, lossOfPay: fresh.deductions.lossOfPay };
-  Object.assign(set, withTotals({ earnings: slip.earnings, deductions }));
+  Object.assign(set, withTotals({ earnings, deductions }));
   await Payslip.updateOne({ _id: slip._id, status: 'draft' }, { $set: set });
 }
 
+/**
+ * An absent day of a draft slip's month was really leave (founder, 2026-11-05): HR marks it on
+ * the slip screen, paid or unpaid. It is recorded like an approved leave (a leave request
+ * approved by HR, the day's "Leave" attendance row, and for paid leave optionally a day off the
+ * paid leave balance), then the slip's attendance part is worked out again
+ * (refreshSlipAttendance); other earnings typed by hand stay as they are.
+ */
 export async function markAbsentAsLeave(
   actor,
   id,

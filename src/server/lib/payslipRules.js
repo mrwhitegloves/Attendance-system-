@@ -1,15 +1,23 @@
-// The founder's rules for a month's salary from attendance (2026-10-27). Pure functions.
+// The founder's rules for a month's salary from attendance (2026-10-27, earnings by paid days
+// 2026-11-10). Pure functions.
 //
-// - Working days: every day of the month except the employee's weekly offs (one or two days).
+// - Days before the joining date do not count at all: "Not joined yet" (no absence, no holiday,
+//   no weekly off, no pay).
 // - A punch-in more than 5 minutes after the expected time (from minute 6) is a half day;
 //   an earlier punch-in is a full day.
-// - The first 3 half days of a month are free; each further half day costs half a day's salary.
-// - Paid leave, holidays and comp-off days (a day off for a weekly off worked) cost nothing;
-//   unpaid leave costs a full day's salary.
-// - A working day with no punch and no leave is an absence and costs a full day's salary.
-// - One day's salary = monthly gross ÷ calendar days of the month (30 days: 27,000 → 900;
-//   31 days: 27,000 → 870.97).
-// - Days after today are not counted yet.
+// - One day's salary = monthly gross ÷ calendar days of the month (31 days: 22,000 → 709.68).
+// - The salary is earned by paid days, line by line:
+//   · each fixed earning (Basic …) is paid for full days, weekly offs, paid holidays, comp-off
+//     days and half a day for every half day (its share of the month: value × days ÷ month);
+//   · "Paid Leave" = one day's salary × paid leave days;
+//   · "HD Allowance" = half a day's salary for each of the first 3 half days of the month, so
+//     those are paid in full; a further half day is paid only half;
+//   · unpaid leave and absence earn nothing.
+// - Loss of pay is no longer subtracted: the unpaid days are already left out of the earnings.
+//   Their number and amount are shown for information only ("Unpaid days").
+// - Days after today are not counted yet (paid like a full day until they happen).
+// - On the slip: Total working days = full days + half days; Leaves taken = weekly offs +
+//   holidays + comp-off days + paid leave + unpaid leave.
 
 export const FREE_HALF_DAYS = 3;
 
@@ -25,41 +33,84 @@ export const DAY_COUNTS = {
   compOff: 'Comp-off (paid, for a weekly off worked)',
   weeklyOff: 'Weekly off',
   weeklyOffWorked: 'Weekly off worked',
+  notJoined: 'Not joined yet',
   future: 'Not yet',
 };
 
 /**
  * @param {{ days: { countedAs: string }[], monthlyGrossPaise: number, calendarDays: number }} input
- * @returns the attendance numbers for the slip and the loss of pay in paise
+ * @returns the attendance numbers for the slip, the paid days and the unpaid days (paise)
  */
 export function calculateMonth({ days, monthlyGrossPaise, calendarDays }) {
   const count = (kind) => days.filter((day) => day.countedAs === kind).length;
-  const workingDays = days.filter(
-    (day) => !['weeklyOff', 'weeklyOffWorked'].includes(day.countedAs),
-  ).length;
+  const notJoinedDays = count('notJoined');
+  const weeklyOffs = count('weeklyOff');
+  const weeklyOffsWorked = count('weeklyOffWorked');
+  const workingDays = days.length - notJoinedDays - weeklyOffs - weeklyOffsWorked;
+  const fullDays = count('full');
   const halfDays = count('half');
-  const chargedHalfDays = Math.max(0, halfDays - FREE_HALF_DAYS);
+  const freeHalfDays = Math.min(halfDays, FREE_HALF_DAYS);
+  const chargedHalfDays = halfDays - freeHalfDays;
+  const paidLeaveDays = count('paidLeave') + count('unmarkedLeave');
   const unpaidLeaveDays = count('unpaidLeave');
   const absentDays = count('absent');
+  const holidayDays = count('holiday');
+  const compOffDays = count('compOff');
+  const notYetDays = count('future');
   const lossOfPayDays = unpaidLeaveDays + absentDays + chargedHalfDays / 2;
+  // Days paid through the fixed earnings (Basic …).
+  const earnedDays =
+    fullDays +
+    weeklyOffs +
+    weeklyOffsWorked +
+    holidayDays +
+    compOffDays +
+    notYetDays +
+    halfDays / 2;
   const perDayPaise = calendarDays ? monthlyGrossPaise / calendarDays : 0;
   return {
     workingDays,
-    fullDays: count('full'),
+    notJoinedDays,
+    fullDays,
     halfDays,
-    freeHalfDays: Math.min(halfDays, FREE_HALF_DAYS),
+    freeHalfDays,
     chargedHalfDays,
-    paidLeaveDays: count('paidLeave') + count('unmarkedLeave'),
+    paidLeaveDays,
     unmarkedLeaveDays: count('unmarkedLeave'),
-    holidayDays: count('holiday'),
-    compOffDays: count('compOff'),
-    weeklyOffsWorked: count('weeklyOffWorked'),
+    holidayDays,
+    compOffDays,
+    weeklyOffs,
+    weeklyOffsWorked,
     unpaidLeaveDays,
     absentDays,
-    notYetDays: count('future'),
+    notYetDays,
+    earnedDays,
+    calendarDays,
+    // On the slip.
+    slipWorkingDays: fullDays + halfDays,
+    leavesTaken: weeklyOffs + holidayDays + compOffDays + paidLeaveDays + unpaidLeaveDays,
+    // For information: these days are not paid (already left out of the earnings).
     lossOfPayDays,
+    lossOfPayPaise: Math.round(perDayPaise * lossOfPayDays),
     perDayPaise: Math.round(perDayPaise),
     monthlyGrossPaise,
-    lossOfPayPaise: Math.round(perDayPaise * lossOfPayDays),
+    paidLeavePaise: Math.round(perDayPaise * paidLeaveDays),
+    hdAllowancePaise: Math.round((perDayPaise / 2) * freeHalfDays),
+  };
+}
+
+/**
+ * The earnings the attendance decides: each fixed line for its share of the earned days, the
+ * paid leave and the HD allowance. `fixedEarnings`: the monthly amounts of the salary structure.
+ */
+export function attendanceEarnings(fixedEarnings, calculation) {
+  const { earnedDays, calendarDays } = calculation;
+  const share = (value) => (calendarDays ? Math.round((value * earnedDays) / calendarDays) : 0);
+  return {
+    ...Object.fromEntries(
+      Object.entries(fixedEarnings).map(([key, value]) => [key, share(value ?? 0)]),
+    ),
+    paidLeave: calculation.paidLeavePaise,
+    hdAllowance: calculation.hdAllowancePaise,
   };
 }

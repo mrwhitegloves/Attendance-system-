@@ -25,6 +25,7 @@ const COUNTED = {
   // Slips filled before weekly offs existed.
   sunday: { label: 'Sunday', tone: 'neutral' },
   sundayWorked: { label: 'Sunday worked', tone: 'brand' },
+  notJoined: { label: 'Not joined yet', tone: 'neutral' },
   future: { label: 'Not yet', tone: 'neutral' },
 };
 
@@ -48,7 +49,7 @@ function readOpen() {
 
 /**
  * An absent day that was really leave (founder, 2026-11-05): paid or unpaid, optionally taken
- * from the paid leave balance. Saved as an approved leave; the slip's days and pay cut follow.
+ * from the paid leave balance. Saved as an approved leave; the slip's days and earnings follow.
  */
 function MarkLeaveDialog({ slipId, day, balance, onClose }) {
   const router = useRouter();
@@ -93,13 +94,14 @@ function MarkLeaveDialog({ slipId, day, balance, onClose }) {
       <div className="space-y-4 text-sm">
         <p className="text-muted">
           This day counts as absent because there is no punch and no leave. If the employee was on
-          leave, mark it here: it is saved as an approved leave, and the slip&rsquo;s days and pay
-          cut are worked out again. Earnings you typed stay as they are.
+          leave, mark it here: it is saved as an approved leave, and the slip&rsquo;s days, Basic,
+          Paid Leave and HD Allowance are worked out again. Incentive, advance and other amounts you
+          typed stay as they are.
         </p>
         <fieldset className="grid gap-2 sm:grid-cols-2">
           {[
-            [true, 'Paid leave', 'No salary is cut for this day.'],
-            [false, 'Unpaid leave', 'One day of salary is cut, like an absence.'],
+            [true, 'Paid leave', 'Paid under "Paid Leave" (one day of salary).'],
+            [false, 'Unpaid leave', 'Not paid, like an absence.'],
           ].map(([value, label, hint]) => (
             <label
               key={label}
@@ -179,26 +181,30 @@ export function MonthAttendance({
   };
   const { days, calculation } = data;
   const differs =
-    slipAttendance.totalWorkingDays !== calculation.workingDays ||
+    slipAttendance.totalWorkingDays !== (calculation.slipWorkingDays ?? calculation.workingDays) ||
     slipAttendance.fullDays !== calculation.fullDays ||
     slipAttendance.halfDays !== calculation.halfDays;
 
   const facts = [
-    ['Working days (no weekly offs)', calculation.workingDays],
+    ['Working days (full + half)', calculation.slipWorkingDays ?? calculation.workingDays],
     ['Full days', calculation.fullDays],
     [
-      `Half days (first 3 free)`,
-      `${calculation.halfDays} (${calculation.chargedHalfDays} charged)`,
+      `Half days (first 3 paid in full)`,
+      `${calculation.halfDays} (${calculation.chargedHalfDays} paid half)`,
     ],
-    ['Paid leave', calculation.paidLeaveDays],
+    ['Weekly offs (paid)', (calculation.weeklyOffs ?? 0) + (calculation.weeklyOffsWorked ?? 0)],
     ['Holidays (paid)', calculation.holidayDays ?? 0],
     ['Comp-off days (paid)', calculation.compOffDays ?? 0],
-    ['Weekly offs worked', calculation.weeklyOffsWorked ?? calculation.sundaysWorked ?? 0],
+    ['Paid leave', calculation.paidLeaveDays],
     ['Unpaid leave', calculation.unpaidLeaveDays],
     ['Absent', calculation.absentDays],
+    ['Not joined yet', calculation.notJoinedDays ?? 0],
     ['One day of salary', formatRupees(calculation.perDayPaise)],
-    ['Days of pay cut', calculation.lossOfPayDays],
-    ['Loss of pay', formatRupees(calculation.lossOfPayPaise)],
+    ['Days paid in Basic', calculation.earnedDays ?? '—'],
+    ['Paid Leave amount', formatRupees(calculation.paidLeavePaise ?? 0)],
+    ['HD Allowance', formatRupees(calculation.hdAllowancePaise ?? 0)],
+    ['Unpaid days (not paid)', calculation.lossOfPayDays],
+    ['Unpaid amount (left out)', formatRupees(calculation.lossOfPayPaise)],
   ];
 
   return (
@@ -248,7 +254,9 @@ export function MonthAttendance({
                     <tr
                       key={day.date}
                       className={
-                        ['weeklyOff', 'sunday'].includes(day.countedAs) ? 'bg-raised/60' : ''
+                        ['weeklyOff', 'sunday', 'notJoined'].includes(day.countedAs)
+                          ? 'bg-raised/60'
+                          : ''
                       }
                     >
                       <td className="whitespace-nowrap px-4 py-2">{formatDayName(day.date)}</td>

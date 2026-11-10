@@ -27,6 +27,7 @@ const CELL_TONE = {
   'Leave pending': 'bg-warning/5 text-warning',
   Absent: 'bg-danger/10 text-danger',
   'No punch': 'text-muted',
+  'Not joined': 'bg-raised text-muted',
 };
 
 /** "09:52 AM" or "19:09" → "09:52" / "19:09" for a time input; '' when unreadable. */

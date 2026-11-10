@@ -107,7 +107,8 @@ describe('editing the punch times of a day', () => {
     // The draft slip: one absent day less, one day less of pay cut.
     const after = await Payslip.findById(slip._id).lean();
     expect(after.calculation.absentDays).toBe(before.calculation.absentDays - 1);
-    expect(after.deductions.lossOfPay).toBeLessThan(before.deductions.lossOfPay);
+    expect(after.earnings.basic).toBeGreaterThan(before.earnings.basic);
+    expect(after.totals.net).toBeGreaterThan(before.totals.net);
     expect(after.totals.net).toBe(after.totals.earnings - after.totals.deductions);
 
     expect(await AuditLog.exists({ action: 'attendance.edited' })).toBeTruthy();
