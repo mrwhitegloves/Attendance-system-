@@ -77,6 +77,9 @@ export function PayslipEditor({ slip }) {
     lines.reduce((sum, line) => sum + (Number(form[group][line.key]) || 0), 0);
   const earnings = total('earnings', EARNINGS);
   const deductions = total('deductions', DEDUCTIONS);
+  // Loss of Pay is shown, not subtracted, on slips filled by the paid-days rules.
+  const notCut = slip.calculation?.lossOfPayShownOnly ? Number(form.deductions.lossOfPay) || 0 : 0;
+  const net = earnings - deductions + notCut;
   const dirty = Object.keys(changes(form, initial)).length > 0;
 
   const run = async (action, after) => {
@@ -295,10 +298,10 @@ export function PayslipEditor({ slip }) {
               <dd className="tabular-nums">{formatRupees(deductions * 100)}</dd>
             </div>
             <div
-              className={`flex justify-between border-t border-border pt-2 text-base font-semibold ${earnings - deductions < 0 ? 'text-danger' : ''}`}
+              className={`flex justify-between border-t border-border pt-2 text-base font-semibold ${net < 0 ? 'text-danger' : ''}`}
             >
               <dt>Net payable</dt>
-              <dd className="tabular-nums">{formatRupees((earnings - deductions) * 100)}</dd>
+              <dd className="tabular-nums">{formatRupees(net * 100)}</dd>
             </div>
             {!dirty && <p className="text-xs italic text-muted">{slip.netInWords}</p>}
             {dirty && <p className="text-xs text-warning">Not saved yet.</p>}

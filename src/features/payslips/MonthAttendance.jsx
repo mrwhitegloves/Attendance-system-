@@ -202,7 +202,7 @@ export function MonthAttendance({
     ['One day of salary', formatRupees(calculation.perDayPaise)],
     ['Paid Leave amount', formatRupees(calculation.paidLeavePaise ?? 0)],
     ['HD Allowance', formatRupees(calculation.hdAllowancePaise ?? 0)],
-    ['Loss of Pay (half days after 3)', formatRupees(calculation.halfDayCutPaise ?? 0)],
+    ['Loss of Pay (shown, not cut again)', formatRupees(calculation.lossOfPayPaise ?? 0)],
   ];
 
   return (

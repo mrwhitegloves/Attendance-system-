@@ -283,6 +283,12 @@ export function PayslipDocument({ slip, company, brand, logoSrc, stampSrc }) {
               count={count}
             />
           </View>
+          {slip.calculation?.lossOfPayShownOnly && slip.deductions?.lossOfPay > 0 && (
+            <Text style={{ fontSize: 7, color: '#6B7280', marginTop: -4, marginBottom: 8 }}>
+              Loss of Pay shows the days not paid; they are already left out of the earnings, so it
+              is not subtracted again.
+            </Text>
+          )}
 
           <View style={s.net}>
             <View>

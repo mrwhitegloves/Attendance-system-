@@ -19,7 +19,7 @@ const days = (counts) =>
   );
 
 describe('earnings by paid days (founder, 2026-11-10)', () => {
-  it('the agreed example: ₹31,000, 31 days → Basic ₹27,000, Paid Leave ₹1,000, HD ₹2,000, LoP ₹500', () => {
+  it('₹31,000, 31 days → Basic ₹25,500, HD ₹3,000, Paid Leave ₹1,000; Loss of Pay ₹1,500', () => {
     const calculation = calculateMonth({
       days: days({ full: 20, weeklyOff: 4, holiday: 1, half: 4, paidLeave: 1, absent: 1 }),
       monthlyGrossPaise: paise(31000),
@@ -29,22 +29,23 @@ describe('earnings by paid days (founder, 2026-11-10)', () => {
       perDayPaise: paise(1000),
       slipWorkingDays: 24, // full + half
       leavesTaken: 6, // 4 weekly offs + 1 holiday + 1 paid leave
-      earnedDays: 27, // 20 + 4 + 1 + 4 × ½
+      earnedDays: 25.5, // 20 + 4 + 1 + ½ for the 4th half day
       paidLeavePaise: paise(1000),
-      hdAllowancePaise: paise(2000), // the other half of all 4 half days
-      halfDayCutPaise: paise(500), // Loss of Pay: half a day for the 4th half day
+      hdAllowancePaise: paise(3000), // the first 3 half days, a full day each
       lossOfPayDays: 1.5, // the absent day + the 4th half day's unpaid half
       lossOfPayPaise: paise(1500),
     });
     const earnings = attendanceEarnings({ basic: paise(31000) }, calculation);
     expect(earnings).toEqual({
-      basic: paise(27000),
+      basic: paise(25500),
       paidLeave: paise(1000),
-      hdAllowance: paise(2000),
+      hdAllowance: paise(3000),
     });
     // ₹29,500 = ₹31,000 less the absent day and half of the 4th half day.
     const total = earnings.basic + earnings.paidLeave + earnings.hdAllowance;
-    expect(total - calculation.halfDayCutPaise).toBe(paise(29500));
+    expect(total).toBe(paise(29500));
+    // Earnings + loss of pay = the monthly salary.
+    expect(total + calculation.lossOfPayPaise).toBe(paise(31000));
   });
 
   it('every fixed earning is paid for its share of the paid days', () => {
@@ -72,7 +73,7 @@ describe('earnings by paid days (founder, 2026-11-10)', () => {
       absentDays: 0,
       slipWorkingDays: 14,
       leavesTaken: 4,
-      earnedDays: 16,
+      earnedDays: 14.5, // 10 + 3 + 1 + ½ for the 4th half day
     });
   });
 });
@@ -134,19 +135,24 @@ describe('a slip of the month the employee joined', () => {
       weeklyOffs: 2,
       absentDays: 13,
       perDayPaise: paise(1000),
-      earnedDays: 4.5, // 1 full + 2 Sundays + 1 holiday + ½
+      earnedDays: 4, // 1 full + 2 Sundays + 1 holiday (the half day is in HD Allowance)
     });
     expect(slip.attendance).toMatchObject({
       totalWorkingDays: 2,
       leavesTaken: 3, // 2 weekly offs + 1 holiday
     });
     expect(slip.earnings).toMatchObject({
-      basic: paise(4500),
-      hdAllowance: paise(500),
+      basic: paise(4000),
+      hdAllowance: paise(1000),
       paidLeave: 0,
     });
-    expect(slip.deductions.lossOfPay).toBe(0);
-    expect(slip.totals.net).toBe(paise(5000));
+    // 13 absent days: shown under Loss of Pay, not subtracted again.
+    expect(slip.deductions.lossOfPay).toBe(paise(13000));
+    expect(slip.totals).toEqual({
+      earnings: paise(5000),
+      deductions: paise(13000),
+      net: paise(5000),
+    });
 
     // The calendar shows the days before joining as "Not joined".
     const calendar = await getMonthCalendar(hr, staff._id, '2026-10');
@@ -181,7 +187,7 @@ describe('deleting a salary slip', () => {
 });
 
 describe('Loss of Pay: half days beyond the first 3 (founder, 2026-11-10)', () => {
-  it('12 half days: HD Allowance pays the other half of all 12, Loss of Pay cuts 9 halves', () => {
+  it('12 half days: HD pays the first 3 in full, Basic half of the other 9, LoP shows 9 halves', () => {
     // Like the October 2026 slip: ₹15,000, 31 days.
     const calculation = calculateMonth({
       days: days({ full: 12, half: 12, weeklyOff: 4, holiday: 2, paidLeave: 1 }),
@@ -189,11 +195,12 @@ describe('Loss of Pay: half days beyond the first 3 (founder, 2026-11-10)', () =
       calendarDays: 31,
     });
     const earnings = attendanceEarnings({ basic: paise(15000) }, calculation);
-    expect(earnings).toEqual({ basic: 1161290, paidLeave: 48387, hdAllowance: 290323 });
-    expect(calculation.halfDayCutPaise).toBe(217742);
-    const net = earnings.basic + earnings.paidLeave + earnings.hdAllowance - 217742;
-    // The same net as before: the 9 extra half days are paid half, the first 3 in full.
-    expect(net).toBe(1282258);
+    // Basic: (12 full + 4 Sundays + 2 holidays + 9 × ½) × ₹483.87; HD: 3 × ₹483.87.
+    expect(earnings).toEqual({ basic: 1088710, paidLeave: 48387, hdAllowance: 145161 });
+    expect(calculation.lossOfPayPaise).toBe(217742);
+    const total = earnings.basic + earnings.paidLeave + earnings.hdAllowance;
+    expect(total).toBe(1282258); // ₹12,822.58 = the net
+    expect(total + calculation.lossOfPayPaise).toBe(paise(15000));
   });
 
   it('3 half days or fewer: paid in full, nothing is cut', () => {
@@ -202,7 +209,7 @@ describe('Loss of Pay: half days beyond the first 3 (founder, 2026-11-10)', () =
       monthlyGrossPaise: paise(30000),
       calendarDays: 30,
     });
-    expect(calculation.halfDayCutPaise).toBe(0);
-    expect(calculation.hdAllowancePaise).toBe(paise(1500));
+    expect(calculation.lossOfPayPaise).toBe(0);
+    expect(calculation.hdAllowancePaise).toBe(paise(3000));
   });
 });

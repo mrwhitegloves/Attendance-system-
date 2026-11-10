@@ -89,15 +89,15 @@ describe('salary slips', () => {
       absentDays: 23,
       perDayPaise: paise(900),
       lossOfPayDays: 23,
-      earnedDays: 5.5,
+      earnedDays: 5,
     });
     expect(slip.earnings).toMatchObject({
-      basic: paise(4950),
+      basic: paise(4500),
       paidLeave: paise(900),
-      hdAllowance: paise(450),
+      hdAllowance: paise(900),
     });
-    // The 23 absent days are simply not paid; the one half day is free: nothing is cut.
-    expect(slip.deductions.lossOfPay).toBe(0);
+    // The 23 absent days are not paid: shown under Loss of Pay, not subtracted again.
+    expect(slip.deductions.lossOfPay).toBe(paise(23 * 900));
     expect(slip.totals.net).toBe(paise(27000 - 23 * 900));
     expect(slip.netInWords).toBe('Rupees Six Thousand Three Hundred Only');
     await expect(createPayslip(hr, staff._id, '2026-09')).rejects.toMatchObject({ code: 'exists' });

@@ -171,6 +171,12 @@ export default async function PrintPayslipPage({ params }) {
             {table('Earnings', earnings, slip.totals.earnings, 'bg-black')}
             {table('Deductions', deductions, slip.totals.deductions, 'bg-brand')}
           </div>
+          {slip.calculation?.lossOfPayShownOnly && slip.deductions?.lossOfPay > 0 && (
+            <p className="-mt-2 text-[9px] text-gray-500">
+              Loss of Pay shows the days not paid; they are already left out of the earnings, so it
+              is not subtracted again.
+            </p>
+          )}
 
           {/* Net pay */}
           <section className="flex items-center justify-between rounded-md border-l-4 border-l-brand bg-black px-5 py-4 text-white">
