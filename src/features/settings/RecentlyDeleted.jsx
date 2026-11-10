@@ -18,6 +18,7 @@ const PLACE = {
   kyc_link: () => '/kyc-links',
   holiday: () => '/settings/holidays',
   comp_off: (id) => `/employees/${id}/leave`,
+  payslip: (id) => `/payslips/${id}`,
 };
 
 const daysLeft = (expiresAt) =>

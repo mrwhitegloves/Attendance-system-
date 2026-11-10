@@ -19,6 +19,7 @@ export const TRASH_KINDS = {
   kyc_link: { label: 'KYC link', permission: 'users.manage' },
   holiday: { label: 'Holiday', permission: 'settings.manage' },
   comp_off: { label: 'Comp-off', permission: 'leave.decide' },
+  payslip: { label: 'Salary slip', permission: 'payslips.manage' },
 };
 
 const raw = (collection) => mongoose.connection.db.collection(collection);
@@ -115,6 +116,7 @@ const RESTORE_CHECKS = {
   // A KYC link or comp-off belongs to an employee: the employee must exist.
   kyc_link: (item) => needsEmployee(item, 'kyc_links'),
   comp_off: (item) => needsEmployee(item, 'comp_offs'),
+  payslip: (item) => needsEmployee(item, 'payslips'),
 };
 
 async function needsEmployee(item, collection) {

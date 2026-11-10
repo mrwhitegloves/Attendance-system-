@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Download, FileText, RefreshCcw, RotateCcw, Save } from 'lucide-react';
+import { Check, Download, FileText, RefreshCcw, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch.js';
 import { formatDateTime, formatMonth, formatRupees } from '@/lib/format.js';
 import { ATTENDANCE_SUMMARY, DEDUCTIONS, EARNINGS } from '@/config/payslipFields.js';
@@ -68,7 +68,7 @@ export function PayslipEditor({ slip }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [dialog, setDialog] = useState(null); // 'finalise' | 'prefill' | 'reopen'
+  const [dialog, setDialog] = useState(null); // 'finalise' | 'prefill' | 'reopen' | 'delete'
   const editable = slip.permissions.edit;
 
   const set = (group, key) => (event) =>
@@ -107,6 +107,19 @@ export function PayslipEditor({ slip }) {
     );
   const action = (name, body) =>
     run(() => apiFetch(`/api/payslips/${slip._id}/${name}`, { method: 'POST', body }));
+  const remove = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch(`/api/payslips/${slip._id}`, { method: 'DELETE' });
+      router.push('/payslips');
+      router.refresh();
+    } catch (failure) {
+      setError(failure.message);
+      setDialog(null);
+      setBusy(false);
+    }
+  };
 
   const numberInput = (group, line, step = '1') => (
     <Field key={line.key} label={line.label} htmlFor={`${group}-${line.key}`}>
@@ -153,6 +166,9 @@ export function PayslipEditor({ slip }) {
                 </Button>
                 <Button onClick={save} disabled={busy || !dirty}>
                   <Save size={16} /> Save changes
+                </Button>
+                <Button variant="secondary" onClick={() => setDialog('delete')} disabled={busy}>
+                  <Trash2 size={16} /> Delete
                 </Button>
               </>
             )}
@@ -297,6 +313,16 @@ export function PayslipEditor({ slip }) {
         confirmLabel="Make final"
         busy={busy}
         onConfirm={() => action('finalise')}
+        onClose={() => setDialog(null)}
+      />
+      <ConfirmDialog
+        open={dialog === 'delete'}
+        title="Delete this salary slip?"
+        text="The slip goes to Recently deleted for 90 days and can be restored from there. A new slip for this month can then be made again."
+        confirmLabel="Delete"
+        danger
+        busy={busy}
+        onConfirm={remove}
         onClose={() => setDialog(null)}
       />
       <ConfirmDialog

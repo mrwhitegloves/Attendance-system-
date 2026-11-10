@@ -154,7 +154,7 @@ export default async function PrintPayslipPage({ params }) {
           </section>
 
           {/* Attendance */}
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-6 gap-2">
             {ATTENDANCE_SUMMARY.map((line) => (
               <div
                 key={line.key}

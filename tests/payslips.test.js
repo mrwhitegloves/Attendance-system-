@@ -75,21 +75,30 @@ describe('salary slips', () => {
       panLast4: '354P',
       accountLast4: '6261',
     });
-    // September 2026: 30 days, 4 Sundays (the default weekly off) → 26 working days. 1 full, 1 half (free), 1 leave
+    // September 2026: 30 days, 4 Sundays (the default weekly off). 1 full, 1 half (free), 1 leave
     // (not marked: counted as paid); the other 23 working days have no punch → absent.
+    // Earnings by paid days (founder, 2026-11-10): one day ₹900; Basic = (1 full + 4 weekly offs
+    // + ½ for the half day) × 900 = ₹4,950; Paid Leave ₹900; HD Allowance ½ × 900 = ₹450.
     expect(slip.attendance).toMatchObject({
-      totalWorkingDays: 26,
+      totalWorkingDays: 2, // full + half
       fullDays: 1,
       halfDays: 1,
-      leavesTaken: 1,
+      leavesTaken: 5, // 4 weekly offs + 1 paid leave
+      unpaidDays: 23,
     });
     expect(slip.calculation).toMatchObject({
       absentDays: 23,
       perDayPaise: paise(900),
       lossOfPayDays: 23,
+      earnedDays: 5.5,
     });
-    expect(slip.earnings.basic).toBe(paise(27000));
-    expect(slip.deductions.lossOfPay).toBe(paise(23 * 900));
+    expect(slip.earnings).toMatchObject({
+      basic: paise(4950),
+      paidLeave: paise(900),
+      hdAllowance: paise(450),
+    });
+    // The 23 absent days are simply not paid: nothing more is cut.
+    expect(slip.deductions.lossOfPay).toBe(0);
     expect(slip.totals.net).toBe(paise(27000 - 23 * 900));
     expect(slip.netInWords).toBe('Rupees Six Thousand Three Hundred Only');
     await expect(createPayslip(hr, staff._id, '2026-09')).rejects.toMatchObject({ code: 'exists' });
@@ -106,12 +115,13 @@ describe('salary slips', () => {
       deductions: { penalty: paise(500), lossOfPay: 0 },
     });
     expect(view.employee).toMatchObject({ designation: 'Senior Developer', pan: '******234F' });
+    // No punches: only the 4 Sundays are paid (4 × ₹900), plus the incentive.
     expect(view.totals).toEqual({
-      earnings: paise(29000),
+      earnings: paise(3600 + 2000),
       deductions: paise(500),
-      net: paise(28500),
+      net: paise(5100),
     });
-    expect(view.netInWords).toBe('Rupees Twenty-Eight Thousand Five Hundred Only');
+    expect(view.netInWords).toBe('Rupees Five Thousand One Hundred Only');
   });
 
   it('the last person who changed it cannot make it final; a final slip is locked', async () => {

@@ -392,7 +392,7 @@ export async function getDailySheet(actor, date = indiaDay()) {
 export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0, 7)) {
   const person = await User.findById(
     userId,
-    '_id name employeeId expectedInTime expectedOutTime weeklyOffs createdAt',
+    '_id name employeeId expectedInTime expectedOutTime weeklyOffs joiningDate createdAt',
   )
     .lean()
     .catch(() => null);
@@ -422,7 +422,12 @@ export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0
       return {
         date,
         future: date > today,
-        status: date > today ? null : dayStatus(own, pendingLeave),
+        status:
+          date > today
+            ? null
+            : beforeJoining(person, date) && !own.length
+              ? 'Not joined'
+              : dayStatus(own, pendingLeave),
         punchIn: firstIn ? await toView(firstIn) : null,
         punchOut: lastOut ? await toView(lastOut) : null,
         minutesWorked: hoursBetween(firstIn, lastOut),
@@ -461,8 +466,16 @@ export async function getMonthCalendar(actor, userId, month = indiaDay().slice(0
 
 // ---- One month, day by day, as the salary slip counts it ----
 
+/**
+ * True for a day before the person joined (founder, 2026-11-10: such days are neither absent nor
+ * holidays nor weekly offs). No joining date → every day counts.
+ */
+export const beforeJoining = (person, date) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(person?.joiningDate ?? '') && date < person.joiningDate;
+
 /** How a day counts for the salary slip (rules in lib/payslipRules.js). */
 function countDay(date, own, today, { holiday, compOff, person }) {
+  if (beforeJoining(person, date) && !own.length) return 'notJoined';
   if (date > today) return 'future';
   if (isWeeklyOff(person, date)) {
     return own.some(isPunchIn) ? 'weeklyOffWorked' : 'weeklyOff';
