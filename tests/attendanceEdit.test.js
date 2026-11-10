@@ -109,7 +109,10 @@ describe('editing the punch times of a day', () => {
     expect(after.calculation.absentDays).toBe(before.calculation.absentDays - 1);
     expect(after.earnings.basic).toBeGreaterThan(before.earnings.basic);
     expect(after.totals.net).toBeGreaterThan(before.totals.net);
-    expect(after.totals.net).toBe(after.totals.earnings - after.totals.deductions);
+    // Loss of Pay is shown, not subtracted again (founder, 2026-11-10).
+    expect(after.totals.net).toBe(
+      after.totals.earnings - after.totals.deductions + after.deductions.lossOfPay,
+    );
 
     expect(await AuditLog.exists({ action: 'attendance.edited' })).toBeTruthy();
   });

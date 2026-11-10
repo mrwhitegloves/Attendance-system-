@@ -8,13 +8,15 @@
 // - One day's salary = monthly gross ÷ calendar days of the month (31 days: 22,000 → 709.68).
 // - The salary is earned by paid days, line by line:
 //   · each fixed earning (Basic …) is paid for full days, weekly offs, paid holidays, comp-off
-//     days and half a day for every half day (its share of the month: value × days ÷ month);
+//     days and half a day for each half day beyond the first 3 (its share of the month:
+//     value × days ÷ month);
+//   · "HD Allowance" = one full day's salary for each of the first 3 half days;
 //   · "Paid Leave" = one day's salary × paid leave days;
-//   · "HD Allowance" = the other half of every half day (founder, 2026-11-10);
 //   · unpaid leave and absence earn nothing.
-// - "Loss of Pay" cuts half a day's salary for each half day beyond the first 3, so the first 3
-//   half days are paid in full and every further one only half. Absence and unpaid leave are
-//   not cut again: they are already left out of the earnings.
+// - "Loss of Pay" shows what was not paid: a full day for each absence and unpaid leave day,
+//   half a day for each half day beyond the first 3. It is shown, not subtracted again (the
+//   earnings already leave it out): total earnings + loss of pay = the monthly salary, and the
+//   net is the earnings less the other deductions (founder, 2026-11-10).
 // - Days after today are not counted yet (paid like a full day until they happen).
 // - On the slip: Total working days = full days + half days; Leaves taken = weekly offs +
 //   holidays + comp-off days + paid leave + unpaid leave.
@@ -66,7 +68,7 @@ export function calculateMonth({ days, monthlyGrossPaise, calendarDays }) {
     holidayDays +
     compOffDays +
     notYetDays +
-    halfDays / 2;
+    chargedHalfDays / 2;
   const perDayPaise = calendarDays ? monthlyGrossPaise / calendarDays : 0;
   return {
     workingDays,
@@ -89,15 +91,15 @@ export function calculateMonth({ days, monthlyGrossPaise, calendarDays }) {
     // On the slip.
     slipWorkingDays: fullDays + halfDays,
     leavesTaken: weeklyOffs + holidayDays + compOffDays + paidLeaveDays + unpaidLeaveDays,
-    // For information: the days not paid in all (absence, unpaid leave, the cut half days).
+    // "Loss of Pay": the days not paid (absence, unpaid leave, half of each extra half day).
     lossOfPayDays,
     lossOfPayPaise: Math.round(perDayPaise * lossOfPayDays),
+    // Shown on the slip, not subtracted from the net (the earnings already leave it out).
+    lossOfPayShownOnly: true,
     perDayPaise: Math.round(perDayPaise),
     monthlyGrossPaise,
     paidLeavePaise: Math.round(perDayPaise * paidLeaveDays),
-    hdAllowancePaise: Math.round((perDayPaise / 2) * halfDays),
-    // The "Loss of Pay" deduction: half a day for each half day beyond the free ones.
-    halfDayCutPaise: Math.round((perDayPaise / 2) * chargedHalfDays),
+    hdAllowancePaise: Math.round(perDayPaise * freeHalfDays),
   };
 }
 

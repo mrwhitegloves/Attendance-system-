@@ -76,10 +76,15 @@ describe('marking an absent day of a salary slip as leave', () => {
     expect(after.earnings.paidLeave).toBe(
       before.earnings.paidLeave + before.calculation.perDayPaise,
     );
-    expect(after.deductions.lossOfPay).toBe(0);
+    expect(after.deductions.lossOfPay).toBe(
+      before.deductions.lossOfPay - before.calculation.perDayPaise,
+    );
     expect(after.totals.net).toBe(before.totals.net + before.calculation.perDayPaise + paise(500));
     expect(after.earnings.incentive).toBe(paise(500));
-    expect(after.totals.net).toBe(after.totals.earnings - after.totals.deductions);
+    // Loss of Pay is shown, not subtracted again (founder, 2026-11-10).
+    expect(after.totals.net).toBe(
+      after.totals.earnings - after.totals.deductions + after.deductions.lossOfPay,
+    );
     expect(String(after.lastEditedBy)).toBe(String(hr._id));
 
     const leave = await LeaveRequest.findOne({ employeeId: staff.employeeId }).lean();

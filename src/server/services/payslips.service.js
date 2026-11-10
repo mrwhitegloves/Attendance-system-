@@ -35,13 +35,17 @@ import { moveToTrash } from './trash.service.js';
 
 const sum = (values, lines) => lines.reduce((total, line) => total + (values?.[line.key] ?? 0), 0);
 
+/**
+ * Totals and the amount in words. On a slip filled by the paid-days rules (2026-11-10) the
+ * "Loss of Pay" line is shown but not subtracted: the earnings already leave those days out, so
+ * total earnings + loss of pay = the monthly salary, and net = earnings − the other deductions.
+ */
 function withTotals(slip) {
   const earnings = sum(slip.earnings, EARNINGS);
   const deductions = sum(slip.deductions, DEDUCTIONS);
-  return {
-    totals: { earnings, deductions, net: earnings - deductions },
-    netInWords: amountInWords(earnings - deductions),
-  };
+  const notCut = slip.calculation?.lossOfPayShownOnly ? (slip.deductions?.lossOfPay ?? 0) : 0;
+  const net = earnings - deductions + notCut;
+  return { totals: { earnings, deductions, net }, netInWords: amountInWords(net) };
 }
 
 async function loadEmployee(actor, userId) {
@@ -126,8 +130,8 @@ async function prefill(user, month, now = new Date()) {
       balanceLeaves: Math.max(0, balance),
     },
     earnings,
-    // Half days beyond the free ones (absence is already left out of the earnings).
-    deductions: { ...fixed(DEDUCTIONS), lossOfPay: calculation.halfDayCutPaise },
+    // Shown, not subtracted (see withTotals).
+    deductions: { ...fixed(DEDUCTIONS), lossOfPay: calculation.lossOfPayPaise },
     calculation: { ...calculation, reimbursementRequestIds: claims.map((claim) => claim._id) },
     salaryStructureId: structure?._id ?? null,
     salaryVersion: structure?.version ?? null,
@@ -256,6 +260,7 @@ export async function updatePayslip(actor, id, input, { ip } = {}) {
   const merged = {
     earnings: { ...slip.earnings, ...(input.earnings ?? {}) },
     deductions: { ...slip.deductions, ...(input.deductions ?? {}) },
+    calculation: slip.calculation,
   };
   const { totals, netInWords } = withTotals(merged);
   Object.assign(set, { totals, netInWords, lastEditedBy: actor._id, lastEditedAt: new Date() });
@@ -454,7 +459,7 @@ export async function refreshSlipAttendance(actor, slip, user) {
   };
   const earnings = { ...slip.earnings, ...decided };
   const deductions = { ...slip.deductions, lossOfPay: fresh.deductions.lossOfPay };
-  Object.assign(set, withTotals({ earnings, deductions }));
+  Object.assign(set, withTotals({ earnings, deductions, calculation: set.calculation }));
   await Payslip.updateOne({ _id: slip._id, status: 'draft' }, { $set: set });
 }
 
