@@ -10,11 +10,11 @@
 //   · each fixed earning (Basic …) is paid for full days, weekly offs, paid holidays, comp-off
 //     days and half a day for every half day (its share of the month: value × days ÷ month);
 //   · "Paid Leave" = one day's salary × paid leave days;
-//   · "HD Allowance" = half a day's salary for each of the first 3 half days of the month, so
-//     those are paid in full; a further half day is paid only half;
+//   · "HD Allowance" = the other half of every half day (founder, 2026-11-10);
 //   · unpaid leave and absence earn nothing.
-// - Loss of pay is no longer subtracted: the unpaid days are already left out of the earnings.
-//   Their number and amount are shown for information only ("Unpaid days").
+// - "Loss of Pay" cuts half a day's salary for each half day beyond the first 3, so the first 3
+//   half days are paid in full and every further one only half. Absence and unpaid leave are
+//   not cut again: they are already left out of the earnings.
 // - Days after today are not counted yet (paid like a full day until they happen).
 // - On the slip: Total working days = full days + half days; Leaves taken = weekly offs +
 //   holidays + comp-off days + paid leave + unpaid leave.
@@ -89,13 +89,15 @@ export function calculateMonth({ days, monthlyGrossPaise, calendarDays }) {
     // On the slip.
     slipWorkingDays: fullDays + halfDays,
     leavesTaken: weeklyOffs + holidayDays + compOffDays + paidLeaveDays + unpaidLeaveDays,
-    // For information: these days are not paid (already left out of the earnings).
+    // For information: the days not paid in all (absence, unpaid leave, the cut half days).
     lossOfPayDays,
     lossOfPayPaise: Math.round(perDayPaise * lossOfPayDays),
     perDayPaise: Math.round(perDayPaise),
     monthlyGrossPaise,
     paidLeavePaise: Math.round(perDayPaise * paidLeaveDays),
-    hdAllowancePaise: Math.round((perDayPaise / 2) * freeHalfDays),
+    hdAllowancePaise: Math.round((perDayPaise / 2) * halfDays),
+    // The "Loss of Pay" deduction: half a day for each half day beyond the free ones.
+    halfDayCutPaise: Math.round((perDayPaise / 2) * chargedHalfDays),
   };
 }
 
