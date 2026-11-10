@@ -200,11 +200,9 @@ export function MonthAttendance({
     ['Absent', calculation.absentDays],
     ['Not joined yet', calculation.notJoinedDays ?? 0],
     ['One day of salary', formatRupees(calculation.perDayPaise)],
-    ['Days paid in Basic', calculation.earnedDays ?? '—'],
     ['Paid Leave amount', formatRupees(calculation.paidLeavePaise ?? 0)],
     ['HD Allowance', formatRupees(calculation.hdAllowancePaise ?? 0)],
-    ['Unpaid days (not paid)', calculation.lossOfPayDays],
-    ['Unpaid amount (left out)', formatRupees(calculation.lossOfPayPaise)],
+    ['Loss of Pay (half days after 3)', formatRupees(calculation.halfDayCutPaise ?? 0)],
   ];
 
   return (

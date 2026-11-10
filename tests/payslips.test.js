@@ -84,7 +84,6 @@ describe('salary slips', () => {
       fullDays: 1,
       halfDays: 1,
       leavesTaken: 5, // 4 weekly offs + 1 paid leave
-      unpaidDays: 23,
     });
     expect(slip.calculation).toMatchObject({
       absentDays: 23,
@@ -97,7 +96,7 @@ describe('salary slips', () => {
       paidLeave: paise(900),
       hdAllowance: paise(450),
     });
-    // The 23 absent days are simply not paid: nothing more is cut.
+    // The 23 absent days are simply not paid; the one half day is free: nothing is cut.
     expect(slip.deductions.lossOfPay).toBe(0);
     expect(slip.totals.net).toBe(paise(27000 - 23 * 900));
     expect(slip.netInWords).toBe('Rupees Six Thousand Three Hundred Only');

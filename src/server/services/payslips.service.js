@@ -124,11 +124,10 @@ async function prefill(user, month, now = new Date()) {
       leavesTaken: calculation.leavesTaken,
       // Paid leave balance at the end of the month (never shown below zero on the slip).
       balanceLeaves: Math.max(0, balance),
-      unpaidDays: calculation.lossOfPayDays,
     },
     earnings,
-    // Unpaid days are already left out of the earnings: no loss of pay is subtracted.
-    deductions: { ...fixed(DEDUCTIONS), lossOfPay: 0 },
+    // Half days beyond the free ones (absence is already left out of the earnings).
+    deductions: { ...fixed(DEDUCTIONS), lossOfPay: calculation.halfDayCutPaise },
     calculation: { ...calculation, reimbursementRequestIds: claims.map((claim) => claim._id) },
     salaryStructureId: structure?._id ?? null,
     salaryVersion: structure?.version ?? null,
